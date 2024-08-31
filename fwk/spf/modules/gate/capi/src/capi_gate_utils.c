@@ -18,7 +18,7 @@
 /*------------------------------------------------------------------------
  Function name: capi_gate_get_param
   1. If the control link is opened and connected
-*		a. If proc delay is received and deadline time is received from depack
+*       a. If proc delay is received and deadline time is received from depack
 *           First frame should be sent to encoder only if
 *           deadline is reached.
 *
@@ -36,7 +36,7 @@
 *
 *           Once deadline is serviced then, for every device interrupt,
 *           need to share whatever is left in  buffer to encoder.
-*		b.If they are not received wait and drop data till then
+*       b.If they are not received wait and drop data till then
 * 2. If open not set and not connected its a error scenario*
  * -----------------------------------------------------------------------*/
 
@@ -45,7 +45,7 @@ capi_err_t capi_gate_until_deadline_process(capi_gate_t *       me_ptr,
                                             capi_stream_data_t *output[])
 {
    capi_err_t result                    = CAPI_EOK;
-   uint32_t   time_to_reach_deadline_us = 0;
+   int32_t   time_to_reach_deadline_us = 0;
 
    if (CTRL_PORT_PEER_CONNECTED == me_ptr->in_ctrl_port_info.state)
    {
@@ -100,7 +100,9 @@ capi_err_t capi_gate_until_deadline_process(capi_gate_t *       me_ptr,
                 const_delay_us);
 
          /* deadline time in the past*/
-         while (calc_deadline_time_us > deadline_us)
+         /* moving the deadline time to the next frame only if the calc_deadline_time_us is more than 100us ahead of deadline_us
+            calc_deadline_time_us is based on the current time which also includes scheduling jitter. */
+         while (calc_deadline_time_us > (deadline_us + GATE_SCHEDULING_JITTER_US))
          {
             deadline_us += me_ptr->frame_interval_us;
             AR_MSG(DBG_HIGH_PRIO,
@@ -136,7 +138,7 @@ capi_err_t capi_gate_until_deadline_process(capi_gate_t *       me_ptr,
                AR_MSG(DBG_HIGH_PRIO,
                       "capi_gate: Process: out max data len: %d, input actual len %d, New deadline time msw:%lu "
                       "lsw:%lu, "
-                      "time_to_reach_deadline_us %lu",
+                      "time_to_reach_deadline_us %ld",
                       output[0]->buf_ptr[i].max_data_len,
                       input[0]->buf_ptr[i].actual_data_len,
                       (uint32_t)(me_ptr->deadline_time_us >> 32),
