@@ -329,7 +329,11 @@ ar_result_t spl_cntr_set_get_cfg_util(cu_base_t                         *base_pt
    gen_topo_module_t *module_ptr = (gen_topo_module_t *)mod_ptr;
 
    // Ensure module was found.
-   VERIFY(result, module_ptr && module_ptr->capi_ptr);
+   VERIFY(result, module_ptr);
+   if (module_ptr->capi_ptr == NULL)
+   {
+      return result = AR_EUNSUPPORTED;
+   }
 
    // fwk handling before calling set/get param.
 
