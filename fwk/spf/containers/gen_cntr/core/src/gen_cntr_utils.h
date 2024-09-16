@@ -280,6 +280,7 @@ ar_result_t gen_cntr_update_island_vote(gen_cntr_t *me_ptr, posal_pm_island_vote
 ar_result_t gen_cntr_check_and_vote_for_island_in_data_path_(gen_cntr_t *me_ptr);
 
 /** ------------------ **/
+uint32_t gen_cntr_assign_ext_in_buf_for_int_port(gen_topo_t *topo_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr);
 uint32_t gen_cntr_aggregate_ext_in_port_delay_topo_cb(gen_topo_t *topo_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr);
 uint32_t gen_cntr_aggregate_ext_out_port_delay_topo_cb(gen_topo_t *topo_ptr, gu_ext_out_port_t *gu_ext_out_port_ptr);
 uint32_t gen_cntr_get_additional_ext_in_port_delay_cu_cb(cu_base_t *base_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr);

@@ -43,6 +43,7 @@ const gen_cntr_ext_in_vtable_t peer_cntr_ext_in_vtable = {
    .process_pending_data_cmd = gen_cntr_process_pending_data_cmd_peer_cntr,
    .free_input_buf           = gen_cntr_free_input_data_cmd_peer_cntr,
    .frame_len_change_notif   = NULL,
+   .setup_topo_buf            = NULL,
 };
 // clang-format on
 
@@ -352,7 +353,7 @@ static ar_result_t gen_cntr_copy_peer_cntr_input_to_int_buf(gen_cntr_t          
                                                             gen_cntr_ext_in_port_t *ext_in_port_ptr,
                                                             uint32_t               *bytes_copied_per_buf_ptr)
 {
-   ar_result_t result = AR_EOK;
+   ar_result_t            result      = AR_EOK;
 
    result |= gen_cntr_copy_peer_or_olc_client_input(me_ptr, ext_in_port_ptr, bytes_copied_per_buf_ptr);
    // input logging is done as soon as buf is popped because otherwise deinterleaved data cannot be handled.
@@ -717,6 +718,9 @@ static ar_result_t gen_cntr_free_input_data_cmd_peer_cntr(gen_cntr_t            
       }
    }
    spf_msg_ack_msg(&ext_in_port_ptr->cu.input_data_q_msg, status);
+
+   // set payload to NULL to indicate we are not holding on to any input data msg
+   ext_in_port_ptr->cu.input_data_q_msg.payload_ptr = NULL;
 
    return result;
 }

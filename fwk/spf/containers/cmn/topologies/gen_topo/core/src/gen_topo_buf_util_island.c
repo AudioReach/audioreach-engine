@@ -65,9 +65,9 @@ static bool_t gen_topo_is_inplace_until_nblc_end(gen_topo_t *            topo_pt
    return FALSE;
 }
 
-static bool_t gen_topo_is_inplace_nblc_from_ext_in(gen_topo_t *           topo_ptr,
-                                                   gen_topo_module_t *    module_ptr,
-                                                   gen_topo_input_port_t *start_in_port_ptr)
+static bool_t gen_topo_is_inplace_nblc_from_ext_input_util_(gen_topo_t            *topo_ptr,
+                                                            gen_topo_module_t     *module_ptr,
+                                                            gen_topo_input_port_t *start_in_port_ptr)
 {
    // is nblc start from ext-in port.
    if (!start_in_port_ptr->nblc_start_ptr || !start_in_port_ptr->nblc_start_ptr->gu.ext_in_port_ptr ||
@@ -105,6 +105,13 @@ static bool_t gen_topo_is_inplace_nblc_from_ext_in(gen_topo_t *           topo_p
    }
 
    return FALSE;
+}
+
+bool_t gen_topo_is_inplace_nblc_from_ext_input(gen_topo_t            *topo_ptr,
+                                               gen_topo_module_t     *module_ptr,
+                                               gen_topo_input_port_t *start_in_port_ptr)
+{
+   return gen_topo_is_inplace_nblc_from_ext_input_util_(topo_ptr, module_ptr, start_in_port_ptr);
 }
 
 // This function must be called when ever the module raise,
@@ -230,8 +237,7 @@ ar_result_t gen_topo_check_get_out_buf_from_buf_mgr_util_(gen_topo_t *          
             curr_out_port_ptr->common.flags.buf_origin = GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED;
             // no ref counting for borrowed ext-buf
          }
-         else if ((TOPO_BUF_LOW_LATENCY == topo_ptr->buf_mgr.mode) &&
-                  curr_out_port_ptr->nblc_end_ptr->gu.conn_in_port_ptr)
+         else if (curr_out_port_ptr->nblc_end_ptr->gu.conn_in_port_ptr)
          {
             /**
              * For low latency optimization,
@@ -244,16 +250,22 @@ ar_result_t gen_topo_check_get_out_buf_from_buf_mgr_util_(gen_topo_t *          
              *
              * For example, consider DTMF_GEN->MFC->SAL graph. dtmf generator can reuse the buffer from MFC's input.
              * This will allow dtmf to produce data as must as req at mfc input and avoids pile up.
+             *
+             * Rd shm module would assign a borrowed buffer(GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED) to its input, which
+             * can be further borrowed by the modules in the NBLC upstream. For example Enc -> log -> Rd Shm. Enc output
+             * can borrow Rd shm's input borrowed buffer.
              */
             gen_topo_input_port_t *nblc_end_in_port_ptr =
                (gen_topo_input_port_t *)curr_out_port_ptr->nblc_end_ptr->gu.conn_in_port_ptr;
-            if (nblc_end_in_port_ptr->common.bufs_ptr[0].data_ptr
+            if (nblc_end_in_port_ptr->common.bufs_ptr[0].data_ptr &&
+                ((TOPO_BUF_LOW_LATENCY == topo_ptr->buf_mgr.mode) ||
+                 ( GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED == nblc_end_in_port_ptr->common.flags.buf_origin))
+
 #ifdef SAFE_MODE
-                &&
-                (nblc_end_in_port_ptr->common.bufs_ptr[0].max_data_len >= curr_out_port_ptr->common.max_buf_len) &&
+                && (nblc_end_in_port_ptr->common.bufs_ptr[0].max_data_len >= curr_out_port_ptr->common.max_buf_len) &&
                 (0 == nblc_end_in_port_ptr->common.bufs_ptr[0].actual_data_len)
 #endif
-                   )
+            )
             {
                if (!(((SPF_IS_PCM_DATA_FORMAT(curr_out_port_ptr->common.media_fmt_ptr->data_format)) &&
                       (TOPO_INTERLEAVED != curr_out_port_ptr->common.media_fmt_ptr->pcm.interleaving)) ||
@@ -273,7 +285,10 @@ ar_result_t gen_topo_check_get_out_buf_from_buf_mgr_util_(gen_topo_t *          
                   curr_out_port_ptr->common.bufs_ptr[0].max_data_len =
                      nblc_end_in_port_ptr->common.bufs_ptr[0].max_data_len -
                      nblc_end_in_port_ptr->common.bufs_ptr[0].actual_data_len;
-                  curr_out_port_ptr->common.flags.buf_origin = GEN_TOPO_BUF_ORIGIN_BUF_MGR_BORROWED;
+                  curr_out_port_ptr->common.flags.buf_origin =
+                     (GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED == nblc_end_in_port_ptr->common.flags.buf_origin)
+                        ? GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED
+                        : GEN_TOPO_BUF_ORIGIN_BUF_MGR_BORROWED;
                }
             }
          }
@@ -288,7 +303,7 @@ ar_result_t gen_topo_check_get_out_buf_from_buf_mgr_util_(gen_topo_t *          
 #ifdef BUF_MGMT_DEBUG
    TOPO_MSG(topo_ptr->gu.log_id,
             DBG_LOW_PRIO,
-            " Module 0x%lX: Port 0x%lx, got output buffer 0x%p, size %lu, max_buf_len %lu, buf_origin %u",
+            " Module 0x%lX: Port 0x%lx, got output buffer 0x%p, size %lu, max_buf_len %lu, buf_origin%u",
             module_ptr->gu.module_instance_id,
             curr_out_port_ptr->gu.cmn.id,
             curr_out_port_ptr->common.bufs_ptr[0].data_ptr,
@@ -332,7 +347,7 @@ ar_result_t gen_topo_check_get_in_buf_from_buf_mgr_util_(gen_topo_t *           
    else
    {
       if (curr_in_port_ptr->nblc_end_ptr &&
-          gen_topo_is_inplace_nblc_from_ext_in(topo_ptr, module_ptr, curr_in_port_ptr))
+          gen_topo_is_inplace_nblc_from_ext_input_util_(topo_ptr, module_ptr, curr_in_port_ptr))
       {
          gen_topo_input_port_t *nblc_end_ptr = curr_in_port_ptr->nblc_end_ptr;
          // if nblc end is inplace, & it has a buf

@@ -44,6 +44,9 @@ const gen_cntr_ext_in_vtable_t gpr_olc_client_ext_in_vtable = {
    .process_pending_data_cmd = gen_cntr_process_pending_data_cmd_gpr_client,
    .free_input_buf           = gen_cntr_free_input_data_cmd_gpr_client,
    .frame_len_change_notif   = gen_cntr_send_operating_framesize_event_to_wr_shmem_client,
+   .setup_topo_buf           = NULL,
+    // todo: assign .setup_topo_buf= gen_cntr_wr_shm_setup_int_port_buf() for optimizations.
+    // refer write shared memory ep behavior.
 };
 
 const gen_cntr_ext_out_vtable_t gpr_olc_client_ext_out_vtable = {
@@ -55,6 +58,9 @@ const gen_cntr_ext_out_vtable_t gpr_olc_client_ext_out_vtable = {
    .recreate_out_buf = gen_cntr_recreate_out_buf_olc_client,
    .prop_media_fmt   = gen_cntr_send_cmd_path_media_fmt_to_olc_client,
    .write_metadata   = gen_cntr_write_metadata_in_olc_rd_client_buffer,
+   .setup_topo_buf   = NULL,
+    // todo: assign .setup_topo_buf= gen_cntr_rd_sh_mem_setup_topo_buffer() for optimizations.
+    // refer read shared memory ep behavior.
 };
 
 // clang-format on
@@ -1117,7 +1123,7 @@ static ar_result_t gen_cntr_copy_olc_client_input_to_int_buf(gen_cntr_t *       
                                                              gen_cntr_ext_in_port_t *ext_in_port_ptr,
                                                              uint32_t *              bytes_copied_per_buf_ptr)
 {
-   ar_result_t result = AR_EOK;
+   ar_result_t            result      = AR_EOK;
 
    result |= gen_cntr_copy_peer_or_olc_client_input(me_ptr, ext_in_port_ptr, bytes_copied_per_buf_ptr);
    // input logging is done as soon as buf is popped because otherwise deinterleaved data cannot be handled.

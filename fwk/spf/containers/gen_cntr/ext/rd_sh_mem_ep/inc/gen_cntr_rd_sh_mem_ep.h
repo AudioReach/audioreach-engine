@@ -55,6 +55,8 @@ ar_result_t gen_cntr_flush_output_data_queue_gpr_client(gen_cntr_t *            
                                                         bool_t                   is_client_cmd);
 void gen_cntr_propagate_metadata_gpr_client(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 
+ar_result_t gen_cntr_rd_sh_mem_setup_topo_buffer(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
+
 #ifdef __cplusplus
 }
 #endif //__cplusplus

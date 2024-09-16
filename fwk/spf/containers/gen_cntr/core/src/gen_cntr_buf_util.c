@@ -151,8 +151,6 @@ ar_result_t gen_cntr_create_ext_out_bufs(gen_cntr_t *             me_ptr,
    }
 
    // get heap id for ext out buffer allocations.
-   // if the module support MP extension and raises overrun to use default heap id.
-   // TODO: check if need to recreate buffer if the Dam module changes the override flag runtime.
    POSAL_HEAP_ID downgraded_heap_id =
       gu_get_downgraded_heap_id(me_ptr->topo.heap_id, ext_port_ptr->gu.downstream_handle.heap_id);
 

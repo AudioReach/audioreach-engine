@@ -43,10 +43,11 @@ ar_result_t gen_cntr_copy_gpr_client_input_to_int_buf(gen_cntr_t *            me
                                                       uint32_t *              bytes_copied_ptr);
 bool_t gen_cntr_is_input_a_gpr_client_data_buffer(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
 ar_result_t gen_cntr_process_pending_data_cmd_gpr_client(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
-ar_result_t gen_cntr_free_input_data_cmd_gpr_client(gen_cntr_t *            me_ptr,
+ar_result_t gen_cntr_free_input_data_cmd_gpr_client(gen_cntr_t             *me_ptr,
                                                     gen_cntr_ext_in_port_t *ext_in_port_ptr,
                                                     ar_result_t             status,
                                                     bool_t                  is_flush);
+ar_result_t gen_cntr_wr_shm_setup_int_port_buf(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
 
 #ifdef __cplusplus
 }

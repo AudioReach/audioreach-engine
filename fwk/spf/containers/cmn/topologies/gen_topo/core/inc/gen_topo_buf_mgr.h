@@ -425,6 +425,10 @@ void       topo_buf_check_for_corruption_(uint32_t                log_id,
                                           uint32_t                port_id,
                                           gen_topo_common_port_t *cmn_port_ptr);
 
+bool_t gen_topo_is_inplace_nblc_from_ext_input(gen_topo_t            *topo_ptr,
+                                               gen_topo_module_t     *module_ptr,
+                                               gen_topo_input_port_t *start_in_port_ptr);
+
 #ifdef __cplusplus
 }
 #endif //__cplusplus

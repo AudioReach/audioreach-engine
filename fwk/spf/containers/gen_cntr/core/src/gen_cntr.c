@@ -101,7 +101,14 @@ ar_result_t gen_cntr_prepare_to_launch_thread(gen_cntr_t *         me_ptr,
                                               char *               thread_name,
                                               uint32_t             name_length)
 {
-   snprintf(thread_name, name_length, "GC_%lX", me_ptr->cu.gu_ptr->container_instance_id);
+   if (check_if_pass_thru_container(me_ptr))
+   {
+      snprintf(thread_name, name_length, "PTC_%lX", me_ptr->cu.gu_ptr->container_instance_id);
+   }
+   else
+   {
+      snprintf(thread_name, name_length, "GC_%lX", me_ptr->cu.gu_ptr->container_instance_id);
+   }
 
    // if current thread exists, inherit its priority
    // (if a thread with bumped up priority launches another thread then new thread must also be made high priority)

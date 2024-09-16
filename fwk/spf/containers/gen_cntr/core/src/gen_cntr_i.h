@@ -209,6 +209,7 @@ typedef struct gen_cntr_ext_in_vtable_t
    ar_result_t (*free_input_buf)(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr, ar_result_t status, bool_t is_flush);
    ar_result_t (*process_pending_data_cmd)(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
    ar_result_t (*frame_len_change_notif)(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
+   ar_result_t (*setup_topo_buf)(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_out_port_ptr);
 } gen_cntr_ext_in_vtable_t;
 
 typedef struct gen_cntr_ext_out_vtable_t
@@ -230,6 +231,8 @@ typedef struct gen_cntr_ext_out_vtable_t
    ar_result_t (*prop_media_fmt)(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 
    void  (*write_metadata)(gen_cntr_t * me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr, uint32_t frame_offset_in_ext_buf, bool_t * release_out_buf_ptr);
+
+   ar_result_t (*setup_topo_buf)(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 
 } gen_cntr_ext_out_vtable_t;
 
@@ -705,6 +708,19 @@ static inline bool_t gen_cntr_check_data_msg_out_buf_token_is_v2(spf_msg_token_t
 	return is_v2_buf;
 }
 
+static inline ar_result_t gen_cntr_ext_input_setup_int_port_buf(gen_cntr_t             *me_ptr,
+                                                                   gen_cntr_ext_in_port_t *ext_in_port_ptr,
+                                                                   gen_topo_input_port_t  *in_port_ptr)
+{
+   if (ext_in_port_ptr->vtbl_ptr->setup_topo_buf)
+   {
+      return ext_in_port_ptr->vtbl_ptr->setup_topo_buf(me_ptr, ext_in_port_ptr);
+   }
+
+   // note this call can return a fresh buf or a buf already at inplace-nblc-end.
+   return gen_topo_check_get_in_buf_from_buf_mgr(&me_ptr->topo, in_port_ptr, NULL);
+}
+
 void gen_cntr_handle_st_overrun_at_post_process(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 
 ar_result_t gen_cntr_mv_data_from_topo_to_ext_out_buf_npli_(gen_cntr_t *             me_ptr,
@@ -756,12 +772,20 @@ static inline void gen_cntr_check_and_send_prebuffers(gen_cntr_t *             m
    return gen_cntr_check_and_send_prebuffers_util_(me_ptr, ext_out_port_ptr, out_buf_ptr);
 }
 
-ar_result_t gen_cntr_workloop_async_signal_trigger_handler(cu_base_t* base_ptr, uint32_t bit_mask);
+ar_result_t gen_cntr_workloop_async_signal_trigger_handler(cu_base_t *base_ptr, uint32_t bit_mask);
 ar_result_t gen_cntr_fwk_extn_async_signal_enable(gen_cntr_t *me_ptr, gen_topo_module_t *module_ptr);
 ar_result_t gen_cntr_fwk_extn_async_signal_disable(gen_cntr_t *me_ptr, gen_topo_module_t *module_ptr);
 
-void gen_cntr_set_stm_ts_to_module (gen_cntr_t *me_ptr);
+void gen_cntr_set_stm_ts_to_module(gen_cntr_t *me_ptr);
 
+ar_result_t gen_cntr_clear_borrowed_ext_in_buffer_from_int_ports(gen_cntr_t             *me_ptr,
+                                                                 gen_cntr_ext_in_port_t *ext_in_port_ptr,
+                                                                 gen_topo_input_port_t  *in_port_ptr,
+                                                                 bool_t                  IS_FORCE_CLEAR);
+
+ar_result_t gen_cntr_clear_borrowed_ext_out_buffer_from_int_ports(gen_cntr_t              *me_ptr,
+                                                                  gen_cntr_ext_out_port_t *ext_out_port_ptr,
+                                                                  gen_topo_output_port_t  *out_port_ptr);
 #ifdef __cplusplus
 }
 #endif //__cplusplus
