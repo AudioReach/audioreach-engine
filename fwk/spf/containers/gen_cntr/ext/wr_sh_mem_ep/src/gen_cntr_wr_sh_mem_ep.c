@@ -1751,54 +1751,61 @@ ar_result_t gen_cntr_wr_shm_setup_int_port_buf(gen_cntr_t *me_ptr, gen_cntr_ext_
    {
       if ((ext_in_port_ptr->buf.actual_data_len >= in_port_ptr->common.max_buf_len_per_buf))
       {
-         // nblc end might have some data. point after that data
-         // in interleaved cases there should be only one buffer
-         in_port_ptr->common.bufs_ptr[0].data_ptr =
-            ext_in_port_ptr->buf.data_ptr + (ext_in_port_ptr->buf.max_data_len - ext_in_port_ptr->buf.actual_data_len);
-         in_port_ptr->common.bufs_ptr[0].max_data_len = in_port_ptr->common.max_buf_len_per_buf;
-         // actual data len will be updated later in this fucntion
-         in_port_ptr->common.flags.buf_origin = GEN_TOPO_BUF_ORIGIN_EXT_BUF;
+         uint32_t buf_addr = (uint32_t)(ext_in_port_ptr->buf.data_ptr +
+                                        (ext_in_port_ptr->buf.max_data_len - ext_in_port_ptr->buf.actual_data_len));
 
-#ifdef VERBOSE_DEBUGGING
-         GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
-                      DBG_LOW_PRIO,
-                      "Module 0x%lX: Port 0x%lx, assigned ext input buffer 0x%p  to internal port, size %lu, "
-                      "max_buf_len %lu, buf_origin%u",
-                      in_port_ptr->gu.cmn.module_ptr->module_instance_id,
-                      in_port_ptr->gu.cmn.id,
-                      in_port_ptr->common.bufs_ptr[0].data_ptr,
-                      in_port_ptr->common.bufs_ptr[0].max_data_len,
-                      in_port_ptr->common.max_buf_len_per_buf,
-                      in_port_ptr->common.flags.buf_origin);
-#endif
-
-         // since wr shm is inplace assign the buffer to output here itself to optimize assignment for output.
-         // If output is an external port, dont propagate ext in buffer since ICB/ext out buffer will be assigned
-         if (in_port_ptr->gu.cmn.module_ptr->output_port_list_ptr &&
-             in_port_ptr->gu.cmn.module_ptr->output_port_list_ptr->op_port_ptr->conn_in_port_ptr)
+         // if buffer is not 8 byte aligned, skip reusing client buffer.
+         if (0 == (buf_addr & 0x7))
          {
-            gen_topo_output_port_t *out_port_ptr =
-               (gen_topo_output_port_t *)in_port_ptr->gu.cmn.module_ptr->output_port_list_ptr->op_port_ptr;
+            // nblc end might have some data. point after that data
+            // in interleaved cases there should be only one buffer
+            in_port_ptr->common.bufs_ptr[0].data_ptr     = (int8_t *)buf_addr;
+            in_port_ptr->common.bufs_ptr[0].max_data_len = in_port_ptr->common.max_buf_len_per_buf;
+            // actual data len will be updated later in this fucntion
+            in_port_ptr->common.flags.buf_origin = GEN_TOPO_BUF_ORIGIN_EXT_BUF;
 
-            if (NULL == out_port_ptr->common.bufs_ptr[0].data_ptr)
-            {
-               out_port_ptr->common.bufs_ptr[0].data_ptr     = in_port_ptr->common.bufs_ptr[0].data_ptr;
-               out_port_ptr->common.bufs_ptr[0].max_data_len = in_port_ptr->common.bufs_ptr[0].max_data_len;
-               out_port_ptr->common.flags.buf_origin         = GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED;
 #ifdef VERBOSE_DEBUGGING
-               GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
-                            DBG_LOW_PRIO,
-                            "Module 0x%lX: Port 0x%lx, borrowed ext in buffer 0x%p for the output port, buf_len %lu, "
-                            "buf_origin%u",
-                            out_port_ptr->gu.cmn.module_ptr->module_instance_id,
-                            out_port_ptr->gu.cmn.id,
-                            out_port_ptr->common.bufs_ptr[0].data_ptr,
-                            out_port_ptr->common.bufs_ptr[0].max_data_len,
-                            out_port_ptr->common.flags.buf_origin);
+            GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                         DBG_LOW_PRIO,
+                         "Module 0x%lX: Port 0x%lx, assigned ext input buffer 0x%p  to internal port, size %lu, "
+                         "max_buf_len %lu, buf_origin%u",
+                         in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                         in_port_ptr->gu.cmn.id,
+                         in_port_ptr->common.bufs_ptr[0].data_ptr,
+                         in_port_ptr->common.bufs_ptr[0].max_data_len,
+                         in_port_ptr->common.max_buf_len_per_buf,
+                         in_port_ptr->common.flags.buf_origin);
 #endif
+
+            // since wr shm is inplace assign the buffer to output here itself to optimize assignment for output.
+            // If output is an external port, dont propagate ext in buffer since ICB/ext out buffer will be assigned
+            if (in_port_ptr->gu.cmn.module_ptr->output_port_list_ptr &&
+                in_port_ptr->gu.cmn.module_ptr->output_port_list_ptr->op_port_ptr->conn_in_port_ptr)
+            {
+               gen_topo_output_port_t *out_port_ptr =
+                  (gen_topo_output_port_t *)in_port_ptr->gu.cmn.module_ptr->output_port_list_ptr->op_port_ptr;
+
+               if (NULL == out_port_ptr->common.bufs_ptr[0].data_ptr)
+               {
+                  out_port_ptr->common.bufs_ptr[0].data_ptr     = in_port_ptr->common.bufs_ptr[0].data_ptr;
+                  out_port_ptr->common.bufs_ptr[0].max_data_len = in_port_ptr->common.bufs_ptr[0].max_data_len;
+                  out_port_ptr->common.flags.buf_origin         = GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED;
+#ifdef VERBOSE_DEBUGGING
+                  GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                               DBG_LOW_PRIO,
+                               "Module 0x%lX: Port 0x%lx, borrowed ext in buffer 0x%p for the output port, buf_len "
+                               "%lu, "
+                               "buf_origin%u",
+                               out_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                               out_port_ptr->gu.cmn.id,
+                               out_port_ptr->common.bufs_ptr[0].data_ptr,
+                               out_port_ptr->common.bufs_ptr[0].max_data_len,
+                               out_port_ptr->common.flags.buf_origin);
+#endif
+               }
             }
+            return AR_EOK;
          }
-         return AR_EOK;
       }
    }
 
