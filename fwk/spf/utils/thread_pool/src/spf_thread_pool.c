@@ -5,11 +5,15 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #include "spf_thread_pool_i.h"
+
+#ifdef SPF_THREAD_POOL_TEST
+#include "spf_thread_pool_test.h"
+#endif
 
 /*********************************************************************************/
 // global structure for thread pools
@@ -43,12 +47,27 @@ ar_result_t spf_thread_pool_init()
                                 SPF_DEFAULT_THREAD_POOL_STACK_SIZE,
                                 SPF_DEFAULT_THREAD_POOL_NUM_OF_WORKER_THREADS,
                                 0);
+
+#ifdef SPF_THREAD_POOL_TEST
+   AR_MSG(DBG_ERROR_PRIO, "Launching thread for Thread Pool Test");
+   // launch the Thread Pool tests
+   if AR_FAILED(result = spf_thread_pool_test_init())
+   {
+	   AR_MSG(DBG_ERROR_PRIO, "Launching thread for Thread Pool Test- FAILED.");
+   }
+#endif
+
    return result;
 }
 
 ar_result_t spf_thread_pool_deinit()
 {
    ar_result_t result = AR_EOK;
+
+#ifdef SPF_THREAD_POOL_TEST
+   // join test thread
+   spf_thread_pool_test_deinit();
+#endif
 
    // go through all the thread pool and release their instances until they are destroyed.
    posal_mutex_lock(g_spf_tp.pool_lock);
