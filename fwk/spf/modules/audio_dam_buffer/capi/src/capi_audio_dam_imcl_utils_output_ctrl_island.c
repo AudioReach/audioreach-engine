@@ -233,6 +233,11 @@ static capi_err_t capi_audio_dam_imc_set_param_handler_per_output(capi_audio_dam
             result |= capi_audio_dam_imcl_set_virt_writer_cfg(me_ptr, ctrl_arr_index, op_arr_index, header_ptr);
             break;
          }
+         case PARAM_ID_AUDIO_DAM_ALLOW_DCM_ISLAND_ENTRY:
+         {
+            result |= capi_audio_dam_imcl_trigger_island_entry(me_ptr, op_arr_index, header_ptr);
+            break;
+         }
          default:
          {
             DAM_MSG_ISLAND(me_ptr->miid,

@@ -154,6 +154,33 @@ static ar_result_t audio_dam_stream_read_util_(audio_dam_stream_reader_t *reader
    return result;
 }
 
+ar_result_t audio_dam_force_set_pending_bytes(audio_dam_stream_reader_t *reader_handle)
+{
+   ar_result_t result = AR_EOK;
+
+   // drain the buffers immediately, send an EOS
+   uint32_t requested_batch_us        = reader_handle->data_batching_us;
+   uint32_t requested_batch           = audio_dam_compute_buffer_size_in_bytes(reader_handle->driver_ptr, requested_batch_us);
+
+   reader_handle->pending_batch_bytes = MIN(requested_batch, reader_handle->rd_client_ptr_arr[0]->unread_bytes);
+   return result;
+}
+
+bool_t audio_dam_if_batching_req_met(audio_dam_stream_reader_t *reader_handle          // in
+                                    )
+{
+   uint32_t    requested_batch_us = reader_handle->data_batching_us;
+   uint32_t requested_batch = audio_dam_compute_buffer_size_in_bytes(reader_handle->driver_ptr, requested_batch_us);
+   if (0 == reader_handle->pending_batch_bytes)
+   {
+      if (reader_handle->rd_client_ptr_arr[0]->unread_bytes >= requested_batch)
+      {
+         return TRUE;
+      }
+   }
+   return FALSE;
+}
+
 static ar_result_t audio_dam_stream_batch_read(audio_dam_stream_reader_t *reader_handle,          // in
                                                uint32_t                   num_chs_to_read,        // in
                                                capi_buf_t *               output_buf_arr,         // in/out
@@ -276,6 +303,28 @@ ar_result_t audio_dam_get_stream_reader_unread_bytes(audio_dam_stream_reader_t *
    else
    {
       *unread_bytes = reader_handle->rd_client_ptr_arr[0]->unread_bytes;
+   }
+
+   return result;
+}
+
+ar_result_t audio_dam_get_stream_reader_pending_bytes(audio_dam_stream_reader_t *reader_handle, uint32_t *unread_bytes)
+{
+   ar_result_t result = AR_EOK;
+
+   if (NULL == reader_handle)
+   {
+      return AR_ENOTREADY;
+   }
+
+   if (reader_handle->virt_buf_ptr)
+   {
+      // for virtual buffer
+      *unread_bytes = 0;
+   }
+   else
+   {
+      *unread_bytes = reader_handle->pending_batch_bytes;
    }
 
    return result;

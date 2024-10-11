@@ -248,7 +248,8 @@ capi_err_t capi_audio_dam_change_trigger_policy(capi_audio_dam_t *me_ptr)
 
 capi_err_t capi_dam_insert_flushing_eos_at_out_port(capi_audio_dam_t   *me_ptr,
                                                     capi_stream_data_t *output,
-                                                    bool_t              skip_voting_on_eos)
+                                                    bool_t              skip_voting_on_eos,
+                                                    eos_type_t          eos_typ)
 {
    capi_err_t             capi_result    = CAPI_EOK;
    capi_stream_data_v2_t *out_stream_ptr = (capi_stream_data_v2_t *)output;
