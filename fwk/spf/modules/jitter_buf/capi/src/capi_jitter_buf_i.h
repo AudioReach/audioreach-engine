@@ -7,7 +7,7 @@
  *        This file contains CAPI API's published by Jitter Buf module API.
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -226,6 +226,26 @@ capi_err_t capi_jitter_buf_deinit_out_drift_info(jitter_buf_drift_info_t *drift_
 
 ar_result_t jitter_buf_imcl_read_acc_out_drift(imcl_tdi_hdl_t *      drift_info_hdl_ptr,
                                                imcl_tdi_acc_drift_t *acc_drift_out_ptr);
+
+capi_vtbl_t *capi_jitter_buf_get_vtbl();
+
+capi_err_t capi_jitter_buf_end(capi_t *_pif);
+
+capi_err_t capi_jitter_buf_set_param(capi_t *                _pif,
+                                          uint32_t                param_id,
+                                          const capi_port_info_t *port_info_ptr,
+                                          capi_buf_t *            params_ptr);
+
+capi_err_t capi_jitter_buf_get_param(capi_t *                _pif,
+                                          uint32_t                param_id,
+                                          const capi_port_info_t *port_info_ptr,
+                                          capi_buf_t *            params_ptr);
+
+capi_err_t capi_jitter_buf_set_properties(capi_t *_pif, capi_proplist_t *props_ptr);
+
+capi_err_t capi_jitter_buf_get_properties(capi_t *_pif, capi_proplist_t *props_ptr);
+
+capi_err_t capi_jitter_buf_process(capi_t *_pif, capi_stream_data_t *input[], capi_stream_data_t *output[]);
 
 #ifdef __cplusplus
 }
