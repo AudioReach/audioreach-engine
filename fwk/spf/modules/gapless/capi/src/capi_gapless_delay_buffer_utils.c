@@ -58,7 +58,7 @@ capi_err_t gapless_read_delay_buffer(capi_gapless_t *        me_ptr,
    capi_err_t            capi_result = CAPI_EOK;
    ar_result_t           ar_result   = AR_EOK;
    capi_stream_data_v2_t temp_out_sdata;
-   bool_t                has_partial_output_data     = FALSE;
+   bool_t                has_partial_output_data_md     = FALSE;
    uint32_t              prev_actual_data_len_per_ch = 0;
 
    if (!capi_gapless_does_delay_buffer_exist(me_ptr, in_port_ptr))
@@ -89,9 +89,9 @@ capi_err_t gapless_read_delay_buffer(capi_gapless_t *        me_ptr,
       return CAPI_EOK;
    }
 
-   has_partial_output_data = (0 != out_sdata_ptr->buf_ptr[0].actual_data_len);
+   has_partial_output_data_md = ((0 != out_sdata_ptr->buf_ptr[0].actual_data_len) || (NULL != out_sdata_ptr->metadata_list_ptr));
 
-   if (has_partial_output_data)
+   if (has_partial_output_data_md)
    {
       capi_result |= gapless_setup_output_sdata(me_ptr, &temp_out_sdata, out_sdata_ptr, &prev_actual_data_len_per_ch);
    }
@@ -119,7 +119,7 @@ capi_err_t gapless_read_delay_buffer(capi_gapless_t *        me_ptr,
       }
    }
 
-   if (has_partial_output_data)
+   if (has_partial_output_data_md)
    {
       capi_result |= gapless_adjust_output_sdata(me_ptr, &temp_out_sdata, out_sdata_ptr, prev_actual_data_len_per_ch);
    }
