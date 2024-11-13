@@ -681,6 +681,7 @@ static circbuf_result_t _circ_buf_remove_chunks(circ_buf_t *circ_buf_ptr, uint32
       return CIRCBUF_SUCCESS;
    }
 
+   spf_list_node_t *cur_wr_chunk_ptr = NULL;
    while (removable_size)
    {
       spf_list_node_t *rm_node_ptr = NULL;
@@ -688,7 +689,7 @@ static circbuf_result_t _circ_buf_remove_chunks(circ_buf_t *circ_buf_ptr, uint32
       // Remove after the current write chunks pointer if a write client exist.
       if (circ_buf_ptr->wr_client_ptr && circ_buf_ptr->wr_client_ptr->rw_chunk_node_ptr)
       {
-         spf_list_node_t *cur_wr_chunk_ptr = circ_buf_ptr->wr_client_ptr->rw_chunk_node_ptr;
+         cur_wr_chunk_ptr = circ_buf_ptr->wr_client_ptr->rw_chunk_node_ptr;
 
          if (cur_wr_chunk_ptr->next_ptr)
          {
@@ -777,11 +778,19 @@ static circbuf_result_t _circ_buf_remove_chunks(circ_buf_t *circ_buf_ptr, uint32
          // while loop ends
          removable_size = 0;
 
-         // at this point, write offset needs to be adjusted to be within the newly replaced smaller chunk.
-         if (circ_buf_ptr->wr_client_ptr)
+         // Need to check if the removed chunk is current chunk or not.
+         if (cur_wr_chunk_ptr && cur_wr_chunk_ptr->obj_ptr != rem_chunk_ptr)
          {
-
-            if (circ_buf_ptr->wr_client_ptr->rw_chunk_offset >= new_chunk_ptr->size)
+            // retain the latest data in the realloacted chunk.
+            memscpy(new_chunk_ptr->buffer_ptr,
+                    new_chunk_ptr->size,
+                    rem_chunk_ptr->buffer_ptr + (rem_chunk_ptr->size - new_chunk_ptr->size),
+                    new_chunk_ptr->size);
+         }
+         else
+         {
+            // at this point, write offset needs to be adjusted to be within the newly replaced smaller chunk.
+            if (circ_buf_ptr->wr_client_ptr && circ_buf_ptr->wr_client_ptr->rw_chunk_offset >= new_chunk_ptr->size)
             {
                /** For example in the below case when chunk size reduces from 4k to 1.9k then
                 wr offset=3960 becomes invalid.
@@ -795,8 +804,9 @@ static circbuf_result_t _circ_buf_remove_chunks(circ_buf_t *circ_buf_ptr, uint32
                        new_chunk_ptr->size,
                        rem_chunk_ptr->buffer_ptr + (circ_buf_ptr->wr_client_ptr->rw_chunk_offset - new_chunk_ptr->size),
                        new_chunk_ptr->size);
-
-				circ_buf_ptr->wr_client_ptr->rw_chunk_offset = 0;
+               // Need to move to next chunk, as replaced chunk has valid data.
+               add_circ_buf_next_chunk_node(circ_buf_ptr, &circ_buf_ptr->wr_client_ptr->rw_chunk_node_ptr);
+               circ_buf_ptr->wr_client_ptr->rw_chunk_offset = 0;
             }
             else
             {
@@ -818,7 +828,7 @@ static circbuf_result_t _circ_buf_remove_chunks(circ_buf_t *circ_buf_ptr, uint32
    }
 
    // Reset write position if the new circular buffer size is zero
-   if ( (0 == circ_buf_ptr->circ_buf_size) && circ_buf_ptr->wr_client_ptr)
+   if ((0 == circ_buf_ptr->circ_buf_size) && circ_buf_ptr->wr_client_ptr)
    {
       _circ_buf_write_client_reset(circ_buf_ptr->wr_client_ptr);
    }
