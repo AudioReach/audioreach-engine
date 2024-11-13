@@ -131,7 +131,7 @@ typedef struct apm_module_register_events_v2_t apm_module_register_events_v2_t;
 
 /** @ingroup spf_apm_graph_props
     Container type identifier for a Front end container. */
-#define APM_CONTAINER_TYPE_ID_FRONT_END_FWK             0x0B00100D
+#define APM_CONTAINER_TYPE_ID_FRONT_END_FWK             0x0B00100E
 
 /** @ingroup spf_apm_container_props
     In-Sample mode for the container frame size property. */
