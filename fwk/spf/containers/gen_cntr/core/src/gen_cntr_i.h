@@ -7,7 +7,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -153,8 +153,8 @@ typedef struct gen_cntr_ext_in_port_flags_t
 
                                                 Important note: TS disc is ignored for signal triggered containers.
                                                 So input_discontinuity can never happen to Signal triggerd containers.  */
-   uint32_t pending_mf: 1;					      /**< when data path media format comes during process then it is marked pending
-   	   	   	   	   	   	   	   	  					   and handled when processing is done.
+   uint32_t pending_mf: 1;                        /**< when data path media format comes during process then it is marked pending
+                                                       and handled when processing is done.
 
                                                        Not applicable to Signal triggerd containers. MF is handled immediately by dropping data and aslo
                                                        input_discontinuity is not applicable for ST containers. */
@@ -171,8 +171,8 @@ typedef struct gen_cntr_ext_in_port_flags_t
  */
 typedef struct ext_in_port_client_cfg_t
 {
-	param_id_wr_ep_client_cfg_t cid;  /**< specifies the type and GPR port ID
-	 	 	 	 	 	 	 	 	 	              of the Client sharing the data buffers to the WR EP module */
+    param_id_wr_ep_client_cfg_t cid;  /**< specifies the type and GPR port ID
+                                                      of the Client sharing the data buffers to the WR EP module */
 
 } ext_in_port_client_cfg_t;
 
@@ -183,10 +183,10 @@ typedef struct ext_in_port_client_cfg_t
  */
 typedef struct ext_out_port_client_cfg_t
 {
-	param_id_rd_ep_client_cfg_t cid;     /** specifies the type and GPR port ID sharing the data buffers to the RD EP module */
-	uint32_t                    olc_client_md_buf_size;     /** specifies the metadata buffer size in the client buffer for OLC*/
-	uint32_t                    read_data_buf_size;
-	uint32_t                    pending_internal_eos_event;
+    param_id_rd_ep_client_cfg_t cid;     /** specifies the type and GPR port ID sharing the data buffers to the RD EP module */
+    uint32_t                    olc_client_md_buf_size;     /** specifies the metadata buffer size in the client buffer for OLC*/
+    uint32_t                    read_data_buf_size;
+    uint32_t                    pending_internal_eos_event;
 } ext_out_port_client_cfg_t;
 
 typedef struct gen_cntr_fwk_module_vtable_t
@@ -369,13 +369,13 @@ typedef struct gen_cntr_stm_t
    int32_t                            processed_interrupt_counter;  /**< Counter incremented in process context of container  */
    stm_latest_trigger_ts_t            *st_module_ts_ptr;         /**< ptr from which we can read timestamp */
    uint32_t                           signal_miss_counter;  /**< Counter to keep track of number of signal miss encountered */
-   void                               *stm_ts_ctxt_ptr;	/**< ptr to the dev handle of different ep-modules */
-   stm_get_ts_fn_ptr_t                update_stm_ts_fptr;	/**< function pointer to get the STM timestamp */
+   void                               *stm_ts_ctxt_ptr; /**< ptr to the dev handle of different ep-modules */
+   stm_get_ts_fn_ptr_t                update_stm_ts_fptr;   /**< function pointer to get the STM timestamp */
 #ifdef ENABLE_SIGNAL_MISS_CRASH
-   int32_t						      steady_state_interrupt_counter; /**< Counter incremented in process context similar to
-																		   processed_interrupt_counter but reset after any command handling.
-																		   used for detecting when signal miss occurs after counter is greater
-																		   than 1000 */
+   int32_t                            steady_state_interrupt_counter; /**< Counter incremented in process context similar to
+                                                                           processed_interrupt_counter but reset after any command handling.
+                                                                           used for detecting when signal miss occurs after counter is greater
+                                                                           than 1000 */
 #endif
 } gen_cntr_stm_t;
 
@@ -675,7 +675,12 @@ static inline ar_result_t gen_cntr_check_and_vote_for_island_in_data_path(gen_cn
 #ifdef SIM
       // since sim island entry doesn't rely on pm server aggregated vote therefore it can go in island even when
       // container has voted against island.
+#ifdef USES_BUILD_XR // Simulation testing for Aurora was already going into island, hence not exiting to avoid island crash
+      return AR_EOK;
+#else
       posal_island_trigger_island_exit();
+#endif
+
 #endif
       return gen_cntr_check_and_vote_for_island_in_data_path_(me_ptr);
    }
@@ -697,15 +702,15 @@ static inline bool_t gen_cntr_is_any_path_ready_to_process(gen_cntr_t *me_ptr)
 
 static inline void gen_cntr_set_data_msg_out_buf_token(spf_msg_token_t *token)
 {
-	uint32_t token_data = (1 << GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_SHIFT) & GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK;
-	token->token_data = (token->token_data & ~GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK) | token_data;
-	return;
+    uint32_t token_data = (1 << GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_SHIFT) & GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK;
+    token->token_data = (token->token_data & ~GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK) | token_data;
+    return;
 }
 
 static inline bool_t gen_cntr_check_data_msg_out_buf_token_is_v2(spf_msg_token_t token)
 {
-	bool_t is_v2_buf = (0 != (token.token_data & GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK));
-	return is_v2_buf;
+    bool_t is_v2_buf = (0 != (token.token_data & GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK));
+    return is_v2_buf;
 }
 
 static inline ar_result_t gen_cntr_ext_input_setup_int_port_buf(gen_cntr_t             *me_ptr,
