@@ -111,6 +111,14 @@ capi_err_t capi_latency_check_channel_map_delay_cfg(delay_param_per_ch_cfg_t *de
    {
       uint64_t channel_map =
          ((uint64_t)delay_cfg_ptr[count].channel_mask_msb << 32) | (uint64_t)delay_cfg_ptr[count].channel_mask_lsb;
+
+      //Channel mask Zero is invalid,it should be given properly as per channel mapping on which channel the delay to be set
+      if (channel_map == 0)
+      {
+    	  AR_MSG(DBG_HIGH_PRIO," CAPI latency : Received invalid Channel mask of zero on all channels for config %u",count);
+    	  return CAPI_EBADPARAM;
+      }
+
       if (channel_mask & channel_map)
       {
          return CAPI_EBADPARAM;
@@ -855,30 +863,13 @@ capi_err_t capi_delay_create_buffer(capi_latency_t *me_ptr, uint32_t *old_delay_
       {
          uint8_t *mem_ptr = (uint8_t *)me_ptr->lib_config.mem_ptr;
 
-         if (old_delay_in_us == NULL)
+         //Updating delay line on all the channels
+         for(uint32_t i = 0; i < m->format.num_channels; i++)
          {
-            for (uint32_t i = 0; i < m->format.num_channels; i++)
-            {
-               capi_delay_delayline_set(&me_ptr->lib_config.mchan_config[i].delay_line,
-                                        me_ptr->lib_config.mchan_config[i].delay_in_samples,
-                                        m->format.bits_per_sample,
-                                        mem_ptr);
-               mem_ptr += buf_size_per_channel[i];
-            }
-         }
-         else
-         {
-            for (uint32_t i = 0; i < m->format.num_channels; i++)
-            {
-               if (old_delay_in_us[i] != me_ptr->lib_config.mchan_config[i].delay_in_us)
-               {
-                  capi_delay_delayline_set(&me_ptr->lib_config.mchan_config[i].delay_line,
-                                           me_ptr->lib_config.mchan_config[i].delay_in_samples,
-                                           m->format.bits_per_sample,
-                                           mem_ptr);
-               }
-               mem_ptr += buf_size_per_channel[i];
-            }
+            uint8_t *ch_delay_ptr = (0 != me_ptr->lib_config.mchan_config[i].delay_in_us)? mem_ptr : NULL;
+            capi_delay_delayline_set(&me_ptr->lib_config.mchan_config[i].delay_line, me_ptr->lib_config.mchan_config[i].delay_in_samples,
+                                        m->format.bits_per_sample, ch_delay_ptr);
+            mem_ptr += buf_size_per_channel[i];
          }
          if (NULL != buf_size_per_channel)
          {
