@@ -19,6 +19,7 @@
 
 // DEBUG macro
 //#define DEBUG_JITTER_BUF_DRIVER
+#define JITTER_BUF_TOLERANCE_FRAMES 2
 
 /*==============================================================================
    Function declarations
@@ -65,8 +66,11 @@ ar_result_t jitter_buf_calibrate_driver(capi_jitter_buf_t *me_ptr);
 
 ar_result_t jitter_buf_stream_read(capi_jitter_buf_t *drv_ptr, capi_stream_data_t *out_stream);
 
+ar_result_t jitter_buf_update_drift_based_on_buffer_fullness(capi_jitter_buf_t *me_ptr, bool_t is_input_trig);
+
+void jitter_buffer_set_steady_state_buffer_fullness(capi_jitter_buf_t *me_ptr);
+
 capi_err_t jitter_buf_check_fill_zeros(capi_jitter_buf_t *me_ptr);
-;
 
 #ifdef __cplusplus
 }

@@ -19,8 +19,8 @@
 ==============================================================================*/
 
 /* Create mutex and setting drift function */
-capi_err_t capi_jitter_buf_init_out_drift_info(jitter_buf_drift_info_t *   drift_info_ptr,
-                                               imcl_tdi_get_acc_drift_fn_t get_drift_fn_ptr)
+capi_err_t capi_jitter_buf_init_out_drift_info(uint32_t heap_id, jitter_buf_drift_info_t *     drift_info_ptr,
+                                             imcl_tdi_get_acc_drift_fn_t get_drift_fn_ptr)
 {
    capi_err_t result = CAPI_EOK;
 
@@ -33,7 +33,7 @@ capi_err_t capi_jitter_buf_init_out_drift_info(jitter_buf_drift_info_t *   drift
    memset(drift_info_ptr, 0, sizeof(jitter_buf_drift_info_t));
 
    /* Create mutex for the drift info shared with rate matching modules */
-   posal_mutex_create(&drift_info_ptr->drift_info_mutex, POSAL_HEAP_DEFAULT);
+   posal_mutex_create(&drift_info_ptr->drift_info_mutex, heap_id);
 
    /* Set the function pointer for querying the drift */
    drift_info_ptr->drift_info_hdl.get_drift_fn_ptr = get_drift_fn_ptr;

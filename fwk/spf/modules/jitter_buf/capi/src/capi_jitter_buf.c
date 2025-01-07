@@ -63,13 +63,14 @@ capi_err_t capi_jitter_buf_init(capi_t *capi_ptr, capi_proplist_t *init_set_prop
    me_ptr->event_config.process_state = TRUE;
 
    // default is to mark input non-triggerable optional.
-   me_ptr->input_buffer_mode = JBM_BUFFER_INPUT_AT_OUTPUT_TRIGGER;
+   me_ptr->configured_buffer_mode = JBM_BUFFER_INPUT_AT_OUTPUT_TRIGGER;
+   me_ptr->buffer_mode            = me_ptr->configured_buffer_mode;
 
    /* Set the init properties. */
    result = capi_jitter_buf_set_properties((capi_t *)me_ptr, init_set_prop_ptr);
 
    /* Intialize drift accumulator handle. which will be shared with SS module. */
-   result |= capi_jitter_buf_init_out_drift_info(&me_ptr->drift_info, jitter_buf_imcl_read_acc_out_drift);
+   result |= capi_jitter_buf_init_out_drift_info(me_ptr->heap_id, &me_ptr->drift_info, jitter_buf_imcl_read_acc_out_drift);
 
    return result;
 }
@@ -176,6 +177,8 @@ capi_err_t capi_jitter_buf_set_properties(capi_t *capi_ptr, capi_proplist_t *pro
             me_ptr->first_frame_written = FALSE;
 
             me_ptr->settlement_time_done = FALSE;
+
+            me_ptr->steady_state_value_done = FALSE;
 
             AR_MSG(DBG_HIGH_PRIO, "jitter_buf: Reset!");
 
@@ -401,9 +404,6 @@ capi_err_t capi_jitter_buf_set_param(capi_t *                capi_ptr,
          /* copy configuration */
          me_ptr->jitter_allowance_in_ms = cfg_ptr->jitter_allowance_in_ms;
 
-         /* Set the param and calibrate the driver */
-         result = capi_jitter_buf_set_size(me_ptr, FALSE /* NOT DEBUG PARAM */);
-
          break;
       }
       case PARAM_ID_JITTER_BUF_SIZE_CONFIG:
@@ -422,9 +422,6 @@ capi_err_t capi_jitter_buf_set_param(capi_t *                capi_ptr,
 
          /* copy configuration */
          me_ptr->debug_size_ms = cfg_ptr->jitter_allowance_in_ms;
-
-         /* Set param and calibrate driver */
-         result = capi_jitter_buf_set_size(me_ptr, FALSE);
 
          break;
       }
@@ -465,13 +462,14 @@ capi_err_t capi_jitter_buf_set_param(capi_t *                capi_ptr,
             (param_id_jitter_buf_input_buffer_mode_t *)params_ptr->data_ptr;
 
          /* set  configuration */
-         me_ptr->input_buffer_mode = (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == cfg_ptr->input_buffer_mode)
+         me_ptr->configured_buffer_mode = (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == cfg_ptr->input_buffer_mode)
                                         ? JBM_BUFFER_INPUT_AT_INPUT_TRIGGER
                                         : JBM_BUFFER_INPUT_AT_OUTPUT_TRIGGER;
+         me_ptr->buffer_mode            = me_ptr->configured_buffer_mode;
 
          AR_MSG(DBG_HIGH_PRIO,
                 "jitter_buf: input buffering mode %hu [1: BUFFER_AT_INPUT_TRIGGER, 0: BUFFER_AT_OUTPUT_TRIGGER] ",
-                me_ptr->input_buffer_mode);
+                me_ptr->configured_buffer_mode);
 
          result = capi_jitter_buf_change_trigger_policy(me_ptr);
          break;
@@ -543,7 +541,7 @@ capi_err_t capi_jitter_buf_set_param(capi_t *                capi_ptr,
          event_payload.data_ptr                         = (int8_t *)&event;
          event_payload.actual_data_len = event_payload.max_data_len = sizeof(event);
 
-         if (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == me_ptr->input_buffer_mode)
+         if (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == me_ptr->configured_buffer_mode)
          {
             // Reflect the property because input and output are independently triggered based on upstream and downstream
             // respectively.
@@ -638,5 +636,50 @@ capi_err_t capi_jitter_buf_end(capi_t *capi_ptr)
    result |= capi_jitter_buf_deinit_out_drift_info(&me_ptr->drift_info);
 
    me_ptr->vtbl = NULL;
+   return result;
+}
+
+/* Jitter buffer is by default driven based on output availability. Only if output is read
+ * input is written if it is available at that time. If not, the input gets buffered
+ * up in congestion buffering module.
+ * If input buffering mode is enabled (ICMD) then input is written if it is available.*/
+capi_err_t capi_jitter_buf_change_trigger_policy(capi_jitter_buf_t *me_ptr)
+{
+   capi_err_t result = AR_EOK;
+
+   if (NULL == me_ptr->policy_chg_cb.change_data_trigger_policy_cb_fn)
+   {
+      return result;
+   }
+
+   fwk_extn_port_trigger_affinity_t input_group1  = { FWK_EXTN_PORT_TRIGGER_AFFINITY_NONE };
+   fwk_extn_port_trigger_affinity_t output_group1 = { FWK_EXTN_PORT_TRIGGER_AFFINITY_PRESENT };
+
+   fwk_extn_port_trigger_group_t triggerable_groups[1];
+   triggerable_groups[0].in_port_grp_affinity_ptr  = &input_group1;
+   triggerable_groups[0].out_port_grp_affinity_ptr = &output_group1;
+
+   fwk_extn_port_nontrigger_policy_t input_group2  = { FWK_EXTN_PORT_NON_TRIGGER_OPTIONAL };
+   fwk_extn_port_nontrigger_policy_t output_group2 = { FWK_EXTN_PORT_NON_TRIGGER_INVALID };
+
+   fwk_extn_port_nontrigger_group_t nontriggerable_group[1];
+   nontriggerable_group[0].in_port_grp_policy_ptr  = &input_group2;
+   nontriggerable_group[0].out_port_grp_policy_ptr = &output_group2;
+
+   /* If input buffering is to be done at input trigger then need to mark optional triggerable.*/
+   if (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == me_ptr->buffer_mode)
+   {
+      input_group1 = FWK_EXTN_PORT_TRIGGER_AFFINITY_PRESENT;
+      input_group2 = FWK_EXTN_PORT_NON_TRIGGER_INVALID;
+   }
+
+   // By default set the mode to RT, when the write arrives then make it FTRT.
+   result = me_ptr->policy_chg_cb.change_data_trigger_policy_cb_fn(me_ptr->policy_chg_cb.context_ptr,
+                                                                   nontriggerable_group,
+                                                                   FWK_EXTN_PORT_TRIGGER_POLICY_OPTIONAL,
+                                                                   1,
+                                                                   triggerable_groups);
+
+   AR_MSG(DBG_HIGH_PRIO, "jitter_buf: Raised TP with mode : %d", me_ptr->buffer_mode);
    return result;
 }

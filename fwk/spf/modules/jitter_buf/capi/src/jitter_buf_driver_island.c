@@ -29,29 +29,33 @@
    Local Function Implementation
 ==============================================================================*/
 
-/* Calculate and store until drift based on ts_total_data_written_start, current time
- * and data till current time */
-void jitter_buf_update_local_drift_based_on_buffer(capi_jitter_buf_t *me_ptr, uint64_t cur_ts_us)
+/* Calculate and store until drift based on upper/lower thresholds and steady state buffer fullness */
+int8_t jitter_buf_update_local_drift_based_on_buffer(capi_jitter_buf_t *me_ptr, uint32_t unread_bytes)
 {
-   uint64_t time_gap = 0, data_gap = 0;
+   int8_t drift_correction = 0;
 
-   time_gap = cur_ts_us - me_ptr->ts_total_data_written_start;
+   if (unread_bytes > me_ptr->upper_threshold_drift_bytes)
+   {
+      drift_correction    = -1;
+      me_ptr->buffer_mode = JBM_BUFFER_INPUT_AT_OUTPUT_TRIGGER;
+   }
+   else if (unread_bytes <= me_ptr->steady_state_buffer_fullness_bytes)
+   {
+      me_ptr->buffer_mode = JBM_BUFFER_INPUT_AT_INPUT_TRIGGER;
+      if (unread_bytes < me_ptr->lower_threshold_drift_bytes)
+   {
+         drift_correction = 1;
+      }
+   }
 
-   // already checked is_input_mf_receieved at process start
-   data_gap = capi_cmn_bytes_to_us(me_ptr->total_data_written,
-                                   me_ptr->operating_mf.format.sampling_rate,
-                                   me_ptr->operating_mf.format.bits_per_sample,
-                                   1,
-                                   NULL);
+   if(drift_correction != 0)
+   {
+      AR_MSG(DBG_HIGH_PRIO, "JITTER_BUF_DRIVER: drift_direction %d unread_bytes [%ld ]", drift_correction, unread_bytes);
+   }
 
-   me_ptr->total_drift_pending_update_us = time_gap - data_gap;
-
-   AR_MSG(DBG_LOW_PRIO,
-          "JITTER_BUF_DRIVER: Drift: Local accumulated drift %ld timegap %ld datagap %ld",
-          (int32_t)me_ptr->total_drift_pending_update_us,
-          (int32_t)time_gap,
-          (int32_t)data_gap);
+   return drift_correction;
 }
+
 
 /* Update the drift accumulated with the current drift adjustment */
 ar_result_t jitter_buf_update_accumulated_drift(jitter_buf_drift_info_t *shared_drift_ptr,
@@ -66,32 +70,30 @@ ar_result_t jitter_buf_update_accumulated_drift(jitter_buf_drift_info_t *shared_
 
    posal_mutex_lock(shared_drift_ptr->drift_info_mutex);
 
-   shared_drift_ptr->acc_drift.acc_drift_us = current_drift_adjustment;
+   shared_drift_ptr->acc_drift.acc_drift_us += current_drift_adjustment;
 
    posal_mutex_unlock(shared_drift_ptr->drift_info_mutex);
-
-   AR_MSG(DBG_HIGH_PRIO, "jitter_buf: Drift: Updating imcl drift from Jitter Buf with %lld", current_drift_adjustment);
-
+#ifdef DEBUG_JITTER_BUF_DRIVER_DRIFT_ADJ
+   AR_MSG(DBG_HIGH_PRIO, "JITTER_BUF_DRIVER: Drift:
+                  Updating imcl drift from Jitter Buf with %ld us", (uint32_t)current_drift_adjustment);
+#endif
    return result;
 }
 
 /* Check if the local drift is more than the tolerance value and report
  * it if the control link is connected */
-ar_result_t jitter_buf_check_update_imcl_drift(capi_jitter_buf_t *me_ptr)
+ar_result_t jitter_buf_check_update_imcl_drift(capi_jitter_buf_t *me_ptr, int8_t drift_correction)
 {
    ar_result_t result = AR_EOK;
 
-   // updating imcl drift
-   uint32_t drift_local_samples =
-      capi_cmn_us_to_samples(me_ptr->total_drift_pending_update_us, me_ptr->operating_mf.format.sampling_rate);
-
-   if ((drift_local_samples > JITTER_BUF_DRIFT_TOLERANCE_SAMPLES) ||
-       (drift_local_samples < -JITTER_BUF_DRIFT_TOLERANCE_SAMPLES))
+   if (me_ptr->ctrl_port_info.state == CTRL_PORT_PEER_CONNECTED && (0 != drift_correction))
    {
-      result |= jitter_buf_update_accumulated_drift(&me_ptr->drift_info, me_ptr->total_drift_pending_update_us);
+      result |= jitter_buf_update_accumulated_drift(&me_ptr->drift_info, drift_correction * me_ptr->step_drift_us);
+
       if (AR_EOK != result)
       {
          AR_MSG(DBG_ERROR_PRIO, "JITTER_BUF_DRIVER: Failed updating accumulated drift.");
+         return result;
       }
    }
 
@@ -115,21 +117,18 @@ bool_t jitter_buf_settlement_time_reached(capi_jitter_buf_t *me_ptr, uint64_t cu
 }
 
 /* Calculate drift once settlement time is done and report it if required */
-ar_result_t jitter_buf_update_drift_based_on_buffer_fullness(capi_jitter_buf_t *me_ptr, uint32_t data_len)
+ar_result_t jitter_buf_update_drift_based_on_buffer_fullness(capi_jitter_buf_t *me_ptr, bool_t is_input_trig)
 {
    ar_result_t result = AR_EOK;
 
-   if (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == me_ptr->input_buffer_mode)
-   {
-      // during this mode (for ICMD), no need to calculate drift as it won't be correct.
-      return result;
-   }
+   uint32_t unread_bytes = 0;
 
-   uint64_t cur_ts_us = posal_timer_get_time();
+   spf_circ_buf_get_unread_bytes(me_ptr->driver_hdl.reader_handle, &unread_bytes);
 
    /*once settlement time is reached we do not un-set it - it is set only per session. */
    if (!me_ptr->settlement_time_done)
    {
+      uint64_t cur_ts_us = posal_timer_get_time();
       if (!jitter_buf_settlement_time_reached(me_ptr, cur_ts_us))
       {
          /* Drift calculation need not be done yet */
@@ -137,33 +136,25 @@ ar_result_t jitter_buf_update_drift_based_on_buffer_fullness(capi_jitter_buf_t *
       }
       else
       {
-         AR_MSG(DBG_HIGH_PRIO, "JITTER_BUF_DRIVER: Drift: Setllement Time Done at %u", cur_ts_us);
-         me_ptr->settlement_time_done        = TRUE;
-         me_ptr->ts_total_data_written_start = cur_ts_us;
-         me_ptr->total_data_written += data_len;
+         me_ptr->settlement_time_done = TRUE;
          return AR_EOK;
       }
    }
 
-   /* Drift Calculation for local drift donr */
-   jitter_buf_update_local_drift_based_on_buffer(me_ptr, cur_ts_us);
-
-   /*Update imcl drift - if the peer control port is not connected
-    * we don't need to update the imcl drift. */
-   if (me_ptr->ctrl_port_info.state == CTRL_PORT_PEER_CONNECTED)
+   if (!me_ptr->steady_state_value_done)
    {
-      result = jitter_buf_check_update_imcl_drift(me_ptr);
-
-      if (AR_EOK == result)
-      {
-         /* once result is updated reset drift info */
-         me_ptr->ts_total_data_written_start = cur_ts_us;
-         me_ptr->total_data_written          = 0;
-      }
+      return result;
    }
 
-   /* Update data len after updating drift */
-   me_ptr->total_data_written += data_len;
+   if (is_input_trig)
+   {
+      /* Drift Calculation for local drift done */
+      int8_t drift_correction = jitter_buf_update_local_drift_based_on_buffer(me_ptr, unread_bytes);
+
+      /*Update imcl drift - if the peer control port is not connected
+       * we don't need to update the imcl drift. */
+      result = jitter_buf_check_update_imcl_drift(me_ptr, drift_correction);
+   }
 
    return result;
 }
@@ -176,12 +167,18 @@ ar_result_t jitter_buf_check_fill_zeros(capi_jitter_buf_t *me_ptr)
    bool_t is_buf_empty = FALSE;
    spf_circ_buf_driver_is_buffer_empty(me_ptr->driver_hdl.reader_handle, &is_buf_empty);
 
-   if (is_buf_empty)
+   uint32_t frame_size_bytes = capi_cmn_us_to_bytes_per_ch(me_ptr->frame_duration_in_us,
+                                                              me_ptr->operating_mf.format.sampling_rate,
+                                                              me_ptr->operating_mf.format.bits_per_sample);
+
+   uint32_t num_zeros_to_fill = me_ptr->jiter_bytes + frame_size_bytes;
+
+   if(is_buf_empty)
    {
       AR_MSG(DBG_HIGH_PRIO,
              "Jitter_Buf Process Read: Buffer was drained - filling buffer with zeros %d",
-             me_ptr->jiter_bytes);
-      result = spf_circ_buf_memset(me_ptr->driver_hdl.writer_handle, TRUE, me_ptr->jiter_bytes, 0);
+             num_zeros_to_fill);
+      result = spf_circ_buf_memset(me_ptr->driver_hdl.writer_handle, TRUE, num_zeros_to_fill, 0);
    }
 
    return result;
@@ -240,8 +237,6 @@ ar_result_t jitter_buf_stream_write(capi_jitter_buf_t *me_ptr, capi_stream_data_
           unread_bytes);
 #endif
 
-   /* Apply drift correction if buffer size crosses upper/lower thresholds. */
-   jitter_buf_update_drift_based_on_buffer_fullness(me_ptr, in_stream->buf_ptr[0].actual_data_len);
 
    return result;
 }
@@ -291,4 +286,42 @@ ar_result_t jitter_buf_stream_read(capi_jitter_buf_t *me_ptr, capi_stream_data_t
 #endif
 
    return result;
+}
+
+void jitter_buffer_set_steady_state_buffer_fullness(capi_jitter_buf_t *me_ptr)
+{
+
+   uint32_t unread_bytes = 0;
+   spf_circ_buf_get_unread_bytes(me_ptr->driver_hdl.reader_handle, &unread_bytes);
+
+   uint32_t frame_size_bytes = capi_cmn_us_to_bytes_per_ch(me_ptr->frame_duration_in_us,
+                                                           me_ptr->operating_mf.format.sampling_rate,
+                                                           me_ptr->operating_mf.format.bits_per_sample);
+
+   uint32_t circ_buf_size_bytes = capi_cmn_us_to_bytes_per_ch(me_ptr->driver_hdl.circ_buf_size_in_us,
+                                                              me_ptr->operating_mf.format.sampling_rate,
+                                                              me_ptr->operating_mf.format.bits_per_sample);
+
+   uint32_t variation_limit = JITTER_BUF_TOLERANCE_FRAMES * frame_size_bytes;
+
+   me_ptr->lower_threshold_drift_bytes = variation_limit / 2;
+
+   me_ptr->upper_threshold_drift_bytes = circ_buf_size_bytes - variation_limit / 2;
+
+   me_ptr->steady_state_buffer_fullness_bytes = circ_buf_size_bytes / 2;
+
+   /* One sample worth*/
+   me_ptr->step_drift_us =
+      ((((uint32_t)1 /* 1 sample */) * 1000000LL /* us */) / me_ptr->operating_mf.format.sampling_rate);
+
+   AR_MSG(DBG_HIGH_PRIO,
+          "JITTER_BUF_DRIVER: Drift: Setllement Time Done Upper Limit %lu Lower Limit %lu "
+          "steady_state_buffer_fullness %lu",
+          me_ptr->upper_threshold_drift_bytes,
+          me_ptr->lower_threshold_drift_bytes,
+          me_ptr->steady_state_buffer_fullness_bytes);
+
+   me_ptr->steady_state_value_done = TRUE;
+
+   return;
 }

@@ -55,7 +55,11 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
 
    if(!me_ptr->is_input_mf_received || !me_ptr->jitter_allowance_in_ms || me_ptr->is_disabled_by_failure)
    {
-      AR_MSG(DBG_ERROR_PRIO, "jitter_buf: not buf size %d / mf %d, is_module_disabled_by_fatal_failure %d",me_ptr->jitter_allowance_in_ms, me_ptr->is_input_mf_received, me_ptr->is_disabled_by_failure);
+      AR_MSG(DBG_ERROR_PRIO, "jitter_buf: buf size %d, mf received %d, is_module_disabled_by_fatal_failure %d",
+                                    me_ptr->jitter_allowance_in_ms,
+                                    me_ptr->is_input_mf_received,
+                                    me_ptr->is_disabled_by_failure);
+
       if(me_ptr->is_input_mf_received && input[0]->buf_ptr)
       {
          for (int i = 0; i < input[0]->bufs_num; i++)
@@ -81,12 +85,20 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
          return CAPI_EOK;
       }
 
-      /* TODO: Pending - check calculation */
-      me_ptr->frame_duration_in_bytes = input[0]->buf_ptr->actual_data_len;
+      /*Circular buffer can work with only deinterleaved unpacked as of now */
+      me_ptr->frame_duration_in_us = capi_cmn_bytes_to_us(input[0]->buf_ptr->actual_data_len,
+                                                          me_ptr->operating_mf.format.sampling_rate,
+                                                          me_ptr->operating_mf.format.bits_per_sample,
+                                                          1,
+                                                          NULL);
 
-       if (CAPI_EOK != (result = ar_result_to_capi_err(jitter_buf_calibrate_driver(me_ptr))))
+#ifdef DEBUG_JITTER_BUF_DRIVER
+      AR_MSG(DBG_LOW_PRIO, "jitter_buf: frame duration set to %lu", me_ptr->frame_duration_in_us);
+#endif
+       posal_island_trigger_island_exit();
+       if (CAPI_EOK != (result = capi_jitter_buf_set_size(me_ptr)))
        {
-          AR_MSG(DBG_ERROR_PRIO, "jitter_buf: Failed calibrating the driver with error = %lx", result);
+          AR_MSG(DBG_ERROR_PRIO, "jitter_buf: Failed init the driver with error = %lx", result);
 
           for (int i = 0; i < input[0]->bufs_num; i++)
           {
@@ -98,7 +110,7 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
        }
    }
 
-   bool_t is_output_written = FALSE;
+   bool_t is_output_written = FALSE, update_drift_thresh = FALSE, is_input_trig = FALSE;
 
    /* mode0: input buffer at output trigger
     * Module is driven based on the reader availability. So when output is available we
@@ -110,7 +122,7 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
 
    // if input and output are independently triggered then always prefills zeros when buffer is empty.
    // This is to ensure that zeros are pushed in the beginning and not in between of valid input data.
-   if (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == me_ptr->input_buffer_mode)
+   if (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == me_ptr->configured_buffer_mode)
    {
       result |= jitter_buf_check_fill_zeros(me_ptr);
       if (result == AR_EFAILED)
@@ -175,6 +187,14 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
                AR_MSG(DBG_HIGH_PRIO, "Buf empty at read so attempting to write before read ");
             }
          }
+
+         /* This should be the first output trigger after settlement time is reached - we must be in steady state
+          * from now onwards. */
+         if ((output[0]->buf_ptr) && (output[0]->buf_ptr->data_ptr) && me_ptr->settlement_time_done &&
+             (!me_ptr->steady_state_value_done))
+         {
+            update_drift_thresh = TRUE;
+         }
       }
    }
 
@@ -190,6 +210,8 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
          /* Write data into the jitter buffer one frame (assuming
           * one frame was successfully read into the output) */
          result = jitter_buf_stream_write(me_ptr, input[0]);
+
+         is_input_trig = (NULL != input[0]->buf_ptr->data_ptr);
       }
    }
 
@@ -207,6 +229,27 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
           * This works as a queue to prevent overruns in case buffer is
           * almost full */
          return CAPI_EFAILED;
+      }
+   }
+
+   //drift detection is disabled if module is configured at input buffering mode.
+   if (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER != me_ptr->configured_buffer_mode)
+   {
+      /* Apply drift correction if buffer size crosses upper/lower thresholds. Depending on
+       * current status of fullness change trigger policy mode */
+      if (update_drift_thresh)
+      {
+         jitter_buffer_set_steady_state_buffer_fullness(me_ptr);
+      }
+
+      uint8_t prev_buffer_mode = me_ptr->buffer_mode;
+
+      jitter_buf_update_drift_based_on_buffer_fullness(me_ptr, is_input_trig);
+
+      if (prev_buffer_mode != me_ptr->buffer_mode)
+      {
+         posal_island_trigger_island_exit();
+         capi_jitter_buf_change_trigger_policy(me_ptr);
       }
    }
 

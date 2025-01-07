@@ -33,7 +33,7 @@ extern "C" {
 ==============================================================================*/
 
 /* Debug flag */
-#define DEBUG_JITTER_BUF_DRIVER_DRIFT_ADJ
+//#define DEBUG_JITTER_BUF_DRIVER_DRIFT_ADJ
 
 #ifdef DEBUG_JITTER_BUF_DRIVER
 #define DEBUG_JITTER_BUF_DRIVER_DRIFT_ADJ
@@ -55,7 +55,12 @@ extern "C" {
 
 /* TODO: Pending - check values of tolerance and max
  * reported if required*/
-#define JITTER_BUF_DRIFT_TOLERANCE_SAMPLES 3
+
+// Jitter tolerance duration is 1000us due to fractional frame sizes
+// from decoder which may not align with jitter buffer container frame sizes.
+//#define JITTER_BUF_DRIFT_TOLERANCE_SAMPLES 3
+#define JITTER_BUF_DRIFT_TOLERANCE_SAMPLES 48
+#define JITTER_BUF_DRIFT_TOLERANCE_DURATION 1000
 
 /* TODO: Pending - check values */
 static const uint32_t JITTER_BUF_BW      = 1 * 1024 * 1024;
@@ -118,21 +123,28 @@ typedef struct capi_jitter_buf_t
    jitter_buf_events_config_t event_config;
    /* Storing the events raised */
 
-   uint8_t input_buffer_mode;
-   /* input trigger is triggerable optional or non-triggerable optional. */
-
    capi_media_fmt_v2_t operating_mf;
    /* Media format of the module. */
+
+   uint8_t configured_buffer_mode;
+   /* buffer mode set by the calibration.
+   input trigger is triggerable optional or non-triggerable optional. */
+
+   uint8_t buffer_mode;
+   /* buffer mode set dynamically based on drift detection logic. */
 
    bool_t is_input_mf_received;
    /* Indicates if valid media format is received. */
 
+   bool_t settlement_time_done;
+   /* Indicates whether the jitter should have settled by now*/
+
+   bool_t steady_state_value_done;
+   /* Indicates we have reached steady state */
+
    bool_t first_frame_written;
    /* Indicate if the first write is done. This helps to note
     * the ts_first_data after which settling time is given. */
-
-   bool_t settlement_time_done;
-   /* Indicates whether the jitter should have settled by now*/
 
    bool_t is_disabled_by_failure;
    /* Indicates whether module got disabled by fatal failures like malloc/buffer allocation failure.
@@ -160,27 +172,21 @@ typedef struct capi_jitter_buf_t
    jitter_buf_drift_info_t drift_info;
    /* Drift correction that is sent to SS */
 
-   uint32_t total_data_written;
-   /* Total data written from the time ts_total_data_written_start
-    * used for drift reporting*/
+   uint32_t steady_state_buffer_fullness_bytes;
+   /* Steady State buffer fullness that we try to maintain
+    * by toggling trigger policy to pull / stop pull */
 
-   uint64_t ts_total_data_written_start;
-   /* Timestamp of the start of total_data_written chunk
-    * used for drift reporting */
+   uint32_t upper_threshold_drift_bytes;
+   /* Upper drift limit for jitter buffer */
 
-   int64_t total_drift_pending_update_us;
-   /* Total drift that is pending to be updated. We update the shared
-    * accumulated drift when the total local pending drift in beyond a
-    * threshold */
+   uint32_t lower_threshold_drift_bytes;
+   /* Lower drift limit for jitter buffer */
 
-   uint32_t frame_duration_in_bytes;
-   /* Decoder frame duration in us. This might not be the
-    * same as container duration as decoder might raise worst
-    * case threshold but the frame bytes should be same across
-    * process calls */
+   int32_t step_drift_us;
+   /* Drift step for 1 sample correction in us */
 
    uint32_t frame_duration_in_us;
-   /* Decoder frame duration in us obtained from frame_duration_in_bytes */
+   /* Decoder frame duration in us obtained from first input from decoder */
 
    jitter_buf_driver_t driver_hdl;
    /* Jitter Buf driver handle. */
@@ -203,7 +209,7 @@ capi_err_t capi_jitter_buf_raise_output_mf_event(capi_jitter_buf_t *me_ptr, capi
 
 capi_err_t capi_jitter_buf_raise_kpps_bw_event(capi_jitter_buf_t *me_ptr);
 
-capi_err_t capi_jitter_buf_set_size(capi_jitter_buf_t *me_ptr, bool_t is_debug);
+capi_err_t capi_jitter_buf_set_size(capi_jitter_buf_t *me_ptr);
 
 capi_err_t capi_jitter_buf_change_trigger_policy(capi_jitter_buf_t *me_ptr);
 
@@ -219,7 +225,7 @@ capi_err_t capi_jitter_buf_handle_imcl_port_operation(capi_jitter_buf_t *me_ptr,
 
 capi_err_t capi_jitter_buf_send_drift_info_hdl_to_rat(capi_jitter_buf_t *me_ptr);
 
-capi_err_t capi_jitter_buf_init_out_drift_info(jitter_buf_drift_info_t *   drift_info_ptr,
+capi_err_t capi_jitter_buf_init_out_drift_info(uint32_t heap_id, jitter_buf_drift_info_t *     drift_info_ptr,
                                                imcl_tdi_get_acc_drift_fn_t get_drift_fn_ptr);
 
 capi_err_t capi_jitter_buf_deinit_out_drift_info(jitter_buf_drift_info_t *drift_info_ptr);
