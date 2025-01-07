@@ -1465,61 +1465,6 @@ capi_err_t capi_cmn_populate_trigger_ts_payload(capi_buf_t *             params_
    return capi_result;
 }
 
-void capi_cmn_dec_update_buffer_end_md(capi_stream_data_v2_t *in_stream_ptr,
-                                       capi_stream_data_v2_t *out_stream_ptr,
-                                       capi_err_t *           agg_process_result,
-                                       bool_t *               error_recovery_done)
-{
-   // if result is not EOK or ENEEDMORE, or there is error_recovery_done, if we see end md we fill it and reset values
-   // first level check will prevent unnecessary looping for end md
-   if (((CAPI_EOK != *agg_process_result) && (CAPI_ENEEDMORE != *agg_process_result)) || (TRUE == *error_recovery_done))
-   {
-      module_cmn_md_list_t *node_ptr = in_stream_ptr->metadata_list_ptr;
-
-      while (node_ptr)
-      {
-         module_cmn_md_t *md_ptr = node_ptr->obj_ptr;
-         if (MODULE_CMN_MD_ID_BUFFER_END == md_ptr->metadata_id)
-         {
-            module_cmn_md_buffer_end_t *md_buf_end_ptr =
-               (module_cmn_md_buffer_end_t *)((uint8_t *)md_ptr + sizeof(metadata_header_t));
-
-            // error result
-            capi_set_bits(&md_buf_end_ptr->flags,
-                          MD_END_RESULT_FAILED,
-                          MD_END_PAYLOAD_FLAGS_BIT_MASK_ERROR_RESULT,
-                          MD_END_PAYLOAD_FLAGS_SHIFT_ERROR_RESULT);
-
-            // result will be failed but if recovery is done we need to indicate to the clients
-            if (TRUE == *error_recovery_done)
-            {
-               capi_set_bits(&md_buf_end_ptr->flags,
-                             MD_END_RESULT_ERROR_RECOVERY_DONE,
-                             MD_END_PAYLOAD_FLAGS_BIT_MASK_ERROR_RECOVERY_DONE,
-                             MD_END_PAYLOAD_FLAGS_SHIFT_ERROR_RECOVERY_DONE);
-            }
-
-            // reset the flags
-            *error_recovery_done = FALSE;
-            *agg_process_result  = CAPI_EOK;
-
-            AR_MSG(DBG_HIGH_PRIO,
-                   "MD_DBG: Fill error in end md flags: node_ptr 0x%lx, md_ptr 0x%lx, md_id 0x%lx, buf idx msw:0x%lx "
-                   "lsw:0x%lx, flag set %lx",
-                   node_ptr,
-                   md_ptr,
-                   md_ptr->metadata_id,
-                   md_buf_end_ptr->buffer_index_msw,
-                   md_buf_end_ptr->buffer_index_lsw,
-                   md_buf_end_ptr->flags);
-            break;
-         }
-         node_ptr = node_ptr->next_ptr;
-      }
-   }
-   return;
-}
-
 capi_err_t capi_cmn_dec_handle_metadata(capi_stream_data_v2_t *                in_stream_ptr,
                                         capi_stream_data_v2_t *                out_stream_ptr,
                                         intf_extn_param_id_metadata_handler_t *metadata_handler_ptr,

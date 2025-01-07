@@ -672,16 +672,7 @@ static inline ar_result_t gen_cntr_check_and_vote_for_island_in_data_path(gen_cn
        (0 == me_ptr->cu.active_non_island_num_buffers_for_ctrl_port)) // if non-island buffers are active then avoid
                                                                       // island entry
    {
-#ifdef SIM
-      // since sim island entry doesn't rely on pm server aggregated vote therefore it can go in island even when
-      // container has voted against island.
-#ifdef USES_BUILD_XR // Simulation testing for Aurora was already going into island, hence not exiting to avoid island crash
-      return AR_EOK;
-#else
-      posal_island_trigger_island_exit();
-#endif
 
-#endif
       return gen_cntr_check_and_vote_for_island_in_data_path_(me_ptr);
    }
    return AR_EOK;

@@ -2078,6 +2078,7 @@ spf_circ_buf_result_t _circ_buf_raw_write_one_frame(spf_circ_buf_raw_client_t *w
 
             if (have_to_expand)
             {
+               posal_island_trigger_island_exit();
                _circ_buf_raw_expand_buffer_by_chunk(wr_raw_client_ptr);
             }
             else
