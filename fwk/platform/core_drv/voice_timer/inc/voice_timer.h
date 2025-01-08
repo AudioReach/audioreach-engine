@@ -147,6 +147,9 @@ typedef struct spf_msg_sub_vtimer_t
    uint64_t abs_vfr_timestamp;
    /**< Indicates the Qtimer TS at which the periodic soft VFR should start. */
 
+   posal_timer_callback_func_t client_cb_fun_ptr;
+   void *cb_context_ptr;
+
 }spf_msg_sub_vtimer_t;
 
 /**< payload for SPF_MSG_VTIMER_UNSUBSCRIBE. as always spf_msg_header_t precedes this. */
