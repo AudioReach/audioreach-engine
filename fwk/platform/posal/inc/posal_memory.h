@@ -82,6 +82,12 @@ extern "C" {
 /*Returns  heap table index based on actual heap ID */
 #define HEAP_TABLE_INDEX_FROM_HEAP_ID(actual_heap_id) (actual_heap_id - POSAL_HEAP_MGR_HEAP_INDEX_START)
 
+
+//#define ENABLE_SAFE_HEAP  1
+
+// Specific memory alignment is not needed, alignment requirement is zero
+#define POSAL_MEM_ALIGN_UNSPECIFIED 0
+
 /* -----------------------------------------------------------------------
 ** Global definitions/forward declarations
 ** ----------------------------------------------------------------------- */
@@ -94,6 +100,14 @@ typedef enum
    POSAL_MEM_TYPE_LOW_POWER_2, // Low-power 2 memory type
    POSAL_MEM_TYPE_NUM_SUPPORTED
 } posal_mem_t;
+
+typedef enum
+{
+   POSAL_HEAP_NON_ISLAND,          // non island (DDR) memory
+   POSAL_HEAP_ISLAND,              // island memory (TCM, LLC) supported
+   POSAL_HEAP_LPM,                 // LPM memory
+   POSAL_HEAP_NON_ISLAND_SAFE_HEAP // non island (DDR) memory safe heap
+} posal_heap_t;
 
 /** ID of the available heap in the system.  */
 typedef enum
