@@ -32,11 +32,6 @@ static circbuf_result_t _circ_buf_client_resize(circ_buf_t *circ_buf_ptr);
 // Utility to reset the client write chunk position based on current buffer state.
 static circbuf_result_t _circ_buf_write_client_reset(circ_buf_client_t *wr_client_ptr);
 
-#ifdef DEBUG_CIRC_BUF_UTILS
-static void print_chunk_list(circ_buf_t *circ_buf_ptr);
-static void print_client_chunk_positions(circ_buf_t *circ_buf_ptr);
-#endif
-
 // Utility to check if the buffer is corrupted.
 // static circbuf_result_t _circ_buf_check_if_corrupted(circ_buf_t *frag_circ_buf_ptr);
 
@@ -978,7 +973,7 @@ static circbuf_result_t _circ_buf_client_resize(circ_buf_t *circ_buf_ptr)
 }
 
 #ifdef DEBUG_CIRC_BUF_UTILS
-static void print_chunk_list(circ_buf_t *circ_buf_ptr)
+void print_chunk_list(circ_buf_t *circ_buf_ptr)
 {
    spf_list_node_t *head_chunk_ptr = circ_buf_ptr->head_chunk_ptr;
 
@@ -996,7 +991,7 @@ static void print_chunk_list(circ_buf_t *circ_buf_ptr)
    }
 }
 
-static void print_client_chunk_positions(circ_buf_t *circ_buf_ptr)
+void print_client_chunk_positions(circ_buf_t *circ_buf_ptr)
 {
 
    for (spf_list_node_t *client_list_ptr = circ_buf_ptr->rd_client_list_ptr; (NULL != client_list_ptr);

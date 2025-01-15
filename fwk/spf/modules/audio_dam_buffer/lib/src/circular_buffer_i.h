@@ -44,4 +44,10 @@ circbuf_result_t add_circ_buf_data_copy_util(circ_buf_t *      circ_buf_ptr,
  * force adjust unread length to the full size of the buffer.
  */
 circbuf_result_t add_circ_buf_read_client_reset(circ_buf_client_t *client_ptr, bool_t force_reset);
+
+#ifdef DEBUG_CIRC_BUF_UTILS
+void print_chunk_list(circ_buf_t *circ_buf_ptr);
+void print_client_chunk_positions(circ_buf_t *circ_buf_ptr);
+#endif
+
 #endif // __CIRC_BUFFER_I_H
