@@ -58,7 +58,10 @@ struct apm_satellite_cont_node_info_t
   @dependencies
   Before calling this function, the global must be initialized.
 */
-ar_result_t apm_offload_master_memorymap_register(uint32_t mem_map_client, uint32_t master_handle, uint32_t mem_size);
+ar_result_t apm_offload_master_memorymap_register(uint32_t mem_map_client,
+                                                  uint32_t master_handle,
+                                                  uint32_t mem_size,
+                                                  uint32_t heap_mgr_type);
 
 /**
   Deletes the Heap Manager and destroys the record of the

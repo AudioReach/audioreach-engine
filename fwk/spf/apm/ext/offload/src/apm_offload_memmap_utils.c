@@ -135,7 +135,10 @@ ar_result_t apm_offload_global_mem_mgr_init(POSAL_HEAP_ID heap_id)
 }
 // same master memhandle should not come again and again. If this API is called, all that validation should've been
 // done by the memmap APIs if the same region is being mapped again. This will trust that the Master memhandle is unique
-ar_result_t apm_offload_master_memorymap_register(uint32_t mem_map_client, uint32_t master_handle, uint32_t mem_size)
+ar_result_t apm_offload_master_memorymap_register(uint32_t mem_map_client,
+                                                  uint32_t master_handle,
+                                                  uint32_t mem_size,
+												  posal_heap_t heap_mgr_type)
 {
    ar_result_t   result         = AR_EOK;
    uint64_t      virt_addr      = 0;
@@ -171,7 +174,14 @@ ar_result_t apm_offload_master_memorymap_register(uint32_t mem_map_client, uint3
    AR_MSG(DBG_HIGH_PRIO, "Offload: APM Loaned MemMap Register: VA Query returned VA= 0x%lx", virt_addr);
 #endif // APM_OFFLOAD_MAP_UTILS_DBG
 
-   if (AR_DID_FAIL(result = posal_memory_heapmgr_create(&region_heap_id, (void *)virt_addr, mem_size, TRUE)))
+   if (AR_DID_FAIL(result = posal_memory_heapmgr_create_v2(&region_heap_id,
+                                                           (void *)virt_addr,
+                                                           mem_size,
+                                                           TRUE,
+														   heap_mgr_type,
+                                                           NULL,
+                                                           NULL,
+                                                           NULL)))
    {
       AR_MSG(DBG_ERROR_PRIO, "Offload: APM Loaned MemMap Register: Failed to create heap manager");
       return result;
