@@ -702,6 +702,15 @@ ar_result_t sgm_open_fill_sub_graph_cfg(apm_sub_graph_cfg_t **sg_cfg_list_pptr,
 
             fill_size = memscpy(payload_ptr + offset, payload_size, sg_prop_node_ptr, payload_size);
 
+            if (APM_SUB_GRAPH_PROP_ID_SCENARIO_ID == sg_prop_node_ptr->prop_id)
+            {
+               apm_sg_prop_id_scenario_id_t *scenario_id_ptr =
+                  (apm_sg_prop_id_scenario_id_t *)(payload_ptr + offset + sizeof(apm_prop_data_t));
+               if (APM_SUB_GRAPH_SID_VOICE_CALL == scenario_id_ptr->scenario_id)
+               {
+                  scenario_id_ptr->scenario_id = APM_SUB_GRAPH_SID_SAT_VOICE_CALL;
+               }
+            }
             offset += fill_size;
             prop_node_ptr += payload_size;
          }

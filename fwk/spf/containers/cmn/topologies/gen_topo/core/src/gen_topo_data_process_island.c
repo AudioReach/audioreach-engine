@@ -1853,7 +1853,7 @@ GEN_TOPO_STATIC ar_result_t gen_topo_module_process(gen_topo_t *       topo_ptr,
       // clang-format on
    }
 #ifdef PROC_DELAY_DEBUG
-   if (APM_SUB_GRAPH_SID_VOICE_CALL == module_ptr->gu.sg_ptr->sid)
+   if (IS_VOICE_SCENARIO_ID(module_ptr->gu.sg_ptr->sid))
    {
       TOPO_MSG_ISLAND(topo_ptr->gu.log_id,
                       DBG_HIGH_PRIO,

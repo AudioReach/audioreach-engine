@@ -39,6 +39,9 @@ ar_result_t icb_determine_buffering(icb_upstream_info_t *  us_ptr,
    bool_t   is_unit_samples    = FALSE;
    bool_t   is_multiple        = FALSE;
    bool_t   disable_double_buf = FALSE, disable_otp = FALSE, disable_reg_prebuf = FALSE;
+   bool_t   is_us_voice_sid   = IS_VOICE_SCENARIO_ID(us_ptr->sid);
+   bool_t   is_ds_voice_sid   = IS_VOICE_SCENARIO_ID(ds_ptr->sid);
+
 
    /* If period is provided for downstream, then use period as frame length for downstream
     * else if both sample rates are provided, then use in samples, else convert the other to us. */
@@ -92,9 +95,9 @@ ar_result_t icb_determine_buffering(icb_upstream_info_t *  us_ptr,
       ds_frame_len = ds_frame_len_us;
    }
 
-   if (APM_SUB_GRAPH_SID_VOICE_CALL == us_ptr->sid)
+   if (is_us_voice_sid)
    {
-      if (APM_SUB_GRAPH_SID_VOICE_CALL == ds_ptr->sid)
+      if (is_ds_voice_sid)
       {
          // We don't need extra buffering between voice containers.
          disable_double_buf = TRUE;
@@ -121,10 +124,9 @@ ar_result_t icb_determine_buffering(icb_upstream_info_t *  us_ptr,
    disable_double_buf = ((disable_double_buf) || us_ptr->flags.is_default_single_buffering_mode ||
                          ((us_frame_len_us <= ds_frame_len_us) && (ds_ptr->flags.is_default_single_buffering_mode)));
 
-   disable_otp = us_ptr->disable_otp || (APM_SUB_GRAPH_SID_VOICE_CALL == us_ptr->sid) ||
-                 (APM_SUB_GRAPH_SID_VOICE_CALL == ds_ptr->sid);
+   disable_otp = us_ptr->disable_otp || (is_us_voice_sid) || (is_ds_voice_sid);
 
-   disable_reg_prebuf = (APM_SUB_GRAPH_SID_VOICE_CALL == us_ptr->sid);
+   disable_reg_prebuf = is_us_voice_sid;
 
    if (us_frame_len_us >= ds_frame_len_us)
    {
@@ -202,7 +204,7 @@ ar_result_t icb_determine_buffering(icb_upstream_info_t *  us_ptr,
        * e.g. RAT->RAT, or Slimbus->Dec->RAT. Extra empty buffer to cover for any jitter.
        */
       if (us_ptr->flags.is_real_time && ds_ptr->flags.is_real_time && (us_frame_len_us < ds_frame_len_us) &&
-          (APM_SUB_GRAPH_SID_VOICE_CALL != us_ptr->sid))
+          (!is_us_voice_sid))
       {
          result_ptr->num_reg_bufs = result_ptr->num_reg_bufs + 1;
       }

@@ -163,6 +163,7 @@ typedef struct cu_voice_info_t
     cu_voice_cntr_event_flags_t event_flags;            /**< Flag bitfields to indicate the change in cntr proc params
                                                             Used to raise events to vcpm */
     uint32_t      safety_margin_us;
+    bool_t        is_satellite_voice_sid;               /** specifies the container is operating in satellite SPF */
 } cu_voice_info_t;
 
 typedef struct cu_offload_info_t

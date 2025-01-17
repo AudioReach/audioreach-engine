@@ -442,7 +442,7 @@ static ar_result_t spl_topo_process_attached_modules(spl_topo_t *topo_ptr, spl_t
          // clang-format on
 
 #ifdef PROC_DELAY_DEBUG
-         if (APM_SUB_GRAPH_SID_VOICE_CALL == module_ptr->t_base.gu.sg_ptr->sid)
+         if (IS_VOICE_SCENARIO_ID(module_ptr->t_base.gu.sg_ptr->sid))
          {
             TOPO_MSG(topo_ptr->t_base.gu.log_id,
                      DBG_HIGH_PRIO,
@@ -2314,7 +2314,7 @@ ar_result_t spl_topo_process(spl_topo_t *topo_ptr, uint8_t path_index)
                // clang-format on
 
 #ifdef PROC_DELAY_DEBUG
-               if (APM_SUB_GRAPH_SID_VOICE_CALL == curr_module_ptr->t_base.gu.sg_ptr->sid)
+               if (IS_VOICE_SCENARIO_ID(curr_module_ptr->t_base.gu.sg_ptr->sid))
                {
                   TOPO_MSG(topo_ptr->t_base.gu.log_id,
                            DBG_HIGH_PRIO,
