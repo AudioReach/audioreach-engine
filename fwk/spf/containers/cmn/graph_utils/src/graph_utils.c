@@ -504,9 +504,8 @@ static ar_result_t gu_parse_subgraph_props(gu_t *gu_ptr, gu_sg_t *sg_ptr, apm_su
             VERIFY(result, sg_prop_ptr->prop_size >= sizeof(apm_sg_prop_id_scenario_id_t));
             apm_sg_prop_id_scenario_id_t *sid_ptr = (apm_sg_prop_id_scenario_id_t *)(sg_prop_ptr + 1);
             VERIFY(result,
-                   ((APM_SUB_GRAPH_SID_VOICE_CALL == sid_ptr->scenario_id) ||
-                    (APM_SUB_GRAPH_SID_AUDIO_PLAYBACK == sid_ptr->scenario_id) ||
-                    (APM_SUB_GRAPH_SID_AUDIO_RECORD == sid_ptr->scenario_id) ||
+                   (((APM_SUB_GRAPH_SID_AUDIO_PLAYBACK <= sid_ptr->scenario_id) &&
+                     (APM_SUB_GRAPH_SID_SAT_VOICE_CALL >= sid_ptr->scenario_id)) ||
                     (APM_PROP_ID_DONT_CARE == sid_ptr->scenario_id)));
 
             sg_ptr->sid = (uint8_t)sid_ptr->scenario_id;
@@ -518,9 +517,8 @@ static ar_result_t gu_parse_subgraph_props(gu_t *gu_ptr, gu_sg_t *sg_ptr, apm_su
             VERIFY(result, sg_prop_ptr->prop_size >= sizeof(apm_sg_prop_id_scenario_id_t));
             apm_sg_prop_id_scenario_id_t *sid_ptr = (apm_sg_prop_id_scenario_id_t *)(sg_prop_ptr + 1);
             VERIFY(result,
-                   ((APM_SUB_GRAPH_SID_VOICE_CALL == sid_ptr->scenario_id) ||
-                    (APM_SUB_GRAPH_SID_AUDIO_PLAYBACK == sid_ptr->scenario_id) ||
-                    (APM_SUB_GRAPH_SID_AUDIO_RECORD == sid_ptr->scenario_id) ||
+                   (((APM_SUB_GRAPH_SID_AUDIO_PLAYBACK <= sid_ptr->scenario_id) &&
+                     (APM_SUB_GRAPH_SID_SAT_VOICE_CALL >= sid_ptr->scenario_id)) ||
                     (APM_PROP_ID_DONT_CARE == sid_ptr->scenario_id)));
 
 

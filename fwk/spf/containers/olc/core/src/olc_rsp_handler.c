@@ -303,6 +303,9 @@ ar_result_t olc_graph_open_rsp_h(cu_base_t *base_ptr, spgm_cmd_rsp_node_t *rsp_i
 
    TRY(result, sgm_register_olc_module_with_gpr(&me_ptr->spgm_info));
 
+   /* Allocate memory for voice info structure, for voice call use cases*/
+   TRY(result, cu_create_voice_info(&me_ptr->cu, open_cmd_ptr));
+
    TRY(result, cu_init_external_ports(&me_ptr->cu, ALIGN_8_BYTES(sizeof(olc_ext_ctrl_port_t))));
 
    // Check if RT and set frame size

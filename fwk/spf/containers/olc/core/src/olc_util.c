@@ -788,3 +788,8 @@ uint32_t olc_aggregate_ext_out_port_delay_topo_cb(gen_topo_t *topo_ptr, gu_ext_o
    return cu_aggregate_ext_out_port_delay(&me_ptr->cu, gu_ext_out_port_ptr);
 }
 
+ar_result_t olc_aggregate_hw_acc_proc_delay(void *cu_ptr, uint32_t *hw_acc_proc_delay_ptr)
+{
+   *hw_acc_proc_delay_ptr = 0;
+   return AR_EOK;
+}
