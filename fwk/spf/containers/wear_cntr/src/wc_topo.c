@@ -7,7 +7,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -271,7 +271,8 @@ static ar_result_t wcntr_topo_create_virtual_stub(wcntr_topo_t *           topo_
 
    TRY(result, wcntr_topo_check_create_bypass_module(topo_ptr, module_ptr));
 
-   module_ptr->flags.inplace = TRUE;
+   module_ptr->flags.inplace         = TRUE;
+   module_ptr->flags.dynamic_inplace = TRUE;
 
    // stack size for bypass is not high: graph_init_ptr->max_stack_size = MAX(graph_init_ptr->max_stack_size, 0);
    // port_has_threshold, requires_data_buffering -> default value of 0 works.
@@ -310,7 +311,7 @@ static ar_result_t wcntr_topo_create_module(wcntr_topo_t *           topo_ptr,
 
          TRY(result, __gpr_cmd_register(module_ptr->gu.module_instance_id, graph_init_ptr->gpr_cb_fn, gpr_cb_handle));
       }
-	  //Since no query from AMDB type will be 0 
+	  //Since no query from AMDB type will be 0
 	  else if(MODULE_ID_RD_SHARED_MEM_EP == module_ptr->gu.module_id)
 	  {
 
@@ -621,7 +622,7 @@ void wcntr_topo_destroy_module(wcntr_topo_t *topo_ptr, wcntr_topo_module_t *modu
 	   WCNTR_TOPO_MSG(topo_ptr->gu.log_id,
 				  DBG_HIGH_PRIO,
 				  "wcntr_topo_destroy_module Module 0x%lX END",
-				  module_ptr->gu.module_instance_id);	
+				  module_ptr->gu.module_instance_id);
 }
 
 ar_result_t wcntr_topo_destroy_modules(wcntr_topo_t *topo_ptr, spf_cntr_sub_graph_list_t *spf_sg_list_ptr)
@@ -1363,7 +1364,7 @@ static bool_t wcntr_topo_is_module_bypassable(wcntr_topo_module_t *module_ptr)
    }
 
    /**
-    * Only generic may be disabled 
+    * Only generic may be disabled
     */
    if (!((AMDB_MODULE_TYPE_GENERIC == module_ptr->gu.module_type) ||
          (AMDB_MODULE_TYPE_FRAMEWORK == module_ptr->gu.module_type)))

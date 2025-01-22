@@ -46,11 +46,13 @@ INCLUDE FILES FOR MODULE
 #include "posal_err_fatal.h"
 
 #include "gen_topo.h"
+#include "thin_topo_inline.h"
 #include "gen_topo_capi.h"
 #include "gen_topo_buf_mgr.h"
 #include "gen_cntr_utils.h"
 #include "gen_cntr_err_check.h"
 #include "gen_cntr_tgt_specific.h"
+#include "thin_topo_cntr_utils.h"
 #define GEN_CNTR_STATIC static
 
 /**
@@ -163,6 +165,9 @@ typedef struct gen_cntr_ext_in_port_flags_t
 
    uint32_t is_not_reset : 1;                 /**< TRUE indicates port is not in reset state, FALSE indicates port is in reset state*/
 
+#ifdef USES_THIN_TOPO
+   uint32_t pass_thru_upstream_buffer : 1;        /** indicates if the entire topo path is SISO and NBLC starting from this ext-in to the ext-out */
+#endif
 } gen_cntr_ext_in_port_flags_t;
 
 /**

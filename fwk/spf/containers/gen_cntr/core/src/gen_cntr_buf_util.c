@@ -4,7 +4,7 @@
  *     This file contains utility functions for GEN_CNTR buffer handling
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -466,6 +466,8 @@ static uint32_t gen_cntr_set_thresh_value(gen_topo_t *               topo_ptr,
    // modules with num proc loops greater than cannot be supported in Pure ST topology.
    if (module_ptr->num_proc_loops > 1)
    {
+      THIN_TOPO_SET_EXIT_FLAG(topo_ptr, requires_module_looping, TRUE);
+
       topo_ptr->flags.cannot_be_pure_signal_triggered = TRUE;
       GEN_CNTR_MSG(topo_ptr->gu.log_id,
                    DBG_HIGH_PRIO,
@@ -2438,6 +2440,8 @@ ar_result_t gen_cntr_handle_port_data_thresh_change(void *ctx_ptr)
     * if we clear port_thresh event flag, then buffers will never get created.*/
    bool_t thresh_prop_not_complete = FALSE;
 
+   THIN_TOPO_SET_EXIT_FLAG((&me_ptr->topo), thresh_prop_not_complete, FALSE);
+
    GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
                 DBG_MED_PRIO,
                 " in gen_cntr_handle_port_data_thresh_change. thresh event %u, media_fmt_event %u, simple threshold "
@@ -2523,6 +2527,8 @@ ar_result_t gen_cntr_handle_port_data_thresh_change(void *ctx_ptr)
    {
       GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_MED_PRIO, " gen_cntr_handle_port_data_thresh_change not complete");
    }
+
+   THIN_TOPO_SET_EXIT_FLAG((&me_ptr->topo), thresh_prop_not_complete, thresh_prop_not_complete);
 
    // clear anyway as media fmt will call this func again. keeping it on triggers repeated calls from data_process.
    capi_event_flag_ptr->port_thresh = FALSE;

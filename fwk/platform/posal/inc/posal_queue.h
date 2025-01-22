@@ -7,7 +7,7 @@
  *  	 they are no longer needed.
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -221,6 +221,32 @@ ar_result_t posal_queue_enable_disable_signaling(posal_queue_t *q_ptr, bool_t is
   @newpage
 */
 ar_result_t posal_queue_push_back(posal_queue_t* q_ptr, posal_queue_element_t* payload_ptr);
+
+/**
+  Pushes an item to Front of the queue.
+
+  @datatypes
+  posal_queue_t
+
+  @param[in] q_ptr     Pointer to the queue.
+  @param[in] pPayload  Pointer to the address (location) of the item. \n
+                       The item is pushed (copied) onto the queue, not the
+                       queue address.
+
+  @detdesc
+  This function is nonblocking. The user is responsible for not overflowing
+  the queue to avoid getting an unwanted assertion.
+
+  @return
+  0 -- Success
+  @par
+  Nonzero -- Failure
+
+  @dependencies
+  Before calling this function, the object must be created and initialized.
+  @newpage
+*/
+ar_result_t posal_queue_insert_front(posal_queue_t *q_ptr, posal_queue_element_t *payload_ptr);
 
 /**
   Pushes an item onto a priority queue.

@@ -5,7 +5,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -779,6 +779,10 @@ static ar_result_t gen_cntr_data_process_one_frame(gen_cntr_t *me_ptr)
    for (uint8_t i = 0; i < me_ptr->cu.gu_ptr->num_parallel_paths; i++)
    {
       gu_module_list_t *start_module_list_ptr = me_ptr->topo.started_sorted_module_list_ptr;
+
+      // if there was switch from thin topo to gen topo get the module from which process needs to continue.
+      thin_topo_check_get_start_module(&me_ptr->topo, &start_module_list_ptr);
+
       if (0 == me_ptr->wait_mask_arr[i])
       {
          while (TRUE)

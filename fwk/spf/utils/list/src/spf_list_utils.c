@@ -5,7 +5,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -170,58 +170,6 @@ ar_result_t spf_list_attach_at_tail(spf_list_node_t **head_ptr, spf_list_node_t 
 }
 
 /*
-  search for/delete the node for the particular instance from the list
-
-  param[in] head_ptr: pointer to the head of module list
-  param[in] obj_ptr: pointer to the instance that needs to be deleted
-  param[in] to_delete: indicates if the found node needs to be deleted
-
-  return: TRUE if particular instance present, else false
-*/
-bool_t spf_list_search_delete_node(spf_list_node_t **head_ptr, void *obj_ptr, bool_t to_delete, bool_t pool_used)
-{
-   if ((NULL == head_ptr) || (NULL == obj_ptr))
-   {
-      return FALSE;
-   }
-
-   spf_list_node_t *curr_ptr = *head_ptr;
-
-   while (NULL != curr_ptr)
-   {
-      if (curr_ptr->obj_ptr == obj_ptr)
-      {
-         if (to_delete)
-         {
-            if (curr_ptr == *head_ptr)
-            {
-               // Next node becomes head, set prev to null
-               *head_ptr = curr_ptr->next_ptr;
-
-               if (curr_ptr->next_ptr)
-               {
-                  curr_ptr->next_ptr->prev_ptr = NULL;
-               }
-            }
-            else
-            {
-               curr_ptr->prev_ptr->next_ptr = curr_ptr->next_ptr;
-
-               if (curr_ptr->next_ptr)
-               {
-                  curr_ptr->next_ptr->prev_ptr = curr_ptr->prev_ptr;
-               }
-            }
-            spf_list_node_free(curr_ptr, pool_used);
-         }
-         return TRUE;
-      }
-      curr_ptr = curr_ptr->next_ptr;
-   }
-   return FALSE;
-}
-
-/*
   pops the head of the list. Returns the instance pointer for the first node
   and deletes the head node.
 
@@ -301,18 +249,7 @@ bool_t spf_list_contains_node(spf_list_node_t **head_ptr, void *obj_ptr)
                                       TRUE /*pool_used: doesn't matter as we are not deleting*/);
 }
 
-/*
-  Delete the node for the particular instance from the list
 
-  param[in] head_ptr: pointer to the head of module list
-  param[in] obj_ptr: pointer to the instance that needs to be searched/deleted
-
-  return: TRUE if particular instance present, else false
-*/
-bool_t spf_list_find_delete_node(spf_list_node_t **head_ptr, void *obj_ptr, bool_t pool_used)
-{
-   return spf_list_search_delete_node(head_ptr, obj_ptr, TRUE, pool_used);
-}
 
 /*
   delete the complete list, specified by the head pointer, instance memories are not

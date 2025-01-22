@@ -3,7 +3,7 @@
  * \brief
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -998,7 +998,8 @@ PT_CNTR_STATIC ar_result_t pt_cntr_data_process_one_frame(pt_cntr_t *me_ptr)
       // proc_info_ptr->is_in_mod_proc_context = TRUE;
 
       // clang-format off
-      IRM_PROFILE_MOD_PROCESS_SECTION(src_module_ptr->gc.topo.prof_info_ptr, topo_ptr->gu.prof_mutex,
+      IRM_PROFILE_MOD_PROCESS_SECTION(src_module_ptr->gc.topo.prof_info_ptr,
+      topo_ptr->gu.prof_mutex,
       proc_result                           = src_module_ptr->process(src_module_ptr->gc.topo.capi_ptr,
                                             NULL, // will be NULL for src module
                                             (capi_stream_data_t **)src_module_ptr->out_port_sdata_pptr);
@@ -2279,7 +2280,7 @@ capi_err_t pt_cntr_bypass_module_process(capi_t *_pif, capi_stream_data_t *input
    uint32_t ip_idx = 0;
    uint32_t op_idx = 0;
 
-#ifdef VERBOSE_LOGGING
+#ifdef VERBOSE_DEBUGGING
    if (inputs[ip_idx]->bufs_num != outputs[op_idx]->bufs_num)
    {
       GEN_CNTR_MSG(0,

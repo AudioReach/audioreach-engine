@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -19,6 +19,7 @@ ar_result_t gen_cntr_handle_frame_done(gen_topo_t *topo_ptr, uint8_t path_index)
 
    bool_t need_to_handle_frame_done = FALSE;
 
+   bool_t ext_in_has_to_preserve_prebuffer = FALSE;
    for (gu_ext_in_port_list_t *ext_in_port_list_ptr = me_ptr->cu.gu_ptr->ext_in_port_list_ptr; ext_in_port_list_ptr;
         LIST_ADVANCE(ext_in_port_list_ptr))
    {
@@ -38,8 +39,12 @@ ar_result_t gen_cntr_handle_frame_done(gen_topo_t *topo_ptr, uint8_t path_index)
       {
          // if at least one external input port is using prebuffer Q then continue to handle frame_done
          need_to_handle_frame_done = TRUE;
+
+         ext_in_has_to_preserve_prebuffer = TRUE;
       }
    }
+
+   THIN_TOPO_SET_EXIT_FLAG((&me_ptr->topo), has_to_preserve_prebuffer, ext_in_has_to_preserve_prebuffer);
 
    if (AR_SUCCEEDED(cu_raise_frame_done_event(&me_ptr->cu, me_ptr->topo.gu.log_id)))
    {

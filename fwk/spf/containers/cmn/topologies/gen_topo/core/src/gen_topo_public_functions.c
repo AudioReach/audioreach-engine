@@ -7,11 +7,11 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
-#include "gen_topo.h"
+#include "gen_topo_i.h"
 #include "gen_topo_capi.h"
 #include "gen_topo_buf_mgr.h"
 
@@ -810,6 +810,7 @@ void gen_topo_update_dm_enabled_flag(gen_topo_t *topo_ptr)
          if (module_ptr->flags.need_dm_extn && gen_topo_is_dm_enabled(module_ptr))
          {
             topo_ptr->flags.is_dm_enabled = TRUE;
+            THIN_TOPO_SET_EXIT_FLAG(topo_ptr, has_active_dm_module, (topo_ptr->flags.is_dm_enabled ? TRUE : FALSE));
             return;
          }
       }
@@ -861,12 +862,29 @@ void gen_topo_reset_top_level_flags(gen_topo_t *topo_ptr)
 
    TOPO_MSG(topo_ptr->gu.log_id, DBG_LOW_PRIO, "Resetting top level flags.");
 
+   bool_t has_voice_sg            = FALSE;
+   bool_t need_soft_timer_extn    = FALSE;
+   bool_t has_duty_cycling_module = FALSE;
+   bool_t has_signal_tgp_module   = FALSE;
+   bool_t requires_module_looping = FALSE;
+   bool_t has_sh_mem_ep_module    = FALSE;
    for (gu_sg_list_t *sg_list_ptr = topo_ptr->gu.sg_list_ptr; (NULL != sg_list_ptr); LIST_ADVANCE(sg_list_ptr))
    {
+      if (APM_SUB_GRAPH_SID_VOICE_CALL == topo_ptr->gu.sg_list_ptr->sg_ptr->sid)
+      {
+         has_voice_sg = TRUE;
+      }
+
       for (gu_module_list_t *module_list_ptr = sg_list_ptr->sg_ptr->module_list_ptr; (NULL != module_list_ptr);
            LIST_ADVANCE(module_list_ptr))
       {
          gen_topo_module_t *module_ptr = (gen_topo_module_t *)module_list_ptr->module_ptr;
+
+         if ((MODULE_ID_WR_SHARED_MEM_EP == module_ptr->gu.module_id) ||
+             (MODULE_ID_RD_SHARED_MEM_EP == module_ptr->gu.module_id))
+         {
+            has_sh_mem_ep_module = TRUE;
+         }
 
          // reset the flags for all modules that didn't raise an event for data trigger in ST,
          // The need_data_trigger_in_st will be updated properly by propagation.
@@ -913,6 +931,22 @@ void gen_topo_reset_top_level_flags(gen_topo_t *topo_ptr)
          {
             topo_ptr->flags.is_dm_enabled = TRUE;
          }
+
+         // checks for thin topo
+         if (module_ptr->flags.need_soft_timer_extn)
+         {
+            need_soft_timer_extn = TRUE;
+         }
+
+         if (module_ptr->flags.supports_module_allow_duty_cycling)
+         {
+            has_duty_cycling_module = TRUE;
+         }
+
+         if (module_ptr->num_proc_loops > 1)
+         {
+            requires_module_looping = TRUE;
+         }
       }
    }
 
@@ -935,6 +969,11 @@ void gen_topo_reset_top_level_flags(gen_topo_t *topo_ptr)
                }
                gen_topo_propagate_data_trigger_in_st_cntr_event(module_ptr);
             }
+
+            if (gen_topo_is_module_signal_trigger_policy_active(module_ptr))
+            {
+               has_signal_tgp_module = TRUE;
+            }
          }
       }
    }
@@ -951,6 +990,27 @@ void gen_topo_reset_top_level_flags(gen_topo_t *topo_ptr)
    {
       // need to be done after gen_topo_propagate_data_trigger_in_st_cntr_event
       gen_topo_update_data_tpm_count(topo_ptr);
+   }
+
+   // reset all all the thin topo related static property flags here
+   if (topo_ptr->flags.is_signal_triggered)
+   {
+      // intializes data structures requires for tracking if cntr can switch to thin topo.
+      // note: cntr is not switching to thin topo at this point. Cntr will switch to thin topo, only at the end of gen
+      // topo process context if conditions are met.
+      thin_topo_init_handle(topo_ptr);
+      thin_topo_update_exit_flags(topo_ptr,
+                                  has_voice_sg,
+                                  need_soft_timer_extn,
+                                  has_duty_cycling_module,
+                                  has_signal_tgp_module,
+                                  requires_module_looping,
+                                  has_sh_mem_ep_module);
+   }
+   else
+   {
+      // free thin topo structure if container becomes non-signal triggered
+      thin_topo_reset_handle(topo_ptr, TRUE);
    }
 }
 

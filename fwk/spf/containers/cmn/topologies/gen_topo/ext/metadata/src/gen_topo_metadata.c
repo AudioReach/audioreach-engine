@@ -7,15 +7,16 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #include "gen_topo.h"
 #include "gen_topo_capi.h"
 #include "spf_ref_counter.h"
+#include "thin_topo_inline.h"
 
-static ar_result_t gen_topo_metadata_create_with_tracking(uint32_t                  log_id,
+static ar_result_t gen_topo_metadata_create_with_tracking(gen_topo_t *               topo_ptr,
                                                           module_cmn_md_list_t **   md_list_pptr,
                                                           uint32_t                  size,
                                                           capi_heap_id_t            heap_id,
@@ -102,7 +103,7 @@ ar_result_t gen_topo_create_eos_for_cntr(gen_topo_t *               topo_ptr,
    }
 
    TRY(result,
-       gen_topo_metadata_create_with_tracking(topo_ptr->gu.log_id,
+       gen_topo_metadata_create_with_tracking(topo_ptr,
                                               eos_md_list_pptr,
                                               sizeof(module_cmn_md_eos_t),
                                               heap_info,
@@ -184,7 +185,7 @@ ar_result_t gen_topo_create_eos_for_cntr(gen_topo_t *               topo_ptr,
  *  1. By pause modules.
  *  2. By container if the upstream SG is suspended and self SG is started.
  */
-ar_result_t gen_topo_create_dfg_metadata(uint32_t               log_id,
+ar_result_t gen_topo_create_dfg_metadata(gen_topo_t            *topo_ptr,
                                          module_cmn_md_list_t **metadata_list_pptr,
                                          POSAL_HEAP_ID          heap_id,
                                          module_cmn_md_t **     dfg_md_pptr,
@@ -192,11 +193,12 @@ ar_result_t gen_topo_create_dfg_metadata(uint32_t               log_id,
                                          topo_media_fmt_t *     media_format_ptr)
 {
    ar_result_t result = AR_EOK;
+   uint32_t    log_id = topo_ptr->gu.log_id;
 
    if (dfg_md_pptr)
    {
       ar_result_t local_result =
-         gen_topo_metadata_create(log_id, metadata_list_pptr, 0, heap_id, FALSE /* is_out_band*/, dfg_md_pptr);
+         gen_topo_metadata_create(topo_ptr, metadata_list_pptr, 0, heap_id, FALSE /* is_out_band*/, dfg_md_pptr);
 
       if (AR_SUCCEEDED(local_result))
       {
@@ -653,7 +655,7 @@ ar_result_t gen_topo_raise_tracking_event(gen_topo_t *          topo_ptr,
 /**
  * function to create meta-data with tracking feature.
  */
-static ar_result_t gen_topo_metadata_create_with_tracking(uint32_t                  log_id,
+static ar_result_t gen_topo_metadata_create_with_tracking(gen_topo_t               *topo_ptr,
                                                           module_cmn_md_list_t **   md_list_pptr,
                                                           uint32_t                  size,
                                                           capi_heap_id_t            heap_id,
@@ -666,6 +668,7 @@ static ar_result_t gen_topo_metadata_create_with_tracking(uint32_t              
    INIT_EXCEPTION_HANDLING
    uint32_t md_size = sizeof(module_cmn_md_t);
    uint32_t md_tracking_heap_id;
+   uint32_t log_id = topo_ptr->gu.log_id;
 
    bool_t tracking_ref_created = FALSE;
    bool_t tracking_mode        = FALSE;
@@ -750,15 +753,13 @@ static ar_result_t gen_topo_metadata_create_with_tracking(uint32_t              
                             (POSAL_HEAP_ID)heap_id.heap_id,
                             TRUE /* use pool */));
 
-#if defined(METADATA_DEBUGGING)
    spf_list_get_tail_node((spf_list_node_t *)*md_list_pptr, &tail_node_ptr);
+#if defined(METADATA_DEBUGGING)
    TOPO_MSG(log_id,
             DBG_MED_PRIO,
             "MD_DBG: Metadata create: spf_list_node_t 0x%p host md_ptr 0x%p",
             tail_node_ptr,
             md_ptr);
-#else
-   (void)tail_node_ptr;
 #endif
 
    md_ptr->metadata_flag = flags;
@@ -784,6 +785,13 @@ static ar_result_t gen_topo_metadata_create_with_tracking(uint32_t              
       MFREE_NULLIFY(md_ptr);
       // No errors after inserting to linked list
    }
+
+   // Increment md counter as the last step, so that if there was any error MD counter incremented can be skipped.
+   if (ar_result == AR_EOK)
+   {
+      thin_topo_incr_active_md_nodes(topo_ptr, (module_cmn_md_list_t *)tail_node_ptr);
+   }
+
    return ar_result;
 }
 
@@ -815,7 +823,7 @@ capi_err_t gen_topo_capi_metadata_create_with_tracking(void *                   
    TOPO_MSG(topo_ptr->gu.log_id, DBG_LOW_PRIO, "MD_DBG: create metadata 0x%lx", metadata_id);
 #endif
 
-   ar_result = gen_topo_metadata_create_with_tracking(topo_ptr->gu.log_id,
+   ar_result = gen_topo_metadata_create_with_tracking(topo_ptr,
                                                       md_list_pptr,
                                                       size,
                                                       heap_id,

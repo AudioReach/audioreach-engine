@@ -5,7 +5,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -1584,7 +1584,7 @@ ar_result_t spl_cntr_deliver_output_buffer(spl_cntr_t *me_ptr, spl_cntr_ext_out_
    }
 
    topo_port_state_t ds_downgraded_state =
-      cu_get_external_output_ds_downgraded_port_state(&me_ptr->cu, &ext_out_port_ptr->gu);
+      cu_get_external_output_ds_downgraded_port_state( &ext_out_port_ptr->cu);
 
    // can happen if downstream is stopped.
    if (TOPO_PORT_STATE_STARTED != ds_downgraded_state)

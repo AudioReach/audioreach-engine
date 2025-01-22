@@ -8,7 +8,7 @@
  *  
  * 
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -28,6 +28,8 @@ spf_list_node_t *spf_list_get_node(POSAL_HEAP_ID heap_id);
 void spf_list_node_return(spf_list_node_t *node_ptr);
 
 void spf_list_node_free(spf_list_node_t *node_ptr, bool_t pool_used);
+
+bool_t spf_list_search_delete_node(spf_list_node_t **head_ptr, void *obj_ptr, bool_t to_delete, bool_t pool_used);
 
 #ifdef __cplusplus
 }

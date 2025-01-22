@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -1446,19 +1446,14 @@ capi_err_t gen_topo_copy_input_to_output(gen_topo_t *        topo_ptr,
    return result;
 }
 
-void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr)
+void gen_topo_process_attached_module_to_output(gen_topo_t             *topo_ptr,
+                                                gen_topo_module_t      *module_ptr,
+                                                gen_topo_output_port_t *out_port_ptr)
 {
-   /**
-    * Process output side attached point modules.
-    */
    capi_err_t attached_proc_result = CAPI_EOK;
-   for (gu_output_port_list_t *out_port_list_ptr = module_ptr->gu.output_port_list_ptr; out_port_list_ptr;
-        LIST_ADVANCE(out_port_list_ptr))
-   {
-      gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
       if (!out_port_ptr->gu.attached_module_ptr)
       {
-         continue;
+      return;
       }
 
          gen_topo_module_t *out_attached_module_ptr = (gen_topo_module_t *)out_port_ptr->gu.attached_module_ptr;
@@ -1479,8 +1474,7 @@ void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo
              (attached_mod_ip_port_ptr->common.flags.module_rejected_mf))
          {
 #ifdef VERBOSE_DEBUGGING
-            uint32_t mask =
-               ((out_attached_module_ptr->flags.disabled << 2) | (out_port_ptr->common.flags.is_mf_valid << 1) |
+      uint32_t mask = ((out_attached_module_ptr->flags.disabled << 2) | (out_port_ptr->common.flags.is_mf_valid << 1) |
                 attached_mod_ip_port_ptr->common.flags.module_rejected_mf);
             TOPO_MSG(topo_ptr->gu.log_id,
                      DBG_MED_PRIO,
@@ -1498,7 +1492,7 @@ void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo
                         : (0 == out_port_ptr->common.sdata.buf_ptr[0].actual_data_len),
                      (NULL == out_port_ptr->common.sdata.metadata_list_ptr));
 #endif
-            continue;
+      return;
          }
 
          uint32_t out_port_idx = out_port_ptr->gu.cmn.index;
@@ -1561,6 +1555,19 @@ void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo
          }
 #endif
     }
+
+void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr)
+{
+   /**
+    * Process output side attached point modules.
+    */
+   for (gu_output_port_list_t *out_port_list_ptr = module_ptr->gu.output_port_list_ptr; out_port_list_ptr;
+        LIST_ADVANCE(out_port_list_ptr))
+   {
+      gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
+
+      gen_topo_process_attached_module_to_output(topo_ptr, module_ptr, out_port_ptr);
+   }
 }
 
 /**

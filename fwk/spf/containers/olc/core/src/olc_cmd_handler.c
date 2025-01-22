@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -248,7 +248,7 @@ static ar_result_t olc_post_operate_on_connected_input(olc_t *                  
             {
                uint32_t         bytes_across_all_ch = gen_topo_get_total_actual_len(&conn_in_port_ptr->common);
                module_cmn_md_t *out_md_ptr          = NULL;
-               result                               = gen_topo_create_dfg_metadata(me_ptr->topo.gu.log_id,
+               result                               = gen_topo_create_dfg_metadata(&me_ptr->topo,
                                                      &conn_in_port_ptr->common.sdata.metadata_list_ptr,
                                                      me_ptr->cu.heap_id,
                                                      &out_md_ptr,
@@ -551,7 +551,7 @@ ar_result_t olc_operate_on_ext_in_port(void *             base_ptr,
          if (ext_in_port_ptr->wdp_ctrl_cfg_ptr)
          {
             cu_stop_listen_to_mask(&me_ptr->cu, ext_in_port_ptr->wdp_ctrl_cfg_ptr->sat_rw_bit_mask);
-         }      
+         }
    }
 
    if (TOPO_SG_OP_CLOSE == sg_ops)
@@ -622,7 +622,7 @@ ar_result_t olc_post_operate_on_ext_in_port(void *                     base_ptr,
       else if (TOPO_SG_OP_SUSPEND & sg_ops)
       {
          module_cmn_md_t *out_md_ptr = NULL;
-         result                      = gen_topo_create_dfg_metadata(me_ptr->topo.gu.log_id,
+         result                      = gen_topo_create_dfg_metadata(&me_ptr->topo,
                                                &ext_in_port_ptr->md_list_ptr,
                                                me_ptr->cu.heap_id,
                                                &out_md_ptr,

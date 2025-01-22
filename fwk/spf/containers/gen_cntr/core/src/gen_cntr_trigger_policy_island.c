@@ -4,7 +4,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -120,7 +120,7 @@ static gen_topo_port_trigger_need_t gen_cntr_ext_out_needs_to_be_waited_on(gen_c
    gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
    gen_topo_module_t *     module_ptr   = (gen_topo_module_t *)out_port_ptr->gu.cmn.module_ptr;
    topo_port_state_t       ds_downgraded_state =
-      cu_get_external_output_ds_downgraded_port_state(&me_ptr->cu, &ext_out_port_ptr->gu);
+      cu_get_external_output_ds_downgraded_port_state(&ext_out_port_ptr->cu);
    /**
     * First check all the blocked conditions. which are as followings.
     * 1. do not wait for the external ports which are not started.

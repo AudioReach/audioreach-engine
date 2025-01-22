@@ -7,7 +7,7 @@
  *  
  * 
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -54,8 +54,8 @@ typedef struct topo_buf_manager_element_t
 typedef enum topo_buf_manager_mode_t
 {
    TOPO_BUF_MODE_INVALID = 0,
-   TOPO_BUF_LOW_LATENCY = 1,      
-   TOPO_BUF_LOW_POWER = 2,     
+   TOPO_BUF_LOW_LATENCY = 1,
+   TOPO_BUF_LOW_POWER = 2,
 } topo_buf_manager_mode_t;
 
 typedef struct topo_buf_manager_t
@@ -80,7 +80,7 @@ ar_result_t topo_buf_manager_get_buf(gen_topo_t *topo_ptr, int8_t **buf_pptr, ui
 
 void topo_buf_manager_return_buf(gen_topo_t *topo_ptr, int8_t *buf_ptr);
 
-void topo_buf_manager_destroy_all_unused_buffers(gen_topo_t *topo_ptr);
+void topo_buf_manager_destroy_all_unused_buffers(gen_topo_t *topo_ptr, bool_t force_free);
 
 #ifdef ENABLE_BUF_MANAGER_TEST
 ar_result_t buf_mgr_test();

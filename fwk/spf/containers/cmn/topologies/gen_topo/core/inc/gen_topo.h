@@ -10,7 +10,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -57,6 +57,7 @@
 #include "topo_buf_mgr.h"
 #include "gen_topo_pure_st.h"
 #include "rtm_logging_api.h"
+#include "thin_topo.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -135,6 +136,10 @@ typedef struct gen_topo_module_bypass_t      gen_topo_module_bypass_t;
 typedef struct gen_topo_vtable_t             gen_topo_vtable_t;
 typedef struct gen_topo_common_port_t        gen_topo_common_port_t;
 typedef struct gen_topo_graph_init_t         gen_topo_graph_init_t;
+
+#ifdef USES_THIN_TOPO
+typedef struct thin_topo_t                    thin_topo_t;
+#endif
 
 /*
  * Table of functions that can be populated by different topo implementations
@@ -255,6 +260,8 @@ typedef struct topo_to_cntr_vtable_t
    ar_result_t (*notify_ts_disc_evt)(gen_topo_t *topo_ptr, bool_t ts_valid, int64_t timestamp_disc_us, uint32_t path_index);
 
    ar_result_t (*module_buffer_access_event)(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr, capi_event_info_t *event_info_ptr);
+
+   ar_result_t (*check_if_any_ext_in_has_to_preserve_prebuffer)(gen_topo_t *topo_ptr, bool_t *has_to_preserve_prebuffer);
 } topo_to_cntr_vtable_t;
 
 
@@ -315,6 +322,9 @@ typedef struct gen_topo_process_info_t
                                                       If not we need to wait for ext trigger like cmd or data or buf or timer*/
       uint8_t   probing_for_tpm_activity : 1;   /**< Probing trigger policy modules for activity. If nothing changes when all trigger policy modules are done,
                                                       break processing. saves MIPS. Valid for signal trigger container, after signal trigger.*/
+#ifdef USES_THIN_TOPO
+      uint8_t   atleast_one_inp_holds_ext_buffer : 1;     /**< If set means, atleast one internal input is holding/propagating external input buffer to the NBLC */
+#endif
    };
    uint8_t      num_data_tpm_done;              /**< number of data trigger policy modules done in one process call. used only under probing_tpm_for_activity.*/
 
@@ -425,6 +435,8 @@ typedef struct gen_topo_process_context_t
    gen_topo_trigger_t                 curr_trigger;           /**< current trigger that caused process frames */
 
    uint32_t                           err_print_time_in_this_process_ms;
+
+   capi_err_t                         proc_result;
 } gen_topo_process_context_t;
 
 
@@ -653,7 +665,26 @@ typedef struct gen_topo_t
 
    uint32_t                      port_mf_rtm_dump_seq_num;  /**< sequence number used for dumping port MF to RTM */
 
-   topo_capi_callback_f       capi_cb;          /**< CAPI callback function */
+   topo_capi_callback_f          capi_cb;          /**< CAPI callback function */
+
+#ifdef USES_THIN_TOPO
+   thin_topo_exit_flags_t        exit_flags;
+   /** if any of the bit is set in the mask, cntr cannot process data with thin topo.
+    This mask field needs to be tracked irrespective of whether cntr is signal triggered since
+    container can be thin topo at any point. For example metadata and prebuffer related flags
+    must be tracked always.  */
+
+   spf_list_node_t*              list_of_active_md_node_ptr;
+   /**<MD needs to be tracked always for GC since its required for thin topo. irrespective of
+       whether container is currently signal triggered or not. Because it can become signal
+       triggered later. > */
+
+   thin_topo_t                   *thin_topo_ptr;
+   /**This memory will be allocated by thin topo only if its GC & signal triggered container.
+      Unlike the exit flags field, this struct is allocated only if thin cntr is signal triggered.
+      it contains information related to thin topo process context.*/
+#endif
+
 } gen_topo_t;
 
 
@@ -878,6 +909,10 @@ typedef union gen_topo_port_flags_t
                                                 GEN_TOPO_MF_PCM_UNPACKED_V2=0x2 indicates unpacked V2 */
 
       uint32_t       supports_buffer_resuse_extn: 2; /**< GEN_TOPO_MODULE_* bit mask */
+#ifdef USES_THIN_TOPO
+      uint32_t       thin_topo_can_assign_ext_in_buffer;
+      uint32_t       thin_topo_can_assign_ext_out_buffer;
+#endif
    };
    uint32_t          word;
 
@@ -1842,6 +1877,7 @@ ar_result_t gen_topo_sync_to_input_timestamp(gen_topo_t *           topo_ptr,
                                              gen_topo_input_port_t *in_port_ptr,
                                              uint32_t               data_consumed_in_process_per_buf);
 void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr);
+void gen_topo_process_attached_module_to_output(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr, gen_topo_output_port_t *out_port_ptr);
 
 void gen_topo_drop_data_after_mod_process(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr, gen_topo_output_port_t *out_port_ptr);
 void gen_topo_print_process_error(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr);

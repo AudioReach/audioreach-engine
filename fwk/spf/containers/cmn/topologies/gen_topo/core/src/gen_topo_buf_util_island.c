@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -456,15 +456,16 @@ static int8_t *topo_buf_manager_allocate_buf(gen_topo_t *topo_ptr, uint32_t buf_
    return buf_ptr;
 }
 
-void topo_buf_manager_destroy_all_unused_buffers(gen_topo_t *topo_ptr)
+void topo_buf_manager_destroy_all_unused_buffers(gen_topo_t *topo_ptr, bool_t force_free)
 {
    topo_buf_manager_element_t *last_element_ptr = (topo_buf_manager_element_t *)(topo_ptr->buf_mgr.last_node_ptr);
-   spf_list_node_t *           prev_node_ptr;
+   spf_list_node_t            *prev_node_ptr;
 
    // Iterate and delete the buffers from the end of the list, if the unused count reaches the limit
    // End the iteration on hitting a node whose unused count is less than MAX.
-   while (last_element_ptr && (MAX_BUF_UNUSED_COUNT <= last_element_ptr->unused_count) &&
-          (topo_ptr->buf_mgr.total_num_bufs_allocated < last_element_ptr->unused_count))
+   while (last_element_ptr &&
+          (force_free || ((MAX_BUF_UNUSED_COUNT <= last_element_ptr->unused_count) &&
+                          (topo_ptr->buf_mgr.total_num_bufs_allocated < last_element_ptr->unused_count))))
    {
 #ifdef TOPO_BUF_MGR_DEBUG
       TBF_MSG(topo_ptr->gu.log_id,
@@ -538,7 +539,7 @@ static void topo_buf_manager_check_destroy_unused_buf(gen_topo_t *topo_ptr)
       We also call destroy buffers at the end of event/cmd handling, to free any pending buffers. */
    if (PM_ISLAND_VOTE_ENTRY != topo_ptr->flags.aggregated_island_vote)
    {
-      topo_buf_manager_destroy_all_unused_buffers(topo_ptr);
+      topo_buf_manager_destroy_all_unused_buffers(topo_ptr, FALSE);
    }
 
    // update unused count for the unused nodes at the end

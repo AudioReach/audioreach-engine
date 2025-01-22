@@ -4,7 +4,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -157,8 +157,9 @@ static const topo_to_cntr_vtable_t topo_to_spl_cntr_vtable = {
    .aggregate_ext_in_port_delay                 = spl_cntr_aggregate_ext_in_port_delay_topo_cb,
    .aggregate_ext_out_port_delay                = spl_cntr_aggregate_ext_out_port_delay_topo_cb,
 
-   .notify_ts_disc_evt                          = NULL,
-   .module_buffer_access_event                  = NULL,
+   .notify_ts_disc_evt                             = NULL,
+   .module_buffer_access_event                     = NULL,
+   .check_if_any_ext_in_has_to_preserve_prebuffer  = NULL,
 };
 // clang-format on
 
