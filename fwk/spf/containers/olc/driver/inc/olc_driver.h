@@ -124,6 +124,14 @@ ar_result_t sgm_handle_persistent_cfg(spgm_info_t *                     spgm_ptr
                                       bool_t                            is_deregister,
                                       spgm_set_get_cfg_cmd_extn_info_t *cmd_extn_ptr);
 
+ar_result_t sgm_handle_persistent_cfg_v2(spgm_info_t *                     spgm_ptr,
+                                         void **                           param_data_pptr,
+                                         uint32_t                          num_config,
+                                         uint32_t                          payload_size,
+                                         bool_t                            is_inband,
+                                         bool_t                            is_deregister,
+                                         spgm_set_get_cfg_cmd_extn_info_t *cmd_extn_ptr);
+
 ar_result_t sgm_handle_set_get_cfg(spgm_info_t *                     spgm_ptr,
                                    spf_msg_cmd_param_data_cfg_t *    gmc_apm_param_data_cfg_ptr,
                                    uint32_t                          payload_size,
