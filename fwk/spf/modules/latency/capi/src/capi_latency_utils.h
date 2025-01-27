@@ -48,7 +48,7 @@ static const uint32_t CAPI_LATENCY_MAX_DELAY_US = 500000;
 
 #define PCM_CHANNEL_NULL 0
 
-#define CAPI_LATENCY_DBG_MSG 1
+//#define CAPI_LATENCY_DBG_MSG
 
 #define CAPI_LATENCY_ALIGN_4_BYTE(x) (((x) + 3) & (0xFFFFFFFC))
 
