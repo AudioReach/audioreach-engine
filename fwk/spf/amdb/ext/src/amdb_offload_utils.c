@@ -33,7 +33,7 @@ ar_result_t amdb_clean_up_proc_id_cmd_ctrl(amdb_thread_t *amdb_info_ptr, uint32_
             __gpr_cmd_end_command(cmd_gpr_payload_ptr, AR_EFAILED); // send fail response to master's client
             if (NULL != cur_cmd_ctrl_ptr->loaned_mem_ptr)
             {
-               apm_offload_memory_free(cur_cmd_ctrl_ptr->loaned_mem_ptr);
+               apm_offload_memory_free(&cur_cmd_ctrl_ptr->ret_info);
             }
             LIST_ADVANCE(list_ptr); // advance the list before deleting it
             result |= amdb_clear_cmd_ctrl(amdb_info_ptr, cur_cmd_ctrl_ptr);
@@ -46,15 +46,15 @@ ar_result_t amdb_clean_up_proc_id_cmd_ctrl(amdb_thread_t *amdb_info_ptr, uint32_
    return result;
 }
 
-ar_result_t amdb_set_cmd_ctrl(amdb_thread_t    *amdb_info_ptr,
-                              spf_msg_t        *msg_ptr,
-                              void             *master_payload_ptr,
+ar_result_t amdb_set_cmd_ctrl(amdb_thread_t *   amdb_info_ptr,
+                              spf_msg_t *       msg_ptr,
+                              void *            master_payload_ptr,
                               bool_t            is_out_of_band,
                               amdb_cmd_ctrl_t **curr_cmd_ctrl_pptr,
                               uint32_t          dst_domain_id)
 {
    ar_result_t      result = AR_EOK;
-   gpr_packet_t    *gpr_pkt_ptr;
+   gpr_packet_t *   gpr_pkt_ptr;
    amdb_cmd_ctrl_t *cmd_ctrl_ptr;
    uint32_t         cmd_opcode;
 
@@ -137,21 +137,21 @@ static amdb_cmd_ctrl_t *amdb_get_cmd_ctrl_obj(amdb_thread_t *amdb_info_ptr, uint
  * This function should only manage the memory allocated within.
  */
 ar_result_t amdb_route_cmd_to_satellite(amdb_thread_t *amdb_info_ptr,
-                                        spf_msg_t     *msg_ptr,
+                                        spf_msg_t *    msg_ptr,
                                         uint32_t       dst_domain_id,
-                                        uint8_t       *amdb_payload_ptr)
+                                        uint8_t *      amdb_payload_ptr)
 {
    ar_result_t result = AR_EOK;
 
    /** Get the pointer to GPR command */
-   gpr_packet_t     *pkt_ptr             = (gpr_packet_t *)msg_ptr->payload_ptr;
-   void             *payload_ptr         = GPR_PKT_GET_PAYLOAD(void, pkt_ptr);
-   gpr_packet_t     *new_cmd_gpr_ptr     = NULL;
-   void             *new_cmd_payload_ptr = NULL;
+   gpr_packet_t *    pkt_ptr             = (gpr_packet_t *)msg_ptr->payload_ptr;
+   void *            payload_ptr         = GPR_PKT_GET_PAYLOAD(void, pkt_ptr);
+   gpr_packet_t *    new_cmd_gpr_ptr     = NULL;
+   void *            new_cmd_payload_ptr = NULL;
    apm_cmd_header_t *new_apm_header_ptr  = NULL;
    bool_t            is_out_of_band      = FALSE;
    uint32_t          amdb_payload_size   = 0;
-   amdb_cmd_ctrl_t  *curr_cmd_ctrl_ptr   = NULL;
+   amdb_cmd_ctrl_t * curr_cmd_ctrl_ptr   = NULL;
    /** Set the command control for this command */
    if (AR_EOK != (result = amdb_set_cmd_ctrl(amdb_info_ptr,
                                              msg_ptr,
@@ -198,9 +198,8 @@ ar_result_t amdb_route_cmd_to_satellite(amdb_thread_t *amdb_info_ptr,
    if (is_out_of_band)
    {
       amdb_payload_size = new_apm_header_ptr->payload_size;
-      apm_offload_ret_info_t ret_info;
       curr_cmd_ctrl_ptr->loaned_mem_ptr =
-         (void *)apm_offload_memory_malloc(dst_domain_id, amdb_payload_size, &ret_info);
+         (void *)apm_offload_memory_malloc(dst_domain_id, amdb_payload_size, &curr_cmd_ctrl_ptr->ret_info);
 
       if (NULL == curr_cmd_ctrl_ptr->loaned_mem_ptr)
       {
@@ -219,8 +218,8 @@ ar_result_t amdb_route_cmd_to_satellite(amdb_thread_t *amdb_info_ptr,
              ret_info.sat_handle);
 #endif
       // replace the mem handle with the sat handle
-      new_apm_header_ptr->mem_map_handle      = ret_info.sat_handle;
-      new_apm_header_ptr->payload_address_lsw = ret_info.offset; // offset mode mapped
+      new_apm_header_ptr->mem_map_handle      = curr_cmd_ctrl_ptr->ret_info.sat_handle;
+      new_apm_header_ptr->payload_address_lsw = curr_cmd_ctrl_ptr->ret_info.offset; // offset mode mapped
       new_apm_header_ptr->payload_address_msw = 0;
       curr_cmd_ctrl_ptr->is_out_of_band       = TRUE;
    }
@@ -238,7 +237,7 @@ __bailout_route_cmd_2:
    __gpr_cmd_free(new_cmd_gpr_ptr);
    if (NULL != curr_cmd_ctrl_ptr->loaned_mem_ptr)
    {
-      apm_offload_memory_free(curr_cmd_ctrl_ptr->loaned_mem_ptr);
+      apm_offload_memory_free(&curr_cmd_ctrl_ptr->ret_info);
    }
 __bailout_route_cmd_1:
    // Note: caller responds to the client
@@ -250,11 +249,11 @@ ar_result_t amdb_route_basic_rsp_to_client(amdb_thread_t *amdb_info_ptr, spf_msg
 {
    ar_result_t result = AR_EOK;
    /** Get the pointer to GPR command */
-   gpr_packet_t            *basic_rsp_pkt_ptr     = (gpr_packet_t *)msg_ptr->payload_ptr;
-   gpr_packet_t            *cmd_gpr_payload_ptr   = NULL;
+   gpr_packet_t *           basic_rsp_pkt_ptr     = (gpr_packet_t *)msg_ptr->payload_ptr;
+   gpr_packet_t *           cmd_gpr_payload_ptr   = NULL;
    gpr_ibasic_rsp_result_t *basic_rsp_payload_ptr = NULL;
-   amdb_cmd_ctrl_t         *ctrl_obj_ptr          = NULL;
-   apm_cmd_header_t        *cmd_apm_header_ptr    = NULL;
+   amdb_cmd_ctrl_t *        ctrl_obj_ptr          = NULL;
+   apm_cmd_header_t *       cmd_apm_header_ptr    = NULL;
 
    // just to print the ocpode
    basic_rsp_payload_ptr = GPR_PKT_GET_PAYLOAD(gpr_ibasic_rsp_result_t, basic_rsp_pkt_ptr);
@@ -291,7 +290,7 @@ ar_result_t amdb_route_basic_rsp_to_client(amdb_thread_t *amdb_info_ptr, spf_msg
    __gpr_cmd_end_command(cmd_gpr_payload_ptr, result); // send response to master's client
    if (NULL != ctrl_obj_ptr->loaned_mem_ptr)
    {
-      apm_offload_memory_free(ctrl_obj_ptr->loaned_mem_ptr);
+      apm_offload_memory_free(&ctrl_obj_ptr->ret_info);
    }
    amdb_clear_cmd_ctrl(amdb_info_ptr, ctrl_obj_ptr);
 
@@ -302,11 +301,11 @@ ar_result_t amdb_route_get_cfg_rsp_to_client(amdb_thread_t *amdb_info_ptr, spf_m
 {
    ar_result_t result = AR_EOK;
    /** Get the pointer to GPR command */
-   gpr_packet_t          *get_cfg_rsp_pkt_ptr          = (gpr_packet_t *)msg_ptr->payload_ptr;
-   gpr_packet_t          *original_cmd_gpr_payload_ptr = NULL;
+   gpr_packet_t *         get_cfg_rsp_pkt_ptr          = (gpr_packet_t *)msg_ptr->payload_ptr;
+   gpr_packet_t *         original_cmd_gpr_payload_ptr = NULL;
    apm_cmd_rsp_get_cfg_t *get_cfg_rsp_payload_ptr      = NULL;
-   amdb_cmd_ctrl_t       *ctrl_obj_ptr                 = NULL;
-   apm_cmd_header_t      *cmd_apm_header_ptr           = NULL;
+   amdb_cmd_ctrl_t *      ctrl_obj_ptr                 = NULL;
+   apm_cmd_header_t *     cmd_apm_header_ptr           = NULL;
 
    // just to print the ocpode
    get_cfg_rsp_payload_ptr = GPR_PKT_GET_PAYLOAD(apm_cmd_rsp_get_cfg_t, get_cfg_rsp_pkt_ptr);
@@ -326,10 +325,10 @@ ar_result_t amdb_route_get_cfg_rsp_to_client(amdb_thread_t *amdb_info_ptr, spf_m
    original_cmd_gpr_payload_ptr = (gpr_packet_t *)ctrl_obj_ptr->cmd_msg.payload_ptr;
    cmd_apm_header_ptr           = GPR_PKT_GET_PAYLOAD(apm_cmd_header_t, original_cmd_gpr_payload_ptr);
 
-   uint8_t      *payload_ptr      = NULL;
+   uint8_t *     payload_ptr      = NULL;
    uint32_t      alignment_size   = 0;
    gpr_packet_t *gpr_rsp_pkt_ptr  = NULL;
-   uint8_t     **cmd_payload_pptr = (uint8_t **)&payload_ptr;
+   uint8_t **    cmd_payload_pptr = (uint8_t **)&payload_ptr;
    *cmd_payload_pptr              = NULL;
 
    /* For OOB payloads, payload_ptr will be filled with correct dereferenced oob ptr
@@ -389,7 +388,7 @@ ar_result_t amdb_route_get_cfg_rsp_to_client(amdb_thread_t *amdb_info_ptr, spf_m
    }
    if (NULL != ctrl_obj_ptr->loaned_mem_ptr)
    {
-      apm_offload_memory_free(ctrl_obj_ptr->loaned_mem_ptr);
+      apm_offload_memory_free(&ctrl_obj_ptr->ret_info);
    }
    amdb_clear_cmd_ctrl(amdb_info_ptr, ctrl_obj_ptr);
    AR_MSG(DBG_MED_PRIO, "AMDB: done responding to get cfg.");
@@ -401,11 +400,11 @@ ar_result_t amdb_route_load_rsp_to_client(amdb_thread_t *amdb_info_ptr, spf_msg_
 {
    ar_result_t result = AR_EOK;
    /** Get the pointer to GPR command */
-   gpr_packet_t     *pkt_ptr             = (gpr_packet_t *)msg_ptr->payload_ptr;
-   gpr_packet_t     *cmd_gpr_payload_ptr = NULL;
-   gpr_packet_t     *new_rsp_gpr_ptr     = NULL;
-   void             *new_rsp_payload_ptr, *payload_ptr = NULL;
-   amdb_cmd_ctrl_t  *ctrl_obj_ptr       = NULL;
+   gpr_packet_t *    pkt_ptr             = (gpr_packet_t *)msg_ptr->payload_ptr;
+   gpr_packet_t *    cmd_gpr_payload_ptr = NULL;
+   gpr_packet_t *    new_rsp_gpr_ptr     = NULL;
+   void *            new_rsp_payload_ptr, *payload_ptr = NULL;
+   amdb_cmd_ctrl_t * ctrl_obj_ptr       = NULL;
    apm_cmd_header_t *cmd_apm_header_ptr = NULL;
 
    ctrl_obj_ptr = amdb_get_cmd_ctrl_obj(amdb_info_ptr, pkt_ptr->token);
@@ -492,7 +491,7 @@ ar_result_t amdb_route_load_rsp_to_client(amdb_thread_t *amdb_info_ptr, spf_msg_
    __gpr_cmd_free(cmd_gpr_payload_ptr);
    if (NULL != ctrl_obj_ptr->loaned_mem_ptr)
    {
-      apm_offload_memory_free(ctrl_obj_ptr->loaned_mem_ptr);
+      apm_offload_memory_free(&ctrl_obj_ptr->ret_info);
    }
    // Clear AMDB cmd message control
    amdb_clear_cmd_ctrl(amdb_info_ptr, ctrl_obj_ptr);
@@ -505,7 +504,7 @@ __bailout_load_rsp_hdlr_1:
    __gpr_cmd_end_command(cmd_gpr_payload_ptr, result);
    if (NULL != ctrl_obj_ptr->loaned_mem_ptr)
    {
-      apm_offload_memory_free(ctrl_obj_ptr->loaned_mem_ptr);
+      apm_offload_memory_free(&ctrl_obj_ptr->ret_info);
    }
    amdb_clear_cmd_ctrl(amdb_info_ptr, ctrl_obj_ptr);
    return result;

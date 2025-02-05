@@ -79,16 +79,21 @@ static ar_result_t apm_mem_shared_memory_map_regions_cmd_handler(uint32_t      m
                                                                  gpr_packet_t *pkt_ptr,
                                                                  POSAL_HEAP_ID heap_id)
 {
-   ar_result_t                       result = AR_EOK;
-   void                             *payload_ptr, *dummy_ptr;
-   apm_cmd_shared_mem_map_regions_t  common_mem_map_region_payload = { 0 };
-   uint32_t                          mem_map_handle                = 0;
-   gpr_packet_t                     *resp_pkt_ptr                  = NULL;
+   ar_result_t                      result = AR_EOK;
+   void *                           payload_ptr, *dummy_ptr;
+   apm_cmd_shared_mem_map_regions_t common_mem_map_region_payload = { 0 };
+   uint32_t                         mem_map_handle                = 0;
+   uint32_t                         resp_opcode, resp_size;
+   uint32_t                         heap_mngr_type  = APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_DEFAULT;
+   uint32_t                         memory_map_type = APM_MEMORY_MAP_MEMORY_ADDRESS_TYPE_PA_OR_VA;
+
+   gpr_packet_t *                    resp_pkt_ptr = NULL;
    POSAL_MEMORYPOOLTYPE              mem_pool;
    apm_shared_map_region_payload_t **region_pptr;
-   bool_t                            is_virtual, is_cached, is_offset_map, is_mem_loaned;
-   bool_t   is_global_shmem_map_cmd = (APM_CMD_GLOBAL_SHARED_MEM_MAP_REGIONS == pkt_ptr->opcode) ? TRUE : FALSE;
-   uint32_t resp_opcode, resp_size;
+
+   bool_t is_virtual, is_cached, is_offset_map, is_mem_loaned;
+   bool_t is_global_shmem_map_cmd = (APM_CMD_GLOBAL_SHARED_MEM_MAP_REGIONS == pkt_ptr->opcode) ? TRUE : FALSE;
+
    payload_ptr = GPR_PKT_GET_PAYLOAD(void, pkt_ptr);
 
    if (is_global_shmem_map_cmd)
@@ -151,6 +156,39 @@ static ar_result_t apm_mem_shared_memory_map_regions_cmd_handler(uint32_t      m
           common_mem_map_region_payload.num_regions,
           common_mem_map_region_payload.property_flag);
 
+   is_virtual = (common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_IS_VIRTUAL) >>
+                APM_MEMORY_MAP_SHIFT_IS_VIRTUAL;
+   is_cached     = !((common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_IS_UNCACHED) >>
+                 APM_MEMORY_MAP_SHIFT_IS_UNCACHED);
+   is_offset_map = (common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_IS_OFFSET_MODE) >>
+                   APM_MEMORY_MAP_SHIFT_IS_OFFSET_MODE;
+
+   if (!is_global_shmem_map_cmd)
+   {
+      is_mem_loaned = (common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_IS_MEM_LOANED) >>
+                      APM_MEMORY_MAP_SHIFT_IS_MEM_LOANED;
+
+      heap_mngr_type =
+         (common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_LOANED_MEMORY_HEAP_MNGR_TYPE) >>
+         APM_MEMORY_MAP_SHIFT_LOANED_MEMORY_HEAP_MNGR_TYPE;
+
+      memory_map_type = (common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_MEMORY_ADDRESS_TYPE) >>
+                        APM_MEMORY_MAP_SHIFT_MEMORY_ADDRESS_TYPE;
+
+      AR_MSG(DBG_HIGH_PRIO,
+             "spf_shmem_util memory map, property flag 0x%lx,"
+             " is_pa_or_va  %lu (pa:va - 0:1), is_cached %lu,"
+             "is_offset_map %lu, is_mem_loaned %lu, "
+             "heap_mgr_type %lu, memory_map_type %lu ",
+             common_mem_map_region_payload.property_flag,
+             is_virtual,
+             !(is_cached),
+             is_offset_map,
+             is_mem_loaned,
+             heap_mngr_type,
+             memory_map_type);
+   }
+
    /* Allocate the response packet */
    gpr_cmd_alloc_ext_t args;
    args.src_domain_id = pkt_ptr->dst_domain_id;
@@ -201,19 +239,6 @@ static ar_result_t apm_mem_shared_memory_map_regions_cmd_handler(uint32_t      m
              phy_regions[i].shm_addr_lsw,
              phy_regions[i].shm_addr_msw,
              phy_regions[i].mem_size);
-   }
-
-   is_virtual = (common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_IS_VIRTUAL) >>
-                APM_MEMORY_MAP_SHIFT_IS_VIRTUAL;
-   is_cached     = !((common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_IS_UNCACHED) >>
-                 APM_MEMORY_MAP_SHIFT_IS_UNCACHED);
-   is_offset_map = (common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_IS_OFFSET_MODE) >>
-                   APM_MEMORY_MAP_SHIFT_IS_OFFSET_MODE;
-
-   if (!is_global_shmem_map_cmd)
-   {
-      is_mem_loaned = (common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_IS_MEM_LOANED) >>
-                      APM_MEMORY_MAP_SHIFT_IS_MEM_LOANED;
    }
 
    if (0 == is_virtual)
@@ -267,7 +292,7 @@ static ar_result_t apm_mem_shared_memory_map_regions_cmd_handler(uint32_t      m
 
    if (is_global_shmem_map_cmd)
    {
-      gpr_ibasic_rsp_result_t                 *resp_payload_ptr;
+      gpr_ibasic_rsp_result_t *                resp_payload_ptr;
       apm_cmd_global_shared_mem_map_regions_t *mem_map_regions_payload_ptr =
          (apm_cmd_global_shared_mem_map_regions_t *)payload_ptr;
 
@@ -295,21 +320,29 @@ static ar_result_t apm_mem_shared_memory_map_regions_cmd_handler(uint32_t      m
 
          /** Get the pointer to ext utils vtbl   */
          apm_ext_utils_t *ext_utils_ptr   = apm_get_ext_utils_ptr();
-         uint32_t         heap_mngr_type  = APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_DEFAULT;
          posal_heap_t     heap_mgr_type_i = POSAL_HEAP_NON_ISLAND;
-
-         heap_mngr_type = (uint32_t)(
-            (common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_LOANED_MEMORY_HEAP_MNGR_TYPE) >>
-            APM_MEMORY_MAP_SHIFT_LOANED_MEMORY_HEAP_MNGR_TYPE);
 
          if (APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_DEFAULT == heap_mngr_type)
          {
             heap_mgr_type_i = POSAL_HEAP_NON_ISLAND;
          }
-         else if (APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_DEFAULT == heap_mngr_type)
+         else if (APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_SAFE_HEAP == heap_mngr_type)
          {
             heap_mgr_type_i = POSAL_HEAP_NON_ISLAND_SAFE_HEAP;
          }
+
+         AR_MSG(DBG_HIGH_PRIO,
+                "spf_shmem_util memory map, property flag 0x%lx,"
+                " is_pa_or_va  %lu (pa:va - 0:1), is_cached (0) %lu,"
+                "is_offset_map(1) %lu, is_mem_loaned(1) %lu, "
+                "heap_mgr_type %lu, memory_map_type %lu ",
+                common_mem_map_region_payload.property_flag,
+                is_virtual,
+                is_cached,
+                is_offset_map,
+                is_mem_loaned,
+                heap_mngr_type,
+                memory_map_type);
 
          if (ext_utils_ptr->offload_vtbl_ptr &&
              ext_utils_ptr->offload_vtbl_ptr->apm_offload_master_memorymap_register_fptr)
@@ -319,7 +352,7 @@ static ar_result_t apm_mem_shared_memory_map_regions_cmd_handler(uint32_t      m
                     ext_utils_ptr->offload_vtbl_ptr->apm_offload_master_memorymap_register_fptr(mem_map_client,
                                                                                                 mem_map_handle,
                                                                                                 phy_regions[0].mem_size,
-																								heap_mgr_type_i)))
+                                                                                                heap_mgr_type_i)))
             {
                AR_MSG(DBG_ERROR_PRIO,
                       "MDF: Failed to register Loaned Master memory, Handle 0x%lx of size %lu",
@@ -371,7 +404,7 @@ _apm_mem_shared_memory_map_regions_cmd_handler_bail_1:
 static ar_result_t apm_mem_shared_memory_un_map_regions_cmd_handler(uint32_t mem_map_client, gpr_packet_t *pkt_ptr)
 {
    ar_result_t result = AR_EOK;
-   void       *payload_ptr;
+   void *      payload_ptr;
 
    apm_ext_utils_t *ext_utils_ptr;
    uint32_t         mem_map_handle;

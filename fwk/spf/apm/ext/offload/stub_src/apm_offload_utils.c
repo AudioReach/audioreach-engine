@@ -40,6 +40,11 @@ void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t size, apm_offlo
    return NULL;
 }
 
+void apm_offload_memory_free(apm_offload_ret_info_t *shmem_info_ptr)
+{
+   return AR_EOK;
+}
+
 uint32_t apm_offload_get_persistent_sat_handle(uint32_t sat_domain_id, uint32_t master_handle)
 {
    return 0;
