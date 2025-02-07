@@ -290,6 +290,11 @@ ar_result_t olc_ctrl_path_media_fmt(cu_base_t *base_ptr);
 ar_result_t olc_icb_info_from_downstream(cu_base_t *base_ptr);
 ar_result_t olc_handle_peer_port_property_update_cmd(cu_base_t *me_ptr);
 ar_result_t olc_handle_upstream_stop_cmd(cu_base_t *base_ptr);
+ar_result_t olc_register_events_utils(cu_base_t *       base_ptr,
+                                      gu_module_t *     gu_module_ptr,
+                                      topo_reg_event_t *reg_event_payload_ptr,
+                                      bool_t            is_register,
+                                      bool_t *          capi_supports_v1_event_ptr);
 /**--------------------------- olc_buf_utilities ----------------------------*/
 
 ar_result_t olc_init_ext_in_port(void *base_ptr, gu_ext_in_port_t *gu_ext_port_ptr);

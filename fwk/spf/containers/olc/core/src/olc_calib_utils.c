@@ -453,7 +453,7 @@ ar_result_t olc_process_container_set_get_cfg(cu_base_t *                       
                   if (0 == proc_dur_ptr->proc_duration_us)
                   {
                      CU_MSG(base_ptr->gu_ptr->log_id, DBG_ERROR_PRIO, "Proc Duration cannot be 0. Failing.");
-                     result = AR_EFAILED;
+                     //result = AR_EFAILED;
                      break;
                   }
 

@@ -329,7 +329,14 @@ uint32_t sgm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
    uint32_t log_id = 0;
 
    //#ifdef VERBOSE_DEBUGGING
-   AR_MSG(DBG_LOW_PRIO, "GPR callback for dst port 0x%lx pkt_ptr 0x%lx", packet_ptr->dst_port, packet_ptr);
+   AR_MSG(DBG_LOW_PRIO,
+          "GPR callback for src domain id %lu, dst domain id %lu "
+          "src port 0x%lx dst port 0x%lx pkt_ptr 0x%lx",
+          packet_ptr->src_domain_id,
+          packet_ptr->dst_domain_id,
+          packet_ptr->src_port,
+          packet_ptr->dst_port,
+          packet_ptr);
    //#endif
 
    spf_msg_t msg;
@@ -341,6 +348,14 @@ uint32_t sgm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
    /*Validate handles and queue pointers */
    VERIFY(result, (spgm_ptr && spgm_ptr->rsp_q_ptr && spgm_ptr->evnt_q_ptr));
    log_id = spgm_ptr->sgm_id.log_id;
+
+   if (packet_ptr->src_domain_id != spgm_ptr->sgm_id.sat_pd)
+   {
+      msg.msg_opcode = SPF_MSG_CMD_GPR;
+      TRY(result,
+          (ar_result_t)posal_queue_push_back(spgm_ptr->cu_ptr->cmd_handle.cmd_q_ptr, (posal_queue_element_t *)&msg));
+		   return result;
+   }
 
    switch (cu_get_bits(packet_ptr->opcode, AR_GUID_TYPE_MASK, AR_GUID_TYPE_SHIFT))
    {

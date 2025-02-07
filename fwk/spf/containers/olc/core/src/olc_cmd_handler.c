@@ -926,9 +926,22 @@ ar_result_t olc_gpr_cmd(cu_base_t *base_ptr)
 
       case APM_CMD_REGISTER_MODULE_EVENTS:
       {
-         OLC_MSG(me_ptr->topo.gu.log_id, DBG_MED_PRIO, "Register module events received from GPR");
-         TRY(result, olc_register_module_events(me_ptr, packet_ptr));
-         wait_for_response = sgm_get_cmd_rsp_status(&me_ptr->spgm_info, packet_ptr->opcode);
+
+         if ((packet_ptr->dst_port == me_ptr->spgm_info.sgm_id.cont_id) &&
+             (packet_ptr->src_domain_id == me_ptr->host_domain_id))
+         {
+            result = cu_register_module_events(&me_ptr->cu, packet_ptr);
+            if (AR_EOK != result)
+            {
+               OLC_MSG(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, "Failed to register events with container");
+            }
+         }
+         else
+         {
+            OLC_MSG(me_ptr->topo.gu.log_id, DBG_MED_PRIO, "Register module events received from GPR");
+            TRY(result, olc_register_module_events(me_ptr, packet_ptr));
+            wait_for_response = sgm_get_cmd_rsp_status(&me_ptr->spgm_info, packet_ptr->opcode);
+         }
          break;
       }
 
@@ -2108,4 +2121,15 @@ ar_result_t olc_handle_upstream_stop_cmd(cu_base_t *base_ptr)
    }
 
    return spf_msg_return_msg(&base_ptr->cmd_msg);
+}
+
+ar_result_t olc_register_events_utils(cu_base_t *       base_ptr,
+                                      gu_module_t *     gu_module_ptr,
+                                      topo_reg_event_t *reg_event_payload_ptr,
+                                      bool_t            is_register,
+                                      bool_t *          capi_supports_v1_event_ptr)
+{
+   ar_result_t result = AR_EOK;
+
+   return result;
 }
