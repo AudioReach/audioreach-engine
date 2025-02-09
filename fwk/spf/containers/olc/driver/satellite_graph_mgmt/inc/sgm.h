@@ -155,6 +155,7 @@ typedef struct spgm_cmd_hndl_node_t
    spf_msg_t            cmd_msg;
    sgm_shmem_handle_t   shm_info;
    spgm_cmd_extn_info_t cmd_extn_info;
+   uint64_t             ipc_cmd_sent_ts_us; /**< IPC command start time-stamp in microseconds */
 } spgm_cmd_hndl_node_t;
 
 typedef struct spgm_cmd_hndl_list_t

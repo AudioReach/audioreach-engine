@@ -501,7 +501,7 @@ static ar_result_t spdm_update_buffer_size(shmem_data_buf_pool_t *data_buf_pool_
    *is_buf_size_changed   = 0;
    uint32_t prev_buf_size = data_buf_pool_ptr->buf_size;
 
-   data_buf_pool_ptr->buf_size = ALIGN_64_BYTES(new_buf_size); // VB : todo based on media format
+   data_buf_pool_ptr->buf_size = ALIGN_128_BYTES(new_buf_size); // VB : todo based on media format
 
    *is_buf_size_changed = (prev_buf_size != data_buf_pool_ptr->buf_size) ? 1 : 0;
 

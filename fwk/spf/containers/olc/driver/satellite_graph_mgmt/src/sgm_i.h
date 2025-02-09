@@ -123,7 +123,10 @@ ar_result_t sgm_create_reg_event_payload(spgm_info_t *spgm_info_ptr,
 /**--------------------------- response handling utilities --------------------*/
 
 ar_result_t sgm_cmd_rsp_handler(cu_base_t *cu_ptr, uint32_t channel_bit_index);
-ar_result_t sgm_get_cache_cmd_msg(spgm_info_t *spgm_ptr, uint32_t opcode, uint32_t token, spf_msg_t **cmd_msg);
+ar_result_t sgm_get_cache_cmd_msg(spgm_info_t *spgm_ptr,
+                                  uint32_t     opcode,
+                                  uint32_t     token,
+                                  spf_msg_t ** cmd_msg);
 ar_result_t sgm_get_active_cmd_hndl(spgm_info_t *          spgm_ptr,
                                     uint32_t               opcode,
                                     uint32_t               token,

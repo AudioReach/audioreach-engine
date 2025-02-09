@@ -506,7 +506,7 @@ ar_result_t sgm_config_data_port_events(spgm_info_t *spgm_ptr,
       event_id      = event_reg_info_ptr[indx].event_id;
 
       // determine the source port, client or container
-      if (SGM_SOURCE_PORT_READ_CLIENT == src_port_info)
+      if ((SGM_SOURCE_PORT_READ_CLIENT == src_port_info) || (SGM_SOURCE_PORT_WRITE_CLIENT == src_port_info))
       {
          src_port = rw_client_port_id;
       }

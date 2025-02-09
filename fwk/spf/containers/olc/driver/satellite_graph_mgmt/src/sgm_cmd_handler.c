@@ -17,7 +17,7 @@ Static Function Definitions
 ========================================================================== */
 
 /* Function to handle the Satellite Graph Open command
- * - Analyze the GK MSG open payload to determine the size of OPEN payload
+ * - Analyze the SPF MSG open payload to determine the size of OPEN payload
  * - and then create the OPEN payload.
  * - Send the Payload to the satellite processor.
  */

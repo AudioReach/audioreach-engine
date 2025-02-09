@@ -35,6 +35,10 @@ extern "C" {
 /* =======================================================================
   Macros
 ========================================================================== */
+#ifndef ALIGN_128_BYTES
+#define ALIGN_128_BYTES(a)   ((a + 127) & (0xFFFFFF80))
+#endif
+
 #ifndef ALIGN_64_BYTES
 #define ALIGN_64_BYTES(a)   ((a + 63) & (0xFFFFFFC0))
 #endif
