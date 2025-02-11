@@ -51,7 +51,7 @@ OLC SGM Macros
 // Number of event configuration for Write port
 #define NUM_WR_PORT_EVENT_CONFIG             2
 
-#define GAURD_PROTECTION_BYTES               64
+#define GAURD_PROTECTION_BYTES               128
 
 /* =======================================================================
 OLC SDM Structure Definitions

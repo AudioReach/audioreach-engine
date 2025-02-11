@@ -202,6 +202,23 @@ typedef struct sdm_cnt_ext_data_buf_t
 
 } sdm_cnt_ext_data_buf_t;
 
+/* Structure for the guard header */
+typedef struct sdm_data_port_guard_header_info_t
+{
+   uint32_t log_id;
+   /** < specifies the container log_id */
+
+   uint32_t sdm_port_index;
+   /**< port index*/
+
+   uint32_t rw_client_miid;
+   /**< module instance of the rw client module in OLC core*/
+
+   uint32_t rw_ep_miid;
+   /**< module instance of the rw EP module in the satellite graph*/
+
+} sdm_data_port_guard_header_info_t;
+
 /* Data buffer pool node structure */
 typedef struct data_buf_pool_node_t
 {
@@ -282,6 +299,8 @@ typedef struct data_port_obj_t
    data_buf_pool_node_t *active_buf_node_ptr;
    /** < pointer to buffer being processing in the data pool */
 
+   sdm_data_port_guard_header_info_t mem_gaurd_header;
+
 } data_port_obj_t;
 
 /* Union for the Read Write EP buffer payload structure  */
@@ -319,6 +338,7 @@ typedef struct sdm_data_port_info_t
    ipc_data_link_process_state_t data_link_ps;
 
 } sdm_data_port_info_t;
+
 
 /* Structure for the Write Data Port */
 typedef struct sdm_write_port_t
