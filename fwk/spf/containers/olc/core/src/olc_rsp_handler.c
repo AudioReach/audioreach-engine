@@ -463,8 +463,26 @@ ar_result_t olc_graph_set_persistent_cfg_rsp_h(cu_base_t *base_ptr, spgm_cmd_rsp
 
 ar_result_t olc_graph_set_persistent_packed_rsp_h(cu_base_t *base_ptr, spgm_cmd_rsp_node_t *rsp_info_ptr)
 {
-   ar_result_t result = rsp_info_ptr->rsp_result;
+   INIT_EXCEPTION_HANDLING
+   ar_result_t result = AR_EOK;
    olc_t *     me_ptr = (olc_t *)base_ptr;
+   spgm_set_get_cfg_cmd_extn_info_t *cmd_extn_ptr           = NULL;
+
+   cmd_extn_ptr = (spgm_set_get_cfg_cmd_extn_info_t *)rsp_info_ptr->cmd_extn_info.extn_payload_ptr;
+
+   if (0 == rsp_info_ptr->sec_opcode)
+   {
+      VERIFY(result,
+             ((CFG_FOR_SATELLITE_ONLY == cmd_extn_ptr->cfg_destn_type) |
+              (CFG_FOR_SATELLITE_AND_CONTAINER == cmd_extn_ptr->cfg_destn_type)));
+
+      if (NULL != cmd_extn_ptr->sat_cfg_cmd_ptr)
+      {
+         result |= rsp_info_ptr->rsp_result;
+         cmd_extn_ptr->accu_result |= result;
+         cmd_extn_ptr->pending_resp_counter--;
+      }
+   }
 
    result = rsp_info_ptr->rsp_result;
    me_ptr->cu.curr_chan_mask |= (OLC_CMD_BIT_MASK);
@@ -475,7 +493,40 @@ ar_result_t olc_graph_set_persistent_packed_rsp_h(cu_base_t *base_ptr, spgm_cmd_
            base_ptr->curr_chan_mask,
            result);
 
-   return spf_msg_ack_msg(rsp_info_ptr->cmd_msg, result);
+   CATCH(result, OLC_MSG_PREFIX, me_ptr->topo.gu.log_id)
+   {
+   }
+
+   if ((cmd_extn_ptr) && (FALSE == cmd_extn_ptr->cmd_ack_done) && (AR_EOK != cmd_extn_ptr->accu_result))
+   {
+      result                     = spf_msg_ack_msg(rsp_info_ptr->cmd_msg, cmd_extn_ptr->accu_result);
+      cmd_extn_ptr->cmd_ack_done = TRUE;
+      me_ptr->cu.curr_chan_mask |= (OLC_CMD_BIT_MASK);
+   }
+
+   if ((cmd_extn_ptr) && (0 == cmd_extn_ptr->pending_resp_counter))
+   {
+      if (CFG_FOR_SATELLITE_AND_CONTAINER == cmd_extn_ptr->cfg_destn_type)
+      {
+         if (cmd_extn_ptr->cntr_cfg_cmd_ptr)
+         {
+            posal_memory_free(cmd_extn_ptr->cntr_cfg_cmd_ptr);
+         }
+         if (cmd_extn_ptr->sat_cfg_cmd_ptr)
+         {
+            posal_memory_free(cmd_extn_ptr->sat_cfg_cmd_ptr);
+         }
+      }
+      if (FALSE == cmd_extn_ptr->cmd_ack_done)
+      {
+         result                     = spf_msg_ack_msg(rsp_info_ptr->cmd_msg, cmd_extn_ptr->accu_result);
+         cmd_extn_ptr->cmd_ack_done = TRUE;
+         me_ptr->cu.curr_chan_mask |= (OLC_CMD_BIT_MASK);
+      }
+      posal_memory_free(cmd_extn_ptr);
+   }
+
+   return result;
 }
 
 ar_result_t olc_graph_event_reg_rsp_h(cu_base_t *base_ptr, spgm_cmd_rsp_node_t *rsp_info_ptr)
