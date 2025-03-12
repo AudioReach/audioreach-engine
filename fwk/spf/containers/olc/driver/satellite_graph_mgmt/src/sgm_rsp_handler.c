@@ -172,6 +172,11 @@ static ar_result_t spgm_cmd_rsp_handler(cu_base_t *cu_ptr, spgm_info_t *spgm_ptr
                      send_response   = FALSE;
                      free_cmd_handle = FALSE;
                   }
+				  else
+				  {
+					rsp_info->sec_opcode    = cmd_hndl_node_ptr->sec_opcode;
+					rsp_info->cmd_extn_info = cmd_hndl_node_ptr->cmd_extn_info;					  
+				  }
                }
 
                if (TRUE == send_response)
