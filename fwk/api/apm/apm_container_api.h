@@ -548,7 +548,7 @@ struct apm_cont_prop_id_frame_size_time_t
     uint32_t frame_size_us;
     /**< Processing frame size of the container in time (microseconds).*/
 
-    /*#< @h2xmle_range   {1000...100000}
+    /*#< @h2xmle_range   {1...100000}
      @h2xmle_default     {5000}
      @h2xmle_description {Processing frame size of the container in time (microseconds).} */
 }
