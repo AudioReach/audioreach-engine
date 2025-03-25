@@ -217,3 +217,45 @@ circbuf_result_t circ_buf_read_adjust(circ_buf_client_t *rd_client_ptr,
 
    return add_circ_buf_read_advance(rd_client_ptr, rd_client_ptr->unread_bytes - read_offset);
 }
+#ifdef DEBUG_CIRC_BUF_UTILS
+void print_chunk_list(circ_buf_t *circ_buf_ptr)
+{
+   spf_list_node_t *head_chunk_ptr = circ_buf_ptr->head_chunk_ptr;
+
+   for (spf_list_node_t *temp_node_chunk_ptr = head_chunk_ptr; (NULL != temp_node_chunk_ptr);
+        LIST_ADVANCE(temp_node_chunk_ptr))
+   {
+
+      chunk_buffer_t *chunk_ptr = (chunk_buffer_t *)(temp_node_chunk_ptr)->obj_ptr;
+      AR_MSG(DBG_MED_PRIO,
+             "Circular buffer info: buf_idx = 0x%lx,(chunk= 0x%x, id= %d, size=%d)",
+             circ_buf_ptr->id,
+             temp_node_chunk_ptr,
+             chunk_ptr->id,
+             chunk_ptr->size);
+   }
+}
+
+void print_client_chunk_positions(circ_buf_t *circ_buf_ptr)
+{
+
+   for (spf_list_node_t *client_list_ptr = circ_buf_ptr->rd_client_list_ptr; (NULL != client_list_ptr);
+        LIST_ADVANCE(client_list_ptr))
+   {
+
+      circ_buf_client_t *rd_client_ptr = (circ_buf_client_t *)client_list_ptr->obj_ptr;
+      circ_buf_client_t *wr_client_ptr = rd_client_ptr->circ_buf_ptr->wr_client_ptr;
+
+      AR_MSG(DBG_HIGH_PRIO,
+             "Reader client:0x%X, current read position is rd(chunk= 0x%x, offset= %u), unread_bytes=%u,"
+             "wr(chunk= 0x%x, offset= %u,  write_byte_counter:%d)",
+             rd_client_ptr,
+             rd_client_ptr->rw_chunk_node_ptr,
+             rd_client_ptr->rw_chunk_offset,
+             rd_client_ptr->unread_bytes,
+             wr_client_ptr->rw_chunk_node_ptr,
+             wr_client_ptr->rw_chunk_offset,
+             circ_buf_ptr->write_byte_counter);
+   }
+}
+#endif
