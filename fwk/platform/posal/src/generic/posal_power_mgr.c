@@ -506,11 +506,12 @@ ar_result_t posal_power_mgr_send_command(uint32_t msg_opcode, void *payload_ptr,
    ar_result_t cmd_result;
 
    // Send message to server
-   spf_msg_t       msg;
-   uint32_t        msg_payload_size     = GET_SPF_MSG_REQ_SIZE(payload_size);
-   void *          msg_payload_ptr      = NULL;
-   spf_handle_t *  pm_server_handle_ptr = pm_server_get_handle();
-   spf_msg_token_t token;
+   spf_msg_t         msg;
+   uint32_t          msg_payload_size     = GET_SPF_MSG_REQ_SIZE(payload_size);
+   void             *msg_payload_ptr      = NULL;
+   spf_handle_t     *pm_server_handle_ptr = pm_server_get_handle();
+   spf_msg_header_t *msg_header_ptr       = NULL;
+   spf_msg_token_t   token;
 
    token.token_ptr = msg_payload_ptr;
 
@@ -526,10 +527,11 @@ ar_result_t posal_power_mgr_send_command(uint32_t msg_opcode, void *payload_ptr,
              "POSAL_POWER_MGR: FAILED to create msg payload, opcode: 0x%lx, result: 0x%lx",
              msg_opcode,
              cmd_result);
+      return cmd_result;
    }
 
    /* Get the pointer to GK message header */
-   spf_msg_header_t *msg_header_ptr = (spf_msg_header_t *)msg.payload_ptr;
+   msg_header_ptr = (spf_msg_header_t *)msg.payload_ptr;
 
    /* Get the pointer to start of the message */
    msg_payload_ptr = (void *)(&msg_header_ptr->payload_start);
