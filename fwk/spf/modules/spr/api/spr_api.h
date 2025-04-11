@@ -376,7 +376,7 @@ typedef struct param_id_spr_delay_path_end_t param_id_spr_delay_path_end_t;
     @h2xmlp_description {Identifier for the Get parameter used to query the
                          session time. This parameter provides information
                          related to the current session time. For more
-                         details, see AudioReach Signal Processing Framework 
+                         details, see AudioReach Signal Processing Framework
                          SPF) API Reference.}
     @h2xmlp_toolPolicy  {Calibration} */
 
@@ -440,6 +440,91 @@ struct param_id_spr_session_time_t
 ;
 typedef struct param_id_spr_session_time_t param_id_spr_session_time_t;
 
+/** @ingroup ar_spf_mod_spr_macros
+    Indicates that the SPR operates in the Default Mode where session_time is
+    reset when
+        1) Flush command is issued
+        2) Gapless stream switch occurs */
+#define SPR_SESSION_TIME_RESET_MODE_DEFAULT                      0
+
+/** @ingroup ar_spf_mod_spr_macros
+    Indicates that the SPR operates in the mode where session_time reset is
+    skipped when Gapless stream switch occurs */
+#define SPR_SESSION_TIME_SKIP_RESET_GAPLESS_SWITCH                         1
+
+/** @ingroup ar_spf_mod_spr_mod
+    Identifier for the parameter used to configure the SPR module behavior
+    with respect to resetting session time.
+
+    Guidelines for using this param are as below :-
+
+      - This parameter has to be sent by the client explicitly when there
+        is a need to change the default behavior of the SPR module.
+
+      - Until the subgraph hosting the SPR is started, the client can set
+        this parameter multiple times. The last configured value is taken
+        into consideration.
+
+        If a subgraph hosting SPR is stopped and started, the functionality
+        proceeds with the previous configuration (if any). The client can
+        configure this parameter before restarting the session to ensure the
+        desired behavior behavior.
+
+      - If no AVSync functionality is enabled via PARAM_ID_SPR_AVSYNC_CONFIG,
+        then this configuration does not take effect.
+
+      - If client is interested in obtaining the value of session time before reset,
+        refer to #EVENT_ID_SPR_SESSION_TIME_RESET
+
+    The mode field in this payload supports 2 values currently :-
+
+      #SPR_SESSION_TIME_RESET_MODE_DEFAULT
+         - This indicates that session time will be reset whenever there is
+           a flush command or gapless stream switch.
+         - The SPR will choose to operate in this default mode.
+
+      #SPR_SESSION_TIME_SKIP_RESET_GAPLESS_SWITCH
+         - This indicates that the session time will not be reset when
+           gapless stream switch occurs.
+
+    @msgpayload
+    param_id_spr_session_time_t @newpage
+*/
+#define PARAM_ID_SPR_SESSION_TIME_RESET_INFO                         0x08001B07
+
+/*==============================================================================
+   Type definitions
+==============================================================================*/
+
+/*# @h2xmlp_parameter   {"PARAM_ID_SPR_SESSION_TIME_RESET_INFO",
+                          PARAM_ID_SPR_SESSION_TIME_RESET_INFO}
+    @h2xmlp_description {Identifier for the parameter used to configure the
+                         SPR module behavior with respect to resetting session
+                         time.}
+    @h2xmlp_toolPolicy  {NO_SUPPORT} */
+
+/** @ingroup ar_spf_mod_spr_mod
+    Payload of the #PARAM_ID_SPR_SESSION_TIME_RESET_INFO parameter.
+ */
+#include "spf_begin_pack.h"
+struct param_id_spr_session_time_reset_info_t
+{
+   uint32_t mode;
+   /**< Indicates the configuration for handling session time reset.
+
+        @valuesbul
+          - #SPR_SESSION_TIME_RESET_MODE_DEFAULT
+          - #SPR_SESSION_TIME_SKIP_RESET_GAPLESS_SWITCH  */
+
+
+   /*#< @h2xmle_description {Mode of operation for session time reset}
+        @h2xmle_rangeList   {"SPR_SESSION_TIME_RESET_MODE_DEFAULT"=0;
+                             "SPR_SESSION_TIME_SKIP_RESET_GAPLESS_SWITCH"=1}
+        @h2xmle_default     {0} */
+}
+#include "spf_end_pack.h"
+;
+typedef struct param_id_spr_session_time_reset_info_t param_id_spr_session_time_reset_info_t;
 
 /** @ingroup ar_spf_mod_spr_mod
     Identifier for the parameter that configures information required for
@@ -504,7 +589,7 @@ typedef struct param_id_spr_session_time_t param_id_spr_session_time_t;
     @h2xmlp_description {ID for the parameter that configures information
                          required for the AVSync functionalities for the SPR
                          module, including a data render decision. For more
-                         details, see AudioReach Signal Processing Framework 
+                         details, see AudioReach Signal Processing Framework
                          SPF) API Reference.}
     @h2xmlp_toolPolicy  {Calibration} */
 
@@ -798,6 +883,24 @@ struct event_id_spr_underrun_t
 ;
 typedef struct event_id_spr_underrun_t event_id_spr_underrun_t;
 
+/** @ingroup ar_spf_mod_spr_mod
+    Identifier for the session time reset event raised by SPR module.
+    The event provides the current session time at SPR before resetting the
+    session time to 0. Upto 1 client can register for this event with the
+    SPR module.
+
+    If the client does not enable the AV synchronization feature via
+    #PARAM_ID_SPR_AVSYNC_CONFIG, these values are returned as 0.
+
+    @msgpayload
+    param_id_session_time_t
+*/
+
+#define EVENT_ID_SPR_SESSION_TIME_RESET                  0x08001B60
+
+/*# @h2xmlp_parameter   {"EVENT_ID_SPR_SESSION_TIME_RESET", EVENT_ID_SPR_SESSION_TIME_RESET}
+    @h2xmlp_description {ID for the session time reset event raised by SPR module.}
+    @h2xmlp_toolPolicy  {NO_SUPPORT} */
 
 /** @ingroup ar_spf_mod_spr_mod
     Identifier for the Splitter Renderer module, which is used to split an
@@ -806,7 +909,7 @@ typedef struct event_id_spr_underrun_t event_id_spr_underrun_t;
     This module is used for AV Synchronization as well as decision rendering.
     The module is only to be used in an audio playback use case. It is
     supported only in a container whose position is APM_CONT_GRAPH_POS_STREAM.
-    (For information about APM_CONT_GRAPH_POS_STREAM, see AudioReach Signal 
+    (For information about APM_CONT_GRAPH_POS_STREAM, see AudioReach Signal
     Processing Framework (SPF) API Reference.
 
     @subhead4{Supported input media format ID}
@@ -830,7 +933,7 @@ typedef struct event_id_spr_underrun_t event_id_spr_underrun_t;
     @h2xmlm_description           {ID for the Splitter Renderer module, which
                                    is used to split an audio stream into
                                    multiple devices. For more details about
-                                   this module, see AudioReach Signal Processing 
+                                   this module, see AudioReach Signal Processing
                                    Framework (SPF) API Reference.}
     @h2xmlm_dataMaxInputPorts     {1}
     @h2xmlm_dataMaxOutputPorts    {-1}
