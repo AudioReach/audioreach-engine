@@ -198,6 +198,19 @@ typedef DLS_PACKED(struct)
 }
 dls_log_pkt_bitstream_data_t;
 
+/** Complete log packet structure for logging raw data. */
+typedef DLS_PACKED(struct)
+{
+   dls_log_hdr_type hdr;
+   /**< Length of the packet in bytes including this header, the QXDM Pro log
+        code, and system timestamp. Each log packet must begin with a
+        member of type log_hdr_type. */
+
+   uint8_t payload[1];
+   /**< logged bitstream data. */
+}
+dls_log_pkt_raw_data_t;
+
 #ifdef __cplusplus
 }
 #endif /*__cplusplus*/
