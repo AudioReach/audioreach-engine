@@ -8,8 +8,8 @@
 ==============================================================================*/
 
 /*--------------------------------------------------------------------------
-  * Include files and Macro definitions
-  * ------------------------------------------------------------------------ */
+ * Include files and Macro definitions
+ * ------------------------------------------------------------------------ */
 #include "pull_push_mode.h"
 #include "sh_mem_pull_push_mode_api.h"
 #include "capi_properties.h"
@@ -28,10 +28,10 @@
 
 static capi_err_t capi_pm_end(capi_t *_pif);
 
-static capi_err_t capi_pm_set_param(capi_t *                _pif,
-                                          uint32_t                   param_id,
-                                          const capi_port_info_t *port_info_ptr,
-                                          capi_buf_t *            params_ptr);
+static capi_err_t capi_pm_set_param(capi_t                 *_pif,
+                                    uint32_t                param_id,
+                                    const capi_port_info_t *port_info_ptr,
+                                    capi_buf_t             *params_ptr);
 
 static capi_err_t capi_pm_get_param(capi_t                 *_pif,
                                     uint32_t                param_id,
@@ -78,11 +78,12 @@ static void capi_pm_check_n_enable_module_buffer_access_extension(capi_pm_t *me_
          need_to_enable_extension = need_to_enable_extension && TRUE;
       }
 
-      AR_MSG(DBG_HIGH_PRIO,
-             "CAPI PM: circ buf size %lu frame size %lu is mod buf extn enabled ? %lu",
-             me_ptr->pull_push_mode_info.shared_circ_buf_size,
-             frame_size_in_bytes,
-             need_to_enable_extension);
+      PULL_PUSH_MSG(me_ptr->pull_push_mode_info.miid,
+                    DBG_HIGH_PRIO,
+                    "circ buf size %lu frame size %lu is mod buf extn enabled ? %lu",
+                    me_ptr->pull_push_mode_info.shared_circ_buf_size,
+                    frame_size_in_bytes,
+                    need_to_enable_extension);
    }
    else
    {
@@ -178,7 +179,10 @@ capi_err_t capi_pm_raise_event_to_clients(capi_pm_t *me, uint32_t event_id, void
          result = me->cb_info.event_cb(me->cb_info.event_context, CAPI_EVENT_DATA_TO_DSP_CLIENT_V2, &event_info);
          if (CAPI_EOK != result)
          {
-            AR_MSG(DBG_ERROR_PRIO, "capi_pm_raise_event_to_clients: Failed to raise event id 0x%lx", event_id);
+            PULL_PUSH_MSG(me->pull_push_mode_info.miid,
+                          DBG_ERROR_PRIO,
+                          "capi_pm_raise_event_to_clients: Failed to raise event id 0x%lx",
+                          event_id);
          }
       }
    }
@@ -187,9 +191,9 @@ capi_err_t capi_pm_raise_event_to_clients(capi_pm_t *me, uint32_t event_id, void
 }
 
 capi_err_t capi_pull_mode_get_static_properties(capi_proplist_t *init_set_properties,
-                                                      capi_proplist_t *static_properties)
+                                                capi_proplist_t *static_properties)
 {
-   AR_MSG(DBG_LOW_PRIO, "Enter get static prop");
+   PULL_PUSH_MSG(MIID_UNKNOWN, DBG_LOW_PRIO, "Enter get static prop");
 
    capi_err_t capi_result = CAPI_EOK;
 
@@ -207,9 +211,9 @@ capi_err_t capi_pull_mode_get_static_properties(capi_proplist_t *init_set_proper
 }
 
 capi_err_t capi_push_mode_get_static_properties(capi_proplist_t *init_set_properties,
-                                                      capi_proplist_t *static_properties)
+                                                capi_proplist_t *static_properties)
 {
-   AR_MSG(DBG_LOW_PRIO, "Enter get static prop");
+   PULL_PUSH_MSG(MIID_UNKNOWN, DBG_LOW_PRIO, "Enter get static prop");
 
    capi_err_t capi_result = CAPI_EOK;
 
@@ -230,26 +234,26 @@ static capi_err_t capi_pm_process_init(capi_pm_t *me_ptr, capi_proplist_t *init_
 {
    capi_err_t capi_result = CAPI_EOK;
 
-   AR_MSG(DBG_LOW_PRIO, " Enter init---------");
+   PULL_PUSH_MSG(MIID_UNKNOWN, DBG_LOW_PRIO, " Enter init---------");
 
    if (NULL == me_ptr || NULL == init_set_properties)
    {
-      AR_MSG(DBG_ERROR_PRIO,
-             "Init received bad pointer, 0x%p, 0x%p",
-             me_ptr,
-             init_set_properties);
+      PULL_PUSH_MSG(MIID_UNKNOWN, DBG_ERROR_PRIO, "Init received bad pointer, 0x%p, 0x%p", me_ptr, init_set_properties);
 
       return CAPI_EBADPARAM;
    }
+   capi_result = capi_pm_set_properties((capi_t *)me_ptr, init_set_properties);
 
-   capi_result = capi_cmn_set_basic_properties(init_set_properties, &me_ptr->heap_mem, &me_ptr->cb_info, FALSE);
    if (CAPI_EOK != capi_result)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI PM: Set basic properties failed with result %lu", capi_result);
+      PULL_PUSH_MSG(me_ptr->pull_push_mode_info.miid,
+                    DBG_ERROR_PRIO,
+                    "Set basic properties failed with result %lu",
+                    capi_result);
       return capi_result;
    }
    me_ptr->pull_push_mode_info.media_fmt.data_interleaving = CAPI_DEINTERLEAVED_UNPACKED_V2;
-   prio_query_t prio_query = {.is_interrupt_trig = FALSE, .static_req_id = SPF_THREAD_STAT_IST_ID };
+   prio_query_t prio_query = { .is_interrupt_trig = FALSE, .static_req_id = SPF_THREAD_STAT_IST_ID };
    posal_thread_calc_prio(&prio_query, &me_ptr->pull_push_mode_info.ist_priority);
 
    capi_result |= capi_cmn_raise_deinterleaved_unpacked_v2_supported_event(&me_ptr->cb_info);
@@ -261,11 +265,11 @@ capi_err_t capi_pull_mode_init(capi_t *_pif, capi_proplist_t *init_set_propertie
 {
    capi_err_t capi_result = CAPI_EOK;
 
-   AR_MSG(DBG_LOW_PRIO, " Enter capi_pull_mode_init-----");
+   PULL_PUSH_MSG(MIID_UNKNOWN, DBG_LOW_PRIO, " Enter capi_pull_mode_init-----");
 
    if (NULL == _pif || NULL == init_set_properties)
    {
-      AR_MSG(DBG_ERROR_PRIO, "Init received bad pointer, 0x%p, 0x%p", _pif, init_set_properties);
+      PULL_PUSH_MSG(MIID_UNKNOWN, DBG_ERROR_PRIO, "Init received bad pointer, 0x%p, 0x%p", _pif, init_set_properties);
 
       return CAPI_EBADPARAM;
    }
@@ -278,6 +282,7 @@ capi_err_t capi_pull_mode_init(capi_t *_pif, capi_proplist_t *init_set_propertie
    me_ptr->pull_push_mode_info.mode = PULL_MODE;
 
    capi_result = capi_pm_process_init(me_ptr, init_set_properties);
+   PULL_PUSH_MSG(me_ptr->pull_push_mode_info.miid, DBG_LOW_PRIO, "Initialization completed !!");
 
    return capi_result;
 }
@@ -286,11 +291,11 @@ capi_err_t capi_push_mode_init(capi_t *_pif, capi_proplist_t *init_set_propertie
 {
    capi_err_t capi_result = CAPI_EOK;
 
-   AR_MSG(DBG_HIGH_PRIO, " Enter capi_push_mode_init------");
+   PULL_PUSH_MSG(MIID_UNKNOWN, DBG_HIGH_PRIO, " Enter capi_push_mode_init------");
 
    if (NULL == _pif || NULL == init_set_properties)
    {
-      AR_MSG(DBG_ERROR_PRIO, "Init received bad pointer, 0x%p, 0x%p", _pif, init_set_properties);
+      PULL_PUSH_MSG(MIID_UNKNOWN, DBG_ERROR_PRIO, "Init received bad pointer, 0x%p, 0x%p", _pif, init_set_properties);
 
       return CAPI_EBADPARAM;
    }
@@ -313,7 +318,7 @@ static capi_err_t capi_pm_end(capi_t *_pif)
    capi_err_t capi_result = CAPI_EOK;
    if (NULL == _pif)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI PM: End received bad pointer, 0x%p", _pif);
+      PULL_PUSH_MSG(MIID_UNKNOWN, DBG_ERROR_PRIO, "End received bad pointer, 0x%p", _pif);
       return CAPI_EBADPARAM;
    }
    capi_pm_t *me_ptr = (capi_pm_t *)_pif;
@@ -323,34 +328,40 @@ static capi_err_t capi_pm_end(capi_t *_pif)
    return capi_result;
 }
 
-static capi_err_t capi_pm_set_param(capi_t *                _pif,
-                                          uint32_t                   param_id,
-                                          const capi_port_info_t *port_info_ptr,
-                                          capi_buf_t *            params_ptr)
+static capi_err_t capi_pm_set_param(capi_t                 *_pif,
+                                    uint32_t                param_id,
+                                    const capi_port_info_t *port_info_ptr,
+                                    capi_buf_t             *params_ptr)
 {
    if (NULL == _pif || NULL == params_ptr)
    {
-      AR_MSG(DBG_ERROR_PRIO,
-             "CAPI PM: Set param received bad pointer, 0x%p, 0x%p",
-             _pif,
-             params_ptr);
+      PULL_PUSH_MSG(MIID_UNKNOWN,
+                    DBG_ERROR_PRIO,
+                    "Set param received bad pointer, 0x%p, 0x%p",
+                    _pif,
+                    params_ptr);
 
       return CAPI_EBADPARAM;
    }
 
    capi_err_t capi_result = CAPI_EOK;
-   capi_pm_t *me_ptr         = (capi_pm_t *)_pif;
+   capi_pm_t *me_ptr      = (capi_pm_t *)_pif;
+   uint32_t   miid        = me_ptr->pull_push_mode_info.miid;
 
    void *param_payload_ptr = (void *)params_ptr->data_ptr;
 
    if (NULL == param_payload_ptr)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI PM: Set param received NULL payload pointer");
+      PULL_PUSH_MSG(miid, DBG_ERROR_PRIO, "Set param received NULL payload pointer");
 
       return CAPI_EBADPARAM;
    }
 
-   AR_MSG(DBG_HIGH_PRIO, "capi_pm_set_param: set param received for param id, 0x%lX", param_id);
+   PULL_PUSH_MSG(miid,
+                 DBG_HIGH_PRIO,
+                 "capi_pm_set_param: set param received for param id, 0x%lX miid: %d",
+                 param_id,
+                 miid);
 
    switch (param_id)
    {
@@ -358,10 +369,11 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
       {
          if (params_ptr->actual_data_len < sizeof(sh_mem_pull_push_mode_cfg_t))
          {
-            AR_MSG(DBG_ERROR_PRIO,
-                   "CAPI PM: Set param param id 0x%lX. Size not enough %lu",
-                   param_id,
-                   params_ptr->actual_data_len);
+            PULL_PUSH_MSG(miid,
+                          DBG_ERROR_PRIO,
+                          "Set param param id 0x%lX. Size not enough %lu",
+                          param_id,
+                          params_ptr->actual_data_len);
             capi_result = CAPI_EBADPARAM;
          }
          else
@@ -370,10 +382,11 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
             capi_result = pull_push_mode_init(&(me_ptr->pull_push_mode_info), pull_push_mode_cfg_ptr);
             if (capi_result)
             {
-               AR_MSG(DBG_ERROR_PRIO,
-                      "CAPI PM: Set param failed for param id 0x%lX, result %d",
-                      param_id,
-                      capi_result);
+               PULL_PUSH_MSG(miid,
+                             DBG_ERROR_PRIO,
+                             "Set param failed for param id 0x%lX, result %d",
+                             param_id,
+                             capi_result);
             }
          }
          break;
@@ -382,10 +395,11 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
       {
          if (params_ptr->actual_data_len < sizeof(media_format_t))
          {
-            AR_MSG(DBG_ERROR_PRIO,
-                   "CAPI PM: Set param param id 0x%lX. Size not enough %lu",
-                   param_id,
-                   params_ptr->actual_data_len);
+            PULL_PUSH_MSG(miid,
+                          DBG_ERROR_PRIO,
+                          "Set param param id 0x%lX. Size not enough %lu",
+                          param_id,
+                          params_ptr->actual_data_len);
             capi_result = CAPI_EBADPARAM;
          }
          else
@@ -393,11 +407,12 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
             media_format_t *media_fmt = (media_format_t *)params_ptr->data_ptr;
             if ((MEDIA_FMT_ID_PCM != media_fmt->fmt_id) || (DATA_FORMAT_FIXED_POINT != media_fmt->data_format))
             {
-               AR_MSG(DBG_ERROR_PRIO,
-                      "CAPI PM: Set param param id 0x%lX. Invalid fmt_id 0x%lX OR data_format 0x%lX",
-                      param_id,
-                      media_fmt->fmt_id,
-                      media_fmt->data_format);
+               PULL_PUSH_MSG(miid,
+                             DBG_ERROR_PRIO,
+                             "Set param param id 0x%lX. Invalid fmt_id 0x%lX OR data_format 0x%lX",
+                             param_id,
+                             media_fmt->fmt_id,
+                             media_fmt->data_format);
                capi_result = CAPI_EBADPARAM;
             }
             else
@@ -405,11 +420,12 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
                if ((params_ptr->actual_data_len < (sizeof(media_format_t) + sizeof(payload_media_fmt_pcm_t))) ||
                    (media_fmt->payload_size < sizeof(payload_media_fmt_pcm_t)))
                {
-                  AR_MSG(DBG_ERROR_PRIO,
-                         "CAPI PM: Set param param id 0x%lX. Size not enough %lu. media_fmt->payload_size = %lu",
-                         param_id,
-                         sizeof(media_format_t) + sizeof(payload_media_fmt_pcm_t),
-                         media_fmt->payload_size);
+                  PULL_PUSH_MSG(miid,
+                                DBG_ERROR_PRIO,
+                                "Set param param id 0x%lX. Size not enough %lu. media_fmt->payload_size = %lu",
+                                param_id,
+                                sizeof(media_format_t) + sizeof(payload_media_fmt_pcm_t),
+                                media_fmt->payload_size);
                   capi_result = CAPI_EBADPARAM;
                }
                else
@@ -422,10 +438,9 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
                      me_ptr->pull_push_mode_info.is_disabled = FALSE;
 
                      // copy incoming media fmt as input media fmt.
-                     capi_err_t local_result =
-                        pull_push_mode_set_inp_media_fmt(&(me_ptr->pull_push_mode_info),
-                                                         media_fmt,
-                                                         &me_ptr->pull_push_mode_info.media_fmt);
+                     capi_err_t local_result = pull_push_mode_set_inp_media_fmt(&(me_ptr->pull_push_mode_info),
+                                                                                media_fmt,
+                                                                                &me_ptr->pull_push_mode_info.media_fmt);
 
                      if ((CAPI_EOK == local_result) &&
                          (TRUE == pull_push_check_media_fmt_validity(&(me_ptr->pull_push_mode_info))))
@@ -439,10 +454,11 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
                      else
                      {
                         capi_result |= local_result;
-                        AR_MSG(DBG_ERROR_PRIO,
-                               "CAPI PM: Set param failed for param id 0x%lx, result %d",
-                               param_id,
-                               capi_result);
+                        PULL_PUSH_MSG(miid,
+                                      DBG_ERROR_PRIO,
+                                      "Set param failed for param id 0x%lx, result %d",
+                                      param_id,
+                                      capi_result);
                      }
                   }
                   else
@@ -466,8 +482,9 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
                             (med_ptr->bits_per_sample != cfg_ptr->bits_per_sample) ||
                             (med_ptr->Q_format != cfg_ptr->Q_format))
                         {
-                           AR_MSG(DBG_ERROR_PRIO,
-                                  "CAPI PM: Push mode: Media format from client must match input media format.");
+                           PULL_PUSH_MSG(miid,
+                                         DBG_ERROR_PRIO,
+                                         "Push mode: Media format from client must match input media format.");
                            capi_result = CAPI_EBADPARAM;
                         }
                      }
@@ -484,10 +501,11 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
          {
             if (params_ptr->actual_data_len < sizeof(param_id_module_data_interleaving_t))
             {
-               AR_MSG(DBG_ERROR_PRIO,
-                     "CAPI PM: Set param param id 0x%lX. Size not enough %lu",
-                     param_id,
-                     params_ptr->actual_data_len);
+               PULL_PUSH_MSG(miid,
+                             DBG_ERROR_PRIO,
+                             "Set param param id 0x%lX. Size not enough %lu",
+                             param_id,
+                             params_ptr->actual_data_len);
                capi_result = CAPI_EBADPARAM;
             }
 
@@ -499,9 +517,10 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
                                                          push_pull_intl_ptr->data_interleaving,
                                                          CAPI_INVALID_INTERLEAVING);
             capi_pm_raise_output_media_fmt_event(me_ptr);
-            AR_MSG(DBG_LOW_PRIO,
-                   "CAPI_PM: Data interleaving set to %d (0 - intlvd, 1 - packed, 3 - unpacked v2)",
-                   me_ptr->pull_push_mode_info.media_fmt.data_interleaving);
+            PULL_PUSH_MSG(miid,
+                          DBG_LOW_PRIO,
+                          "Data interleaving set to %d (0 - intlvd, 1 - packed, 3 - unpacked v2)",
+                          me_ptr->pull_push_mode_info.media_fmt.data_interleaving);
          }
          else
          {
@@ -517,7 +536,7 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
             fwk_extn_pcm_param_id_media_fmt_extn_t *extn_ptr =
                (fwk_extn_pcm_param_id_media_fmt_extn_t *)(params_ptr->data_ptr);
 
-            AR_MSG(DBG_HIGH_PRIO, "CAPI PM : FWK_EXTN_PCM_PARAM_ID_MEDIA_FORMAT_EXTN, entry");
+            PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "FWK_EXTN_PCM_PARAM_ID_MEDIA_FORMAT_EXTN, entry");
 
             pull_push_mode_set_fwk_ext_inp_media_fmt(&(me_ptr->pull_push_mode_info), extn_ptr);
 
@@ -534,8 +553,9 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
                       (med_ptr->bits_per_sample != cfg_ptr->bits_per_sample) ||
                       (med_ptr->Q_format != cfg_ptr->Q_format))
                   {
-                     AR_MSG(DBG_ERROR_PRIO,
-                            "CAPI PM: Push mode: Media format from client must match input media format.");
+                     PULL_PUSH_MSG(miid,
+                                   DBG_ERROR_PRIO,
+                                   "Push mode: Media format from client must match input media format.");
                   }
                }
             }
@@ -543,13 +563,14 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
          else
          {
             CAPI_SET_ERROR(capi_result, CAPI_ENEEDMORE);
-            AR_MSG(DBG_ERROR_PRIO,
-                   "CAPI PM: set param failed because of length issues, 0x%p, 0x%p, in_len = %d, needed_len = "
-                   "%d",
-                   _pif,
-                   param_id,
-                   params_ptr->actual_data_len,
-                   sizeof(fwk_extn_pcm_param_id_media_fmt_extn_t));
+            PULL_PUSH_MSG(miid,
+                          DBG_ERROR_PRIO,
+                          "set param failed because of length issues, 0x%p, 0x%p, in_len = %d, needed_len = "
+                          "%d",
+                          _pif,
+                          param_id,
+                          params_ptr->actual_data_len,
+                          sizeof(fwk_extn_pcm_param_id_media_fmt_extn_t));
          }
          break;
       }
@@ -558,7 +579,11 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
          uint16_t param_size = params_ptr->actual_data_len;
          if (param_size < sizeof(fwk_extn_param_id_container_frame_duration_t))
          {
-            AR_MSG(DBG_ERROR_PRIO, "CAPI PM: Param id 0x%lx Bad param size %lu", (uint32_t)param_id, param_size);
+            PULL_PUSH_MSG(miid,
+                          DBG_ERROR_PRIO,
+                          "Param id 0x%lx Bad param size %lu",
+                          (uint32_t)param_id,
+                          param_size);
             capi_result |= CAPI_ENEEDMORE;
             break;
          }
@@ -567,7 +592,7 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
             (fwk_extn_param_id_container_frame_duration_t *)params_ptr->data_ptr;
          me_ptr->frame_dur_us = fm_dur->duration_us;
 
-         AR_MSG(DBG_HIGH_PRIO, "CAPI PM : Received container frame duration %lu ", me_ptr->frame_dur_us);
+         PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "Received container frame duration %lu ", me_ptr->frame_dur_us);
 
          capi_pm_check_n_enable_module_buffer_access_extension(me_ptr);
          break;
@@ -582,29 +607,31 @@ static capi_err_t capi_pm_set_param(capi_t *                _pif,
    return capi_result;
 }
 
-static capi_err_t capi_pm_get_param(capi_t *                _pif,
-                                          uint32_t                   param_id,
-                                          const capi_port_info_t *port_info_ptr,
-                                          capi_buf_t *            params_ptr)
+static capi_err_t capi_pm_get_param(capi_t                 *_pif,
+                                    uint32_t                param_id,
+                                    const capi_port_info_t *port_info_ptr,
+                                    capi_buf_t             *params_ptr)
 {
    if (NULL == _pif || NULL == params_ptr)
    {
-      AR_MSG(DBG_ERROR_PRIO,
-             "CAPI PM: Get param received bad pointer, 0x%p, 0x%p",
-             _pif,
-             params_ptr);
+      PULL_PUSH_MSG(MIID_UNKNOWN,
+                    DBG_ERROR_PRIO,
+                    "Get param received bad pointer, 0x%p, 0x%p",
+                    _pif,
+                    params_ptr);
 
       return CAPI_EOK;
    }
 
    capi_err_t capi_result = CAPI_EOK;
-   capi_pm_t *me_ptr         = (capi_pm_t *)_pif;
+   capi_pm_t *me_ptr      = (capi_pm_t *)_pif;
+   uint32_t   miid        = me_ptr->pull_push_mode_info.miid;
 
    void *param_payload_ptr = (void *)params_ptr->data_ptr;
 
    if (NULL == param_payload_ptr)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI PM: Set param received NULL payload pointer");
+      PULL_PUSH_MSG(miid, DBG_ERROR_PRIO, "Set param received NULL payload pointer");
 
       return CAPI_EBADPARAM;
    }
@@ -618,22 +645,23 @@ static capi_err_t capi_pm_get_param(capi_t *                _pif,
             fwk_extn_pcm_param_id_media_fmt_extn_t *extn_ptr =
                (fwk_extn_pcm_param_id_media_fmt_extn_t *)(params_ptr->data_ptr);
 
-            AR_MSG(DBG_HIGH_PRIO, "CAPI PM : GET Param FWK_EXTN_PCM_PARAM_ID_MEDIA_FORMAT_EXTN, entry");
+            PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "GET Param FWK_EXTN_PCM_PARAM_ID_MEDIA_FORMAT_EXTN, entry");
             extn_ptr->alignment  = me_ptr->pull_push_mode_info.media_fmt.alignment;
             extn_ptr->bit_width  = me_ptr->pull_push_mode_info.media_fmt.bit_width;
             extn_ptr->endianness = me_ptr->pull_push_mode_info.media_fmt.endianness;
-            AR_MSG(DBG_HIGH_PRIO, "CAPI PM : GET Param FWK_EXTN_PCM_PARAM_ID_MEDIA_FORMAT_EXTN, exit");
+            PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "GET Param FWK_EXTN_PCM_PARAM_ID_MEDIA_FORMAT_EXTN, exit");
          }
          else
          {
             CAPI_SET_ERROR(capi_result, CAPI_ENEEDMORE);
-            AR_MSG(DBG_ERROR_PRIO,
-                   "CAPI PM: get param failed because of length issues, 0x%p, 0x%p, in_len = %d, needed_len = "
-                   "%d",
-                   _pif,
-                   param_id,
-                   params_ptr->actual_data_len,
-                   sizeof(fwk_extn_pcm_param_id_media_fmt_extn_t));
+            PULL_PUSH_MSG(miid,
+                          DBG_ERROR_PRIO,
+                          "get param failed because of length issues, 0x%p, 0x%p, in_len = %d, needed_len = "
+                          "%d",
+                          _pif,
+                          param_id,
+                          params_ptr->actual_data_len,
+                          sizeof(fwk_extn_pcm_param_id_media_fmt_extn_t));
          }
          break;
       }
@@ -654,21 +682,25 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
 
    if (NULL == props_ptr)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI PM: Set property received null property array");
+      PULL_PUSH_MSG(MIID_UNKNOWN, DBG_ERROR_PRIO, "Set property received null property array");
       return CAPI_EBADPARAM;
    }
 
    capi_pm_t *me_ptr = (capi_pm_t *)_pif;
    if (NULL == me_ptr)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI PM: Set property received null property array");
+      PULL_PUSH_MSG(MIID_UNKNOWN, DBG_ERROR_PRIO, "Set property received null property array");
       return CAPI_EBADPARAM;
    }
+   pull_push_mode_t *pm_info_ptr = &(me_ptr->pull_push_mode_info);
 
    capi_result = capi_cmn_set_basic_properties(props_ptr, &me_ptr->heap_mem, &me_ptr->cb_info, FALSE);
    if (CAPI_EOK != capi_result)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI PM: Set basic properties failed with result %lu", capi_result);
+      PULL_PUSH_MSG(pm_info_ptr->miid,
+                    DBG_ERROR_PRIO,
+                    "Set basic properties failed with result %lu",
+                    capi_result);
       return capi_result;
    }
 
@@ -686,27 +718,34 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
             {
                capi_module_instance_id_t *data_ptr = (capi_module_instance_id_t *)payload_ptr->data_ptr;
                me_ptr->pull_push_mode_info.miid    = data_ptr->module_instance_id;
-               AR_MSG(DBG_LOW_PRIO, "CAPI PM: This module_instance_id 0x%08lX", data_ptr->module_instance_id);
+               PULL_PUSH_MSG(pm_info_ptr->miid,
+                             DBG_LOW_PRIO,
+                             "This module_instance_id 0x%08lX",
+                             data_ptr->module_instance_id);
             }
             else
             {
-               AR_MSG(DBG_ERROR_PRIO,
-                      "CAPI PM: Set, Param id 0x%lx Bad param size %lu",
-                      (uint32_t)prop_ptr[i].id,
-                      payload_ptr->actual_data_len);
+               PULL_PUSH_MSG(pm_info_ptr->miid,
+                             DBG_ERROR_PRIO,
+                             "Set, Param id 0x%lx Bad param size %lu",
+                             (uint32_t)prop_ptr[i].id,
+                             payload_ptr->actual_data_len);
                CAPI_SET_ERROR(capi_result, CAPI_ENEEDMORE);
             }
             break;
          }
          case CAPI_INPUT_MEDIA_FORMAT_V2:
          {
-            AR_MSG(DBG_HIGH_PRIO, "CAPI PM: Set property received for input media fmt");
+            PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Set property received for input media fmt");
             me_ptr->pull_push_mode_info.is_disabled = FALSE;
 
             /* If the query happens for module output port */
             if (!prop_ptr[i].port_info.is_input_port)
             {
-               AR_MSG(DBG_ERROR_PRIO, "CAPI PM: incorrect port info, output port[%d]", prop_ptr[i].id);
+               PULL_PUSH_MSG(pm_info_ptr->miid,
+                             DBG_ERROR_PRIO,
+                             "incorrect port info, output port[%d]",
+                             prop_ptr[i].id);
 
                capi_result |= CAPI_EBADPARAM;
                break;
@@ -715,18 +754,21 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
             /* Validate the MF payload */
             if (payload_ptr->max_data_len < sizeof(capi_pm_media_fmt_t))
             {
-               AR_MSG(DBG_ERROR_PRIO, "CAPI PM: Not valid media format size %d", payload_ptr->actual_data_len);
+               PULL_PUSH_MSG(pm_info_ptr->miid,
+                             DBG_ERROR_PRIO,
+                             "Not valid media format size %d",
+                             payload_ptr->actual_data_len);
 
                capi_result |= CAPI_ENEEDMORE;
                break;
             }
 
             /* Return error if circular buffer is not configured */
-            if(0 == me_ptr->pull_push_mode_info.shared_circ_buf_size)
+            if (0 == me_ptr->pull_push_mode_info.shared_circ_buf_size)
             {
-               AR_MSG(DBG_ERROR_PRIO, "circular buffer is not configured");
+               PULL_PUSH_MSG(pm_info_ptr->miid, DBG_ERROR_PRIO, "circular buffer is not configured");
                me_ptr->pull_push_mode_info.is_disabled = TRUE;
-               capi_result = CAPI_EFAILED;
+               capi_result                             = CAPI_EFAILED;
             }
 
             capi_media_fmt_v2_t *media_fmt_ptr = (capi_media_fmt_v2_t *)(payload_ptr->data_ptr);
@@ -735,10 +777,9 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
             {
                media_format_t          fmt;
                payload_media_fmt_pcm_t pcm;
-               uint8_t channel_mapping[CAPI_MAX_CHANNELS_V2];
+               uint8_t                 channel_mapping[CAPI_MAX_CHANNELS_V2];
             } pm_media_format_t;
             pm_media_format_t media_fmt;
-
 
             media_fmt.fmt.data_format     = 0;
             media_fmt.fmt.payload_size    = sizeof(payload_media_fmt_pcm_t);
@@ -757,8 +798,8 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
             }
 
             capi_result = pull_push_mode_set_inp_media_fmt(&(me_ptr->pull_push_mode_info),
-                                                              &media_fmt.fmt,
-                                                              &me_ptr->pull_push_mode_info.media_fmt);
+                                                           &media_fmt.fmt,
+                                                           &me_ptr->pull_push_mode_info.media_fmt);
             me_ptr->pull_push_mode_info.media_fmt.data_interleaving = media_fmt_ptr->format.data_interleaving;
 
             if ((CAPI_EOK == capi_result) &&
@@ -771,10 +812,11 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
             }
             else
             {
-               AR_MSG(DBG_ERROR_PRIO,
-                      "CAPI PM: Set prop failed for prop id 0x%lx, result %d",
-                      prop_ptr[i].id,
-                      capi_result);
+               PULL_PUSH_MSG(pm_info_ptr->miid,
+                             DBG_ERROR_PRIO,
+                             "Set prop failed for prop id 0x%lx, result %d",
+                             prop_ptr[i].id,
+                             capi_result);
             }
 
             capi_pm_check_n_enable_module_buffer_access_extension(me_ptr);
@@ -783,11 +825,11 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
          }
          case CAPI_ALGORITHMIC_RESET:
          {
-            AR_MSG(DBG_HIGH_PRIO, "CAPI PM: Set property received for algorithmic reset");
+            PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Set property received for algorithmic reset");
 
             if (NULL != me_ptr->pull_push_mode_info.shared_pos_buf_ptr)
             {
-               AR_MSG(DBG_HIGH_PRIO, "CAPI PM: Resetting shared position structure");
+               PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Resetting shared position structure");
                memset(me_ptr->pull_push_mode_info.shared_pos_buf_ptr,
                       0,
                       sizeof(sh_mem_pull_push_mode_position_buffer_t));
@@ -798,15 +840,18 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
          }
          case CAPI_REGISTER_EVENT_DATA_TO_DSP_CLIENT_V2:
          {
-            AR_MSG(DBG_HIGH_PRIO,
-                   "capi_sh_mem_pull_push_mode: Set property received for registering event data to dsp client v2");
+            PULL_PUSH_MSG(pm_info_ptr->miid,
+                          DBG_HIGH_PRIO,
+                          "capi_sh_mem_pull_push_mode: Set property received for registering event data to dsp client "
+                          "v2");
 
             /* Validate the payload */
             if (payload_ptr->actual_data_len < sizeof(capi_register_event_to_dsp_client_v2_t))
             {
-               AR_MSG(DBG_ERROR_PRIO,
-                      "capi_sh_mem_pull_push_mode: Invalid payload size %d",
-                      payload_ptr->actual_data_len);
+               PULL_PUSH_MSG(pm_info_ptr->miid,
+                             DBG_ERROR_PRIO,
+                             "capi_sh_mem_pull_push_mode: Invalid payload size %d",
+                             payload_ptr->actual_data_len);
 
                capi_result |= CAPI_ENEEDMORE;
                break;
@@ -819,7 +864,7 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
             if ((EVENT_ID_SH_MEM_PULL_PUSH_MODE_WATERMARK != reg_event_ptr->event_id) &&
                 (EVENT_ID_SH_MEM_PUSH_MODE_EOS_MARKER != reg_event_ptr->event_id))
             {
-               AR_MSG(DBG_ERROR_PRIO, "Unsupported event ID[%d]", reg_event_ptr->event_id);
+               PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Unsupported event ID[%d]", reg_event_ptr->event_id);
                return CAPI_EUNSUPPORTED;
             }
 
@@ -855,18 +900,20 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
                // validation
                if ((me_ptr->pull_push_mode_info.num_clients_registered >= MAX_EVENT_CLIENTS) || !is_empty_slot_found)
                {
-                  AR_MSG(DBG_ERROR_PRIO,
-                         "capi_sh_mem_pull_push_mode: Reached max clients %lu, cannot register event id 0x%lx",
-                         me_ptr->pull_push_mode_info.num_clients_registered,
-                         reg_event_ptr->event_id);
+                  PULL_PUSH_MSG(pm_info_ptr->miid,
+                                DBG_ERROR_PRIO,
+                                "capi_sh_mem_pull_push_mode: Reached max clients %lu, cannot register event id 0x%lx",
+                                me_ptr->pull_push_mode_info.num_clients_registered,
+                                reg_event_ptr->event_id);
                   return CAPI_EFAILED;
                }
                else if (is_already_registered)
                {
-                  AR_MSG(DBG_ERROR_PRIO,
-                         "capi_sh_mem_pull_push_mode: Event id 0x%lx already registered index %lu",
-                         reg_event_ptr->event_id,
-                         already_registered_index);
+                  PULL_PUSH_MSG(pm_info_ptr->miid,
+                                DBG_ERROR_PRIO,
+                                "capi_sh_mem_pull_push_mode: Event id 0x%lx already registered index %lu",
+                                reg_event_ptr->event_id,
+                                already_registered_index);
                   return CAPI_EFAILED;
                }
 
@@ -876,11 +923,12 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
                me_ptr->pull_push_mode_info.event_client_info[empty_slot_index].event_id  = reg_event_ptr->event_id;
                me_ptr->pull_push_mode_info.num_clients_registered++;
 
-               AR_MSG(DBG_HIGH_PRIO,
-                      "capi_sh_mem_pull_push_mode: Registering event_id 0x%lx at index %lu total_clients %lu",
-                      reg_event_ptr->event_id,
-                      empty_slot_index,
-                      me_ptr->pull_push_mode_info.num_clients_registered);
+               PULL_PUSH_MSG(pm_info_ptr->miid,
+                             DBG_HIGH_PRIO,
+                             "capi_sh_mem_pull_push_mode: Registering event_id 0x%lx at index %lu total_clients %lu",
+                             reg_event_ptr->event_id,
+                             empty_slot_index,
+                             me_ptr->pull_push_mode_info.num_clients_registered);
 
                // handle event specific payloads
                if (EVENT_ID_SH_MEM_PULL_PUSH_MODE_WATERMARK == reg_event_ptr->event_id)
@@ -904,7 +952,9 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
                if (0 == me_ptr->pull_push_mode_info.num_clients_registered)
                {
                   capi_result |= CAPI_EFAILED;
-                  AR_MSG(DBG_ERROR_PRIO, "capi_sh_mem_pull_push_mode: zero clients registered for watermark event");
+                  PULL_PUSH_MSG(pm_info_ptr->miid,
+                                DBG_ERROR_PRIO,
+                                "capi_sh_mem_pull_push_mode: zero clients registered for watermark event");
                   return capi_result;
                }
 
@@ -917,26 +967,30 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
                          sizeof(event_client_info_t));
                   me_ptr->pull_push_mode_info.num_clients_registered--;
 
-                  AR_MSG(DBG_HIGH_PRIO,
-                         "capi_sh_mem_pull_push_mode: Deregistering event_id 0x%lx at index %lu total_clients %lu ",
-                         reg_event_ptr->event_id,
-                         already_registered_index,
-                         me_ptr->pull_push_mode_info.num_clients_registered);
+                  PULL_PUSH_MSG(pm_info_ptr->miid,
+                                DBG_HIGH_PRIO,
+                                "capi_sh_mem_pull_push_mode: Deregistering event_id 0x%lx at index %lu total_clients "
+                                "%lu ",
+                                reg_event_ptr->event_id,
+                                already_registered_index,
+                                me_ptr->pull_push_mode_info.num_clients_registered);
                }
                else
                {
                   capi_result |= CAPI_EFAILED;
-                  AR_MSG(DBG_ERROR_PRIO,
-                         "capi_sh_mem_pull_push_mode: client requested for de-registration not found for event id "
-                         "0x%lx",
-                         reg_event_ptr->event_id);
+                  PULL_PUSH_MSG(pm_info_ptr->miid,
+                                DBG_ERROR_PRIO,
+                                "capi_sh_mem_pull_push_mode: client requested for de-registration not found for event "
+                                "id "
+                                "0x%lx",
+                                reg_event_ptr->event_id);
                }
             }
             break;
          }
          default:
          {
-            AR_MSG(DBG_ERROR_PRIO, "Unknown Prop[0x%lX]", prop_ptr[i].id);
+            PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Unknown Prop[0x%lX]", prop_ptr[i].id);
 
             capi_result |= CAPI_EUNSUPPORTED;
             break;
@@ -953,14 +1007,14 @@ static capi_err_t capi_pm_get_properties(capi_t *_pif, capi_proplist_t *props_pt
 
    if (NULL == props_ptr)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI PM: Get property received null property array");
+      PULL_PUSH_MSG(MIID_UNKNOWN, DBG_ERROR_PRIO, "Get property received null property array");
       return CAPI_EBADPARAM;
    }
 
    capi_pm_t *me_ptr = (capi_pm_t *)_pif;
    if (NULL == me_ptr)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI PM: Get property received null property array");
+      PULL_PUSH_MSG(MIID_UNKNOWN, DBG_ERROR_PRIO, "Get property received null property array");
       return CAPI_EBADPARAM;
    }
 
@@ -974,9 +1028,10 @@ static capi_err_t capi_pm_process_get_properties(capi_pm_t *me_ptr, capi_proplis
    capi_err_t capi_result = CAPI_EOK;
    if (NULL == proplist_ptr)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI PM: Get property received null property array");
+      PULL_PUSH_MSG(MIID_UNKNOWN, DBG_ERROR_PRIO, "Get property received null property array");
       return CAPI_EBADPARAM;
    }
+   uint32_t miid = (me_ptr) ? me_ptr->pull_push_mode_info.miid : MIID_UNKNOWN;
 
    uint32_t          fwk_extn_ids_arr[2] = { FWK_EXTN_PCM, FWK_EXTN_CONTAINER_FRAME_DURATION };
    capi_basic_prop_t mod_prop;
@@ -991,9 +1046,10 @@ static capi_err_t capi_pm_process_get_properties(capi_pm_t *me_ptr, capi_proplis
    capi_result = capi_cmn_get_basic_properties(proplist_ptr, &mod_prop);
    if (CAPI_EOK != capi_result)
    {
-      AR_MSG(DBG_ERROR_PRIO,
-             "CAPI PCM_CNV: Get common basic properties failed with capi_result %lu",
-             capi_result);
+      PULL_PUSH_MSG(miid,
+                    DBG_ERROR_PRIO,
+                    "Get common basic properties failed with capi_result %lu",
+                    capi_result);
       return capi_result;
    }
 
@@ -1018,9 +1074,10 @@ static capi_err_t capi_pm_process_get_properties(capi_pm_t *me_ptr, capi_proplis
          {
             if (NULL == me_ptr || ((prop_ptr[i].port_info.is_valid) && (0 != prop_ptr[i].port_info.port_index)))
             {
-               AR_MSG(DBG_ERROR_PRIO,
-                      "CAPI PM: Get property id 0x%lx failed due to invalid/unexpected values",
-                      (uint32_t)prop_ptr[i].id);
+               PULL_PUSH_MSG(miid,
+                             DBG_ERROR_PRIO,
+                             "Get property id 0x%lx failed due to invalid/unexpected values",
+                             (uint32_t)prop_ptr[i].id);
                CAPI_SET_ERROR(capi_result, CAPI_EFAILED);
                break;
             }
@@ -1063,7 +1120,10 @@ static capi_err_t capi_pm_process_get_properties(capi_pm_t *me_ptr, capi_proplis
          }
          default:
          {
-            AR_MSG(DBG_HIGH_PRIO, "CAPI PM: Skipped Get Property for 0x%x. Not supported.", prop_ptr[i].id);
+            PULL_PUSH_MSG(miid,
+                          DBG_HIGH_PRIO,
+                          "Skipped Get Property for 0x%x. Not supported.",
+                          prop_ptr[i].id);
             CAPI_SET_ERROR(capi_result, CAPI_EUNSUPPORTED);
             continue;
          }
