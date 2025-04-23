@@ -79,8 +79,8 @@ typedef union thin_topo_exit_flags_t
 typedef enum thin_topo_state_t
 {
    THIN_TOPO_SWITCHED_TO_GEN_TOPO                = 0,
-   THIN_TOPO_EXITED_AT_EXT_IN_BUFFER_SETUP       = 1,
-   THIN_TOPO_EXITED_AT_EXT_OUT_BUFFER_SETUP      = 2,
+   THIN_TOPO_EXITED_AT_PREPROCESS_EVENT_HANDLING = 1,
+   THIN_TOPO_EXITED_AT_EXT_IN_BUFFER_SETUP       = 2,
    THIN_TOPO_EXITED_AT_MODULE_PROCESS_EVENTS     = 3,
    THIN_TOPO_EXITED_AT_OUTPUT_POST_PROCESS       = 4,
    THIN_TOPO_ENTERED                             = 5,
@@ -93,7 +93,10 @@ typedef struct thin_topo_t
    gu_ext_out_port_list_t            *active_ext_out_list_ptr; /**< only started ext out ports */
 
    thin_topo_state_t                 state; /** indicates at what point of thin topo processing thin topo was exited. */
-   gu_module_list_t                 *rest_of_module_proc_list_ptr; /**< indicates if there has been a switch from thin topo to gen topo due to some event */
+   gu_module_list_t                 *gen_topo_proc_next_module_list_ptr;
+   /**< Whenever Thin topo is exited, this variable caches the next module that needs to processed from gen topo. Important to note that the list
+        ptrs are different for thin topo and gen topo since they maintain separate module list's, hence this variable must be updated only with the
+        gen topo's module list ptr. */
 }thin_topo_t;
 
 ar_result_t thin_topo_init_handle(gen_topo_t *topo_ptr);

@@ -910,8 +910,8 @@ typedef union gen_topo_port_flags_t
 
       uint32_t       supports_buffer_resuse_extn: 2; /**< GEN_TOPO_MODULE_* bit mask */
 #ifdef USES_THIN_TOPO
-      uint32_t       thin_topo_can_assign_ext_in_buffer;
-      uint32_t       thin_topo_can_assign_ext_out_buffer;
+      uint32_t       thin_topo_can_assign_ext_in_buffer:1;
+      uint32_t       thin_topo_can_assign_ext_out_buffer:1;
 #endif
    };
    uint32_t          word;

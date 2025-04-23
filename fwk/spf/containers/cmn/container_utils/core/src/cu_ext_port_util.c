@@ -793,7 +793,7 @@ static bool_t cu_is_ext_out_port_us_or_ds_rt(cu_base_t *base_ptr, gu_ext_out_por
                                               TOPO_DATA_OUTPUT_PORT_TYPE,
                                               PORT_PROPERTY_IS_DOWNSTREAM_RT,
                                               (void *)ext_out_port_ptr->int_out_port_ptr,
-                                              &is_upstream_realtime);
+                                              &is_downstream_realtime);
 
    return (is_downstream_realtime || is_upstream_realtime);
 }
@@ -812,7 +812,7 @@ static bool_t cu_is_ext_in_port_us_or_ds_rt(cu_base_t *base_ptr, gu_ext_in_port_
                                               TOPO_DATA_INPUT_PORT_TYPE,
                                               PORT_PROPERTY_IS_DOWNSTREAM_RT,
                                               (void *)ext_in_port_ptr->int_in_port_ptr,
-                                              &is_upstream_realtime);
+                                              &is_downstream_realtime);
 
    return (is_downstream_realtime || is_upstream_realtime);
 }

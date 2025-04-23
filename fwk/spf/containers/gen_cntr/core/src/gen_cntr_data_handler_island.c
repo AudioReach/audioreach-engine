@@ -780,8 +780,10 @@ static ar_result_t gen_cntr_data_process_one_frame(gen_cntr_t *me_ptr)
    {
       gu_module_list_t *start_module_list_ptr = me_ptr->topo.started_sorted_module_list_ptr;
 
-      // if there was switch from thin topo to gen topo get the module from which process needs to continue.
-      thin_topo_check_get_start_module(&me_ptr->topo, &start_module_list_ptr);
+      // if there was switch from thin topo to gen topo get the module from
+      // which process needs to continue.
+      thin_topo_check_get_gen_topo_next_proc_module(&me_ptr->topo,
+                                                    &start_module_list_ptr);
 
       if (0 == me_ptr->wait_mask_arr[i])
       {
