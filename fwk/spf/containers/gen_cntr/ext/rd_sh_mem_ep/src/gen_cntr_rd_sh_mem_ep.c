@@ -1502,6 +1502,10 @@ ar_result_t gen_cntr_send_media_fmt_to_gpr_client(gen_cntr_t *             me_pt
                else if (TOPO_INTERLEAVED == ext_out_port_ptr->cu.media_fmt.pcm.interleaving)
                {
                   med_fmt_ptr->fmt_id = MEDIA_FMT_ID_PCM;
+                  if (CLIENT_ID_OLC == ext_out_port_ptr->client_config.cid.client_id)
+                  {
+                     med_fmt_ptr->fmt_id = MEDIA_FMT_ID_PCM_EXTN;
+                  }
                }
 
                payload_media_fmt_pcm_t *pcm_ptr = (payload_media_fmt_pcm_t *)(payload);
