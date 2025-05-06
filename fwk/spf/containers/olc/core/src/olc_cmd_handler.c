@@ -2006,20 +2006,30 @@ ar_result_t olc_handle_peer_port_property_update_cmd_to_satellite(cu_base_t *bas
          {
             gu_ext_in_port_t * dst_port_ptr    = (gu_ext_in_port_t *)header_ptr->dst_handle_ptr;
             olc_ext_in_port_t *ext_in_port_ptr = (olc_ext_in_port_t *)(dst_port_ptr);
-            TRY(result,
-                sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
-                                                         ext_in_port_ptr->wdp_ctrl_cfg_ptr->sdm_port_index,
-                                                         cur_ptr));
+
+            if (ext_in_port_ptr->wdp_ctrl_cfg_ptr)
+            {
+                TRY(result,
+                    sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
+                                                             ext_in_port_ptr->wdp_ctrl_cfg_ptr->sdm_port_index,
+                                                             cur_ptr));
+            }
+
             break;
          }
          case PORT_PROPERTY_IS_DOWNSTREAM_RT:
          {
             gu_ext_out_port_t * dst_port_ptr     = (gu_ext_out_port_t *)header_ptr->dst_handle_ptr;
             olc_ext_out_port_t *ext_out_port_ptr = (olc_ext_out_port_t *)(dst_port_ptr);
-            TRY(result,
-                sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
-                                                         ext_out_port_ptr->rdp_ctrl_cfg_ptr->sdm_port_index,
-                                                         cur_ptr));
+
+            if (ext_out_port_ptr->rdp_ctrl_cfg_ptr)
+            {
+                TRY(result,
+                    sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
+                                                             ext_out_port_ptr->rdp_ctrl_cfg_ptr->sdm_port_index,
+                                                             cur_ptr));
+            }
+
             break;
          }
          case PORT_PROPERTY_TOPO_STATE:
@@ -2029,18 +2039,19 @@ ar_result_t olc_handle_peer_port_property_update_cmd_to_satellite(cu_base_t *bas
             olc_ext_out_port_t *ext_out_port_ptr = (olc_ext_out_port_t *)(dst_port_ptr);
             topo_port_state_t ds_state = (topo_port_state_t)cur_ptr->property_value;
 
-            TRY(result,
-                sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
-                                                         ext_out_port_ptr->rdp_ctrl_cfg_ptr->sdm_port_index,
-                                                         cur_ptr));
-            // Specifies what to listen on the output. external output or read ipc queue
-            if (TOPO_PORT_STATE_STARTED == ds_state)
+            if (ext_out_port_ptr->rdp_ctrl_cfg_ptr)
             {
-               if (ext_out_port_ptr->rdp_ctrl_cfg_ptr)
-               {
-                  spdm_read_dl_pcd(&me_ptr->spgm_info, ext_out_port_ptr->rdp_ctrl_cfg_ptr->sdm_port_index);
-               }
+                TRY(result,
+                    sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
+                                                             ext_out_port_ptr->rdp_ctrl_cfg_ptr->sdm_port_index,
+                                                             cur_ptr));
+                // Specifies what to listen on the output. external output or read ipc queue
+                if (TOPO_PORT_STATE_STARTED == ds_state)
+                {
+                   spdm_read_dl_pcd(&me_ptr->spgm_info, ext_out_port_ptr->rdp_ctrl_cfg_ptr->sdm_port_index);               
+                }
             }
+
             break;
          }
 
