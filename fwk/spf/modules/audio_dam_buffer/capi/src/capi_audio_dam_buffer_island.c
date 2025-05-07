@@ -240,7 +240,7 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
          uint32_t output_frame_len_us = 0;
          bool_t   is_timestamp_valid  = FALSE;
 
-         if (me_ptr->is_island_duty_cycle_enabled)
+         if (me_ptr->out_port_info_arr[arr_idx].is_dcm_duty_cycling_enabled)
          {
             bool_t is_batching_req_met = audio_dam_if_batching_req_met(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr);
             if (is_batching_req_met)
@@ -248,6 +248,7 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
                DAM_MSG_ISLAND(me_ptr->miid, DBG_MED_PRIO, "voting for island exit");
                posal_island_trigger_island_exit();
                capi_dam_duty_cycling_buf_send_message_to_dcm(me_ptr, (uint32_t)SPF_MSG_CMD_DCM_REQ_FOR_ISLAND_EXIT);
+               me_ptr->out_port_info_arr[arr_idx].ready_for_island_entry = FALSE;
                DAM_MSG_ISLAND(me_ptr->miid, DBG_MED_PRIO, "voting for island exit done");
             }
          }
