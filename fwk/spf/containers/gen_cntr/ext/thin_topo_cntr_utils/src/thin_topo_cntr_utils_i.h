@@ -26,12 +26,13 @@ ar_result_t gen_cntr_switch_from_thin_topo_to_gen_topo_during_process(gen_cntr_t
       TOPO_MSG_ISLAND(topo_ptr->gu.log_id,                                                                             \
                       DBG_LOW_PRIO,                                                                                    \
                       " Module 0x%lX: " str1 " port id 0x%lx, assinged buffer " str2                                   \
-                      ": length_per_buf %lu of %lu. buff addr: 0x%p, origin:%lu Flags 0x%lx",                          \
+                      ": length_per_buf %lu of %lu. buff addr: 0x%p, nbufs:%lu origin:%lu Flags 0x%lx",             \
                       m_iid,                                                                                           \
                       port_id,                                                                                         \
                       cmn_port.bufs_ptr[0].actual_data_len,                                                            \
                       cmn_port.bufs_ptr[0].max_data_len,                                                               \
                       cmn_port.bufs_ptr[0].data_ptr,                                                                   \
+                      cmn_port.sdata.bufs_num,                                                                         \
                       cmn_port.flags.buf_origin,                                                                       \
                       cmn_port.sdata.flags.word);                                                                      \
    } while (0)

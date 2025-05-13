@@ -32,7 +32,7 @@ void thin_topo_update_exit_flags(gen_topo_t *topo_ptr,
                                  bool_t      has_duty_cycling_module,
                                  bool_t      has_signal_tgp_module,
                                  bool_t      requires_module_looping,
-                                 bool_t      has_sh_mem_ep_module)
+                                 bool_t      has_unsupported_module)
 {
    return;
 }

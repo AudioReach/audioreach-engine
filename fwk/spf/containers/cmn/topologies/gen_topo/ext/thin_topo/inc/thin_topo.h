@@ -59,8 +59,14 @@ typedef union thin_topo_exit_flags_t
       uint32_t requires_module_looping:1;    // BIT 11
 
       // BIT 12-15
-      uint32_t has_sh_mem_ep_module:1;                      // BIT 12 - Thin topo doesnt support shared memory end point module's as of now
-      uint32_t has_to_preserve_prebuffer:1;
+      uint32_t has_unsupported_module : 1;
+      /* BIT 12 - set if any unsupported module is present, currently unsupported modules, AMDB_MODULE_TYPE_DECODER,
+       * AMDB_MODULE_TYPE_ENCODER,  AMDB_MODULE_TYPE_PACKETIZER, AMDB_MODULE_TYPE_DEPACKETIZER,
+       * MODULE_ID_WR_SHARED_MEM_EP, MODULE_ID_RD_SHARED_MEM_EP.
+       * it cant be supported because these modules might leave partial data after the process.
+       */
+
+      uint32_t has_to_preserve_prebuffer : 1;
       uint32_t num_active_md_nodes_in_cntr:8;  /**< Number of metadata currently present in the container, it can be in the cntr/topo/CAPI modules. */
 
       //uint32_t has_mixed_data_flow_states:1;
@@ -105,12 +111,12 @@ void thin_topo_reset_handle(gen_topo_t *topo_ptr, bool_t free_handle_memory);
 void thin_topo_reset_signal_tgp_flag(gen_topo_t *topo_ptr);
 
 void thin_topo_update_exit_flags(gen_topo_t *topo_ptr,
-                           bool_t      has_voice_sg,
-                           bool_t      need_soft_timer_extn,
-                           bool_t      has_duty_cycling_module,
-                           bool_t      has_signal_tgp_module,
-                           bool_t      requires_module_looping,
-                           bool_t      has_sh_mem_ep_module);
+                                 bool_t      has_voice_sg,
+                                 bool_t      need_soft_timer_extn,
+                                 bool_t      has_duty_cycling_module,
+                                 bool_t      has_signal_tgp_module,
+                                 bool_t      requires_module_looping,
+                                 bool_t      has_unsupported_module);
 
 void thin_topo_destroy(gen_topo_t *topo_ptr);
 

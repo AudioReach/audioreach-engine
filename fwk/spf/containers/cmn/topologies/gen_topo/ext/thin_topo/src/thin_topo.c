@@ -50,9 +50,9 @@ void thin_topo_update_exit_flags(gen_topo_t *topo_ptr,
                                  bool_t      has_duty_cycling_module,
                                  bool_t      has_signal_tgp_module,
                                  bool_t      requires_module_looping,
-                                 bool_t      has_sh_mem_ep_module)
+                                 bool_t      has_unsupported_module)
 {
-   THIN_TOPO_SET_EXIT_FLAG(topo_ptr, has_sh_mem_ep_module, (has_sh_mem_ep_module ? TRUE : FALSE));
+   THIN_TOPO_SET_EXIT_FLAG(topo_ptr, has_unsupported_module, (has_unsupported_module ? TRUE : FALSE));
 
    THIN_TOPO_SET_EXIT_FLAG(topo_ptr,
                            is_signal_trigger_deactive,
