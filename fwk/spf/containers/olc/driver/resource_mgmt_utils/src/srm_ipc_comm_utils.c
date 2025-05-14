@@ -16,6 +16,24 @@
 Static Function Definitions
 ========================================================================== */
 
+ar_result_t sgm_get_unique_token(spgm_info_t *spgm_info, uint32_t *unique_token_ptr)
+{
+   uint32_t unique_token  = 0;
+   uint32_t counter_token = 0;
+
+   unique_token  = spgm_info->base_token;
+   counter_token = posal_atomic_increment(spgm_info->token_instance);
+   if (0xFF == counter_token)
+   {
+      // set the dynamic token variable with start value
+      posal_atomic_set(spgm_info->token_instance, 0);
+   }
+   unique_token      = (counter_token << 16);
+   *unique_token_ptr = unique_token;
+
+   return AR_EOK;
+}
+
 uint32_t sgm_get_src_port_id(spgm_info_t *spgm_info)
 {
    uint32_t src_port_id = (uint32_t)spgm_info->sgm_id.cont_id;
@@ -33,7 +51,7 @@ ar_result_t sgm_ipc_send_command(spgm_info_t *spgm_ptr)
       return AR_EBADPARAM;
    }
 
-   token                                = posal_atomic_increment(spgm_ptr->token_instance);
+   sgm_get_unique_token(spgm_ptr, &token);
    spgm_ptr->active_cmd_hndl_ptr->token = token;
    /** Capture the timestamp for this IPC command sent */
    spgm_ptr->active_cmd_hndl_ptr->ipc_cmd_sent_ts_us = posal_timer_get_time();
@@ -105,7 +123,7 @@ ar_result_t sgm_ipc_send_command_to_dst(spgm_info_t *spgm_ptr, uint32_t dst_port
       return AR_EBADPARAM;
    }
 
-   token                                = posal_atomic_increment(spgm_ptr->token_instance);
+   sgm_get_unique_token(spgm_ptr, &token);
    spgm_ptr->active_cmd_hndl_ptr->token = token;
    /** Capture the timestamp for this IPC command sent */
    spgm_ptr->active_cmd_hndl_ptr->ipc_cmd_sent_ts_us = posal_timer_get_time();
