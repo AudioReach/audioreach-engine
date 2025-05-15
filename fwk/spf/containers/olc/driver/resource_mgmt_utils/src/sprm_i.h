@@ -1,10 +1,6 @@
 /**
  * \file sprm_i.h
- * \brief
- *     This file contains internal definitions and declarations for the OLC Satellite Graph Management.
- *  
- * 
- * \copyright
+ * \brief Internal definitions and declarations for the OLC Satellite Graph Management
  *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
@@ -16,7 +12,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif //__cplusplus//
+#endif // __cplusplus
 
 #include "container_utils.h"
 #include "posal_power_mgr.h"
@@ -24,18 +20,24 @@ extern "C" {
 #include "olc_driver.h"
 
 /* =======================================================================
-OLC SGM Macros
-========================================================================== */
+   OLC SGM Macros
+   ======================================================================= */
 
 /* =======================================================================
-OLC SGM Structure Definitions
-========================================================================== */
+   OLC SGM Structure Definitions
+   ======================================================================= */
 
 /* =======================================================================
 OLC SGM Function Declarations
 ========================================================================== */
 /**--------------------------- olc_sgm_cmd_parser_utilities --------------------*/
 
+/**
+ * \brief Callback function for GPR packet
+ * \param[in] packet Pointer to the GPR packet
+ * \param[in] callback_data Pointer to the callback data
+ * \return Result of the operation
+ */
 uint32_t sgm_gpr_callback(gpr_packet_t *packet, void *callback_data);
 
 #ifdef __cplusplus
