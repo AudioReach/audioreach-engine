@@ -211,6 +211,8 @@ struct amdb_module_registration_t
         @valuesbul
         - #APM_PROC_DOMAIN_ID_MDSP
         - #APM_PROC_DOMAIN_ID_ADSP
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2
         - #APM_PROC_DOMAIN_ID_APPS
         - #APM_PROC_DOMAIN_ID_SDSP
         - #APM_PROC_DOMAIN_ID_CDSP
@@ -271,6 +273,8 @@ struct amdb_module_deregistration_t
         @valuesbul
         - #APM_PROC_DOMAIN_ID_MDSP
         - #APM_PROC_DOMAIN_ID_ADSP
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2
         - #APM_PROC_DOMAIN_ID_SDSP
         - #APM_PROC_DOMAIN_ID_CDSP
         - #APM_PROC_DOMAIN_ID_GDSP_0
@@ -351,6 +355,8 @@ struct amdb_module_load_unload_t
         @valuesbul
         - #APM_PROC_DOMAIN_ID_MDSP
         - #APM_PROC_DOMAIN_ID_ADSP
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2
         - #APM_PROC_DOMAIN_ID_SDSP
         - #APM_PROC_DOMAIN_ID_CDSP
         - #APM_PROC_DOMAIN_ID_GDSP_0
@@ -446,6 +452,8 @@ struct amdb_param_id_module_version_info_t
 	@valuesbul
 	- #APM_PROC_DOMAIN_ID_MDSP
 	- #APM_PROC_DOMAIN_ID_ADSP
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2
 	- #APM_PROC_DOMAIN_ID_SDSP
 	- #APM_PROC_DOMAIN_ID_CDSP
 	- #APM_PROP_ID_DONT_CARE (Default) @tablebulletend */

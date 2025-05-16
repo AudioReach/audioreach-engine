@@ -78,7 +78,12 @@ extern uint8_t ar_logs_debugmsg_lowest_prio;
 #if !defined(ROOTPD_AVS_INTEGRATION)
 
 #define AR_MSG_DOMAIN_ID  2
-#define PROC_DOMAIN  " ADSP: "
+
+#ifdef IMAGE_INSTANCE
+   #define PROC_DOMAIN " ADSP1: "
+#else
+   #define PROC_DOMAIN  " MDSP: "
+#endif
 
 #undef AR_MSG_LOG
 #define AR_MSG_LOG(num_args, priority, xx_fmt, ...)                                                                    \

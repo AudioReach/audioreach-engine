@@ -85,9 +85,16 @@
 #endif
 
 #ifndef PROC_DOMAIN
-#define PROC_DOMAIN  " ADSP: "
+
+#ifdef ADSP1_IMG
+#define PROC_DOMAIN  " ADSP1: "
+#elif ADSP2_IMG
+#define PROC_DOMAIN  " ADSP2: "
+#else
+#define PROC_DOMAIN " ADSP: "
 #endif
 
+#endif
 
 /* Utility to get variable argument
  * Slide the variable arguments to get the string '_N' to be appended */

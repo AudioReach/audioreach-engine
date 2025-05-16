@@ -1548,6 +1548,8 @@ ar_result_t gen_cntr_send_media_fmt_to_gpr_client(gen_cntr_t *             me_pt
                   {
                      case APM_PROC_DOMAIN_ID_MDSP:
                      case APM_PROC_DOMAIN_ID_ADSP:
+                     case APM_PROC_DOMAIN_ID_ADSP_1:
+                     case APM_PROC_DOMAIN_ID_ADSP_2:
                      case APM_PROC_DOMAIN_ID_APPS:
                      case APM_PROC_DOMAIN_ID_CDSP:
                      case APM_PROC_DOMAIN_ID_SDSP:

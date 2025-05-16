@@ -1122,6 +1122,7 @@ bool_t apm_offload_utils_is_valid_sat_pd(uint32_t sat_proc_domain_id)
    else
    {
       if ((APM_PROC_DOMAIN_ID_MDSP == sat_proc_domain_id) || (APM_PROC_DOMAIN_ID_ADSP == sat_proc_domain_id) ||
+          (APM_PROC_DOMAIN_ID_ADSP_1 == sat_proc_domain_id) || (APM_PROC_DOMAIN_ID_ADSP_2 == sat_proc_domain_id) ||
           (APM_PROC_DOMAIN_ID_SDSP == sat_proc_domain_id) || (APM_PROC_DOMAIN_ID_CDSP == sat_proc_domain_id))
       {
          return TRUE;
