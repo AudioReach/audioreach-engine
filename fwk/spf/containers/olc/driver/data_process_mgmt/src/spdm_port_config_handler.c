@@ -14,20 +14,18 @@
 #include "media_fmt_extn_api.h"
 #include "offload_sp_api.h"
 
-sgm_port_reg_event_info_t rd_port_event_info[NUM_RD_PORT_EVENT_CONFIG] =
-{
-     { OFFLOAD_EVENT_ID_RD_SH_MEM_EP_MEDIA_FORMAT,        SGM_SOURCE_PORT_CONTAINER,    SGM_SINK_PORT_READ_EP },
-     { DATA_EVENT_ID_RD_SH_MEM_EP_MEDIA_FORMAT,           SGM_SOURCE_PORT_READ_CLIENT,  SGM_SINK_PORT_READ_EP },
-     { OFFLOAD_EVENT_ID_SH_MEM_EP_OPERATING_FRAME_SIZE,   SGM_SOURCE_PORT_READ_CLIENT,  SGM_SINK_PORT_READ_EP },
-     { OFFLOAD_DATA_EVENT_ID_UPSTREAM_PEER_PORT_PROPERTY, SGM_SOURCE_PORT_READ_CLIENT,  SGM_SINK_PORT_READ_EP },
-     { OFFLOAD_EVENT_ID_UPSTREAM_PEER_PORT_PROPERTY,      SGM_SOURCE_PORT_CONTAINER,    SGM_SINK_PORT_READ_EP },
-     { OFFLOAD_EVENT_ID_UPSTREAM_STATE,                   SGM_SOURCE_PORT_CONTAINER,    SGM_SINK_PORT_READ_EP }
+sgm_port_reg_event_info_t rd_port_event_info[NUM_RD_PORT_EVENT_CONFIG] = {
+   { OFFLOAD_EVENT_ID_RD_SH_MEM_EP_MEDIA_FORMAT, SGM_SOURCE_PORT_CONTAINER, SGM_SINK_PORT_READ_EP },
+   { DATA_EVENT_ID_RD_SH_MEM_EP_MEDIA_FORMAT, SGM_SOURCE_PORT_READ_CLIENT, SGM_SINK_PORT_READ_EP },
+   { OFFLOAD_EVENT_ID_SH_MEM_EP_OPERATING_FRAME_SIZE, SGM_SOURCE_PORT_READ_CLIENT, SGM_SINK_PORT_READ_EP },
+   { OFFLOAD_DATA_EVENT_ID_UPSTREAM_PEER_PORT_PROPERTY, SGM_SOURCE_PORT_READ_CLIENT, SGM_SINK_PORT_READ_EP },
+   { OFFLOAD_EVENT_ID_UPSTREAM_PEER_PORT_PROPERTY, SGM_SOURCE_PORT_CONTAINER, SGM_SINK_PORT_READ_EP },
+   { OFFLOAD_EVENT_ID_UPSTREAM_STATE, SGM_SOURCE_PORT_CONTAINER, SGM_SINK_PORT_READ_EP }
 };
 
-sgm_port_reg_event_info_t wr_port_event_info[NUM_WR_PORT_EVENT_CONFIG] =
-{
-     { OFFLOAD_EVENT_ID_SH_MEM_EP_OPERATING_FRAME_SIZE,   SGM_SOURCE_PORT_WRITE_CLIENT, SGM_SINK_PORT_WRITE_EP },
-     { OFFLOAD_EVENT_ID_DOWNSTREAM_PEER_PORT_PROPERTY,    SGM_SOURCE_PORT_CONTAINER,    SGM_SINK_PORT_READ_EP  }
+sgm_port_reg_event_info_t wr_port_event_info[NUM_WR_PORT_EVENT_CONFIG] = {
+   { OFFLOAD_EVENT_ID_SH_MEM_EP_OPERATING_FRAME_SIZE, SGM_SOURCE_PORT_WRITE_CLIENT, SGM_SINK_PORT_WRITE_EP },
+   { OFFLOAD_EVENT_ID_DOWNSTREAM_PEER_PORT_PROPERTY, SGM_SOURCE_PORT_CONTAINER, SGM_SINK_PORT_READ_EP }
 };
 
 // clang-format on
@@ -47,6 +45,7 @@ ar_result_t spdm_set_rd_ep_port_config(spgm_info_t *spgm_ptr, uint32_t port_inde
    uint32_t log_id            = 0;
    uint32_t rd_ep_port_id     = 0;
    uint32_t rd_client_port_id = 0;
+   uint32_t token             = 0;
 
    typedef struct rd_ep_md_calib_t
    {
@@ -80,6 +79,8 @@ ar_result_t spdm_set_rd_ep_port_config(spgm_info_t *spgm_ptr, uint32_t port_inde
 
    memset((void *)rd_ep_md_calib_ptr, 0, sizeof(rd_ep_md_calib_ptr));
 
+   (void)sgm_get_unique_token(spgm_ptr, &token);
+
    // fill the header with the size information
    rd_ep_md_calib_ptr->cmd_header.payload_size        = sizeof(rd_ep_md_calib_t) - sizeof(apm_cmd_header_t);
    rd_ep_md_calib_ptr->cmd_header.mem_map_handle      = 0;
@@ -105,7 +106,7 @@ ar_result_t spdm_set_rd_ep_port_config(spgm_info_t *spgm_ptr, uint32_t port_inde
                RD_EP_CFG_MD_CNTRL_FLAGS_SHIFT_ENABLE_MEDIA_FORMAT_MD);
 
    rd_ep_md_calib_ptr->calib_data.metadata_control_flags = metadata_control_flags;
-   rd_ep_md_calib_ptr->calib_data.num_frames_per_buffer = 1;
+   rd_ep_md_calib_ptr->calib_data.num_frames_per_buffer  = 1;
 
    // fill the details to be filled in the GPR packet
    spgm_ptr->process_info.active_data_hndl.payload_size = sizeof(rd_ep_md_calib_t);
@@ -113,7 +114,7 @@ ar_result_t spdm_set_rd_ep_port_config(spgm_info_t *spgm_ptr, uint32_t port_inde
    spgm_ptr->process_info.active_data_hndl.src_port     = rd_client_port_id;
    spgm_ptr->process_info.active_data_hndl.dst_port     = rd_ep_port_id;
    spgm_ptr->process_info.active_data_hndl.opcode       = APM_CMD_SET_CFG;
-   spgm_ptr->process_info.active_data_hndl.token        = 0;
+   spgm_ptr->process_info.active_data_hndl.token        = token;
 
    // Send the meta data calibration command to RD EP module on the satellite graph
    TRY(result, sgm_ipc_send_data_pkt(spgm_ptr));
@@ -148,6 +149,7 @@ ar_result_t spdm_set_rd_ep_client_config(spgm_info_t *spgm_ptr, uint32_t port_in
    uint32_t log_id            = 0;
    uint32_t rd_ep_port_id     = 0;
    uint32_t rd_client_port_id = 0;
+   uint32_t token             = 0;
 
    typedef struct rd_ep_md_calib_t
    {
@@ -179,6 +181,8 @@ ar_result_t spdm_set_rd_ep_client_config(spgm_info_t *spgm_ptr, uint32_t port_in
 
    memset((void *)rd_ep_md_calib_ptr, 0, sizeof(rd_ep_md_calib_t));
 
+   (void)sgm_get_unique_token(spgm_ptr, &token);
+
    // fill the header with the size information
    rd_ep_md_calib_ptr->cmd_header.payload_size        = sizeof(rd_ep_md_calib_t) - sizeof(apm_cmd_header_t);
    rd_ep_md_calib_ptr->cmd_header.mem_map_handle      = 0;
@@ -200,7 +204,7 @@ ar_result_t spdm_set_rd_ep_client_config(spgm_info_t *spgm_ptr, uint32_t port_in
    spgm_ptr->process_info.active_data_hndl.src_port     = rd_client_port_id;
    spgm_ptr->process_info.active_data_hndl.dst_port     = rd_ep_port_id;
    spgm_ptr->process_info.active_data_hndl.opcode       = APM_CMD_SET_CFG;
-   spgm_ptr->process_info.active_data_hndl.token        = 0;
+   spgm_ptr->process_info.active_data_hndl.token        = token;
 
    // Send the meta data calibration command to RD EP module on the satellite graph
    TRY(result, sgm_ipc_send_data_pkt(spgm_ptr));
@@ -228,13 +232,14 @@ ar_result_t spdm_set_rd_ep_client_config(spgm_info_t *spgm_ptr, uint32_t port_in
 ar_result_t spdm_set_rd_ep_md_rendered_config(spgm_info_t *              spgm_ptr,
                                               uint32_t                   port_index,
                                               metadata_tracking_event_t *md_te_ptr,
-											  uint32_t                   is_last_instance)
+                                              uint32_t                   is_last_instance)
 {
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
    uint32_t log_id            = 0;
    uint32_t rd_ep_port_id     = 0;
    uint32_t rd_client_port_id = 0;
+   uint32_t token             = 0;
 
    typedef struct md_rendered_calib_t
    {
@@ -269,6 +274,8 @@ ar_result_t spdm_set_rd_ep_md_rendered_config(spgm_info_t *              spgm_pt
 
    memset((void *)md_rendered_calib_ptr, 0, sizeof(md_rendered_calib_t));
 
+   (void)sgm_get_unique_token(spgm_ptr, &token);
+
    // fill the header with the size information
    md_rendered_calib_ptr->cmd_header.payload_size        = sizeof(md_rendered_calib_t) - sizeof(apm_cmd_header_t);
    md_rendered_calib_ptr->cmd_header.mem_map_handle      = 0;
@@ -294,7 +301,7 @@ ar_result_t spdm_set_rd_ep_md_rendered_config(spgm_info_t *              spgm_pt
    spgm_ptr->process_info.active_data_hndl.src_port     = rd_client_port_id;
    spgm_ptr->process_info.active_data_hndl.dst_port     = rd_ep_port_id;
    spgm_ptr->process_info.active_data_hndl.opcode       = APM_CMD_SET_CFG;
-   spgm_ptr->process_info.active_data_hndl.token        = 0;
+   spgm_ptr->process_info.active_data_hndl.token        = token;
 
    // Send the meta data calibration command to RD EP module on the satellite graph
    result = sgm_ipc_send_data_pkt(spgm_ptr);
@@ -303,8 +310,10 @@ ar_result_t spdm_set_rd_ep_md_rendered_config(spgm_info_t *              spgm_pt
    {
       OLC_SDM_MSG(OLC_SDM_ID,
                   DBG_HIGH_PRIO,
-                  "MD_DBG: read data port Release MD configuration rd_client_miid 0x%lx sat rd_ep_miid 0x%lx, "
-                  "token (msw, lsw) 0x%lx 0x%lx , failed to send the configuration, "
+                  "MD_DBG: read data port Release MD configuration "
+                  "rd_client_miid 0x%lx sat rd_ep_miid 0x%lx, "
+                  "token (msw, lsw) 0x%lx 0x%lx , "
+                  "failed to send the configuration, "
                   "can happen when SAT RD_EP is getting closed",
                   rd_client_port_id,
                   rd_ep_port_id,
@@ -315,7 +324,8 @@ ar_result_t spdm_set_rd_ep_md_rendered_config(spgm_info_t *              spgm_pt
    {
       OLC_SDM_MSG(OLC_SDM_ID,
                   DBG_HIGH_PRIO,
-                  "MD_DBG: read data port Release MD configuration rd_client_miid 0x%lx sat rd_ep_miid 0x%lx, "
+                  "MD_DBG: read data port Release MD configuration "
+                  "rd_client_miid 0x%lx sat rd_ep_miid 0x%lx, "
                   "token (msw, lsw) 0x%lx 0x%lx completed",
                   rd_client_port_id,
                   rd_ep_port_id,
@@ -351,6 +361,7 @@ ar_result_t spdm_set_wd_ep_client_config(spgm_info_t *spgm_ptr, uint32_t port_in
    uint32_t log_id            = 0;
    uint32_t wd_ep_port_id     = 0;
    uint32_t wd_client_port_id = 0;
+   uint32_t token             = 0;
 
    typedef struct wd_ep_md_calib_t
    {
@@ -382,6 +393,8 @@ ar_result_t spdm_set_wd_ep_client_config(spgm_info_t *spgm_ptr, uint32_t port_in
 
    memset((void *)wd_ep_md_calib_ptr, 0, sizeof(wd_ep_md_calib_t));
 
+   (void)sgm_get_unique_token(spgm_ptr, &token);
+
    // fill the header with the size information
    wd_ep_md_calib_ptr->cmd_header.payload_size        = sizeof(wd_ep_md_calib_t) - sizeof(apm_cmd_header_t);
    wd_ep_md_calib_ptr->cmd_header.mem_map_handle      = 0;
@@ -403,7 +416,7 @@ ar_result_t spdm_set_wd_ep_client_config(spgm_info_t *spgm_ptr, uint32_t port_in
    spgm_ptr->process_info.active_data_hndl.src_port     = wd_client_port_id;
    spgm_ptr->process_info.active_data_hndl.dst_port     = wd_ep_port_id;
    spgm_ptr->process_info.active_data_hndl.opcode       = APM_CMD_SET_CFG;
-   spgm_ptr->process_info.active_data_hndl.token        = 0;
+   spgm_ptr->process_info.active_data_hndl.token        = token;
 
    // Send the meta data calibration command to RD EP module on the satellite graph
    TRY(result, sgm_ipc_send_data_pkt(spgm_ptr));
@@ -454,7 +467,7 @@ ar_result_t sgm_config_data_port_events(spgm_info_t *spgm_ptr,
 
    log_id = spgm_ptr->sgm_id.log_id;
 
-   OLC_SDM_MSG(OLC_SDM_ID, DBG_HIGH_PRIO, "data port event configuration, dct (w/r : 0/1) %lu", (uint32_t)data_type);
+   OLC_SDM_MSG(OLC_SDM_ID, DBG_HIGH_PRIO, "data port event configuration (wr/rd:0/1) %lu", (uint32_t)data_type);
 
    // Allocate the memory for the event registration payload
    event_cfg_ptr =
@@ -463,7 +476,7 @@ ar_result_t sgm_config_data_port_events(spgm_info_t *spgm_ptr,
    {
       OLC_SDM_MSG(OLC_SDM_ID,
                   DBG_ERROR_PRIO,
-                  "Failed to allocate memory for data port event configuration, dct (w/r : 0/1) %lu",
+                  "Failed to allocate memory for data port event configuration (wr/rd:0/1) %lu",
                   (uint32_t)data_type);
       THROW(result, AR_ENOMEMORY);
       // if the registration fails. We may not be able to process this graph further
@@ -517,7 +530,7 @@ ar_result_t sgm_config_data_port_events(spgm_info_t *spgm_ptr,
 
       OLC_SDM_MSG(OLC_SDM_ID,
                   DBG_HIGH_PRIO,
-                  "data port event reg, dct(w/r:0/1) %lu event id (0x%lX) src port (0x%lx) dst port (0x%lx)",
+                  "data port event register (wr/rd:0/1) %lu, event id (0x%lX) src port (0x%lx) dst port (0x%lx)",
                   (uint32_t)data_type,
                   event_id,
                   src_port,

@@ -444,6 +444,14 @@ ar_result_t sgm_get_data_port_index_given_rw_client_miid(spgm_info_t *       spg
                                                          uint32_t            rw_client_miid,
                                                          uint32_t *          port_index_ptr);
 
+ar_result_t sgm_get_data_port_index_given_wr_client_miid(spgm_info_t *spgm_ptr,
+                                                         uint32_t     write_client_miid,
+                                                         uint32_t *   port_index_ptr);
+
+ar_result_t sgm_get_data_port_index_given_rd_client_miid(spgm_info_t *spgm_ptr,
+                                                         uint32_t     read_client_miid,
+                                                         uint32_t *   port_index_ptr);
+
 ar_result_t spdm_write_dl_pcd(spgm_info_t *spgm_ptr, uint32_t port_index);
 ar_result_t spdm_read_dl_pcd(spgm_info_t *spgm_ptr, uint32_t port_index);
 ar_result_t spdm_process_media_format_event(spgm_info_t * spgm_ptr,
