@@ -154,6 +154,12 @@ static ar_result_t cu_set_cntr_params(cu_base_t *base_ptr,
          *error_code_ptr = result;
          break;
       }
+      case CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO:
+      {
+         result          = cu_offload_voice_session_cfg(base_ptr, param_payload_ptr, param_size_ptr);
+         *error_code_ptr = result;
+         break;
+      }
       default:
       {
          result = cu_dcm_island_entry_exit_handler(base_ptr, param_payload_ptr, param_size_ptr, pid);

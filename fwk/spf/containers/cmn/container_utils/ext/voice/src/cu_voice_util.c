@@ -154,6 +154,46 @@ ar_result_t cu_set_calibration_ops_done(cu_base_t *base_ptr, int8_t *param_paylo
    return result;
 }
 
+ar_result_t cu_offload_voice_session_cfg(cu_base_t *base_ptr, int8_t *param_payload_ptr, uint32_t *param_size_ptr)
+{
+   ar_result_t result = AR_EOK;
+   INIT_EXCEPTION_HANDLING
+
+   cntr_param_id_offload_voice_session_info_t *voice_session_info_ptr = NULL;
+   VERIFY(result, (NULL != base_ptr->voice_info_ptr));
+
+   CU_MSG(base_ptr->gu_ptr->log_id,
+          DBG_HIGH_PRIO,
+          "CMD:OFFLOAD_VOICE_SESSION_CFG: Executing offload voice session cfg SET-param. current channel mask=0x%x",
+          base_ptr->curr_chan_mask);
+
+   VERIFY(result, *param_size_ptr >= sizeof(cntr_param_id_offload_voice_session_info_t));
+   voice_session_info_ptr = (cntr_param_id_offload_voice_session_info_t *)param_payload_ptr;
+
+   VERIFY(result, (NULL != voice_session_info_ptr));
+
+   CU_MSG(base_ptr->gu_ptr->log_id,
+          DBG_HIGH_PRIO,
+          "CMD:OFFLOAD_VOICE_SESSION_CFG: sg_id = %d, kpps_sf = %d, bw_sf = %d",
+          voice_session_info_ptr->sg_id,
+          voice_session_info_ptr->kpps_sf,
+          voice_session_info_ptr->bw_sf);
+
+   base_ptr->cntr_vtbl_ptr->handle_cntr_set_offload_voice_session_info(base_ptr, voice_session_info_ptr);
+
+   CATCH(result, CU_MSG_PREFIX, base_ptr->gu_ptr->log_id)
+   {
+   }
+
+   CU_MSG(base_ptr->gu_ptr->log_id,
+          DBG_HIGH_PRIO,
+          "CMD:OFFLOAD_VOICE_SESSION_CFG: Done Executing offload voice session cfg cmd, current channel mask=0x%x. result=%lu",
+          base_ptr->curr_chan_mask,
+          result);
+
+   return result;
+}
+
 ar_result_t cu_cntr_proc_params_query(cu_base_t *base_ptr, int8_t *param_payload_ptr, uint32_t *param_size_ptr)
 {
    ar_result_t result = AR_EOK;

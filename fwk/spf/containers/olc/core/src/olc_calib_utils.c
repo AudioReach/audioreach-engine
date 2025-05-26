@@ -503,6 +503,15 @@ ar_result_t olc_process_container_set_get_cfg(cu_base_t *                       
                   result = AR_EOK;
                   break;
                }
+               case CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO:
+               {
+                 CU_MSG(base_ptr->gu_ptr->log_id,
+                                          DBG_ERROR_PRIO,
+                                          "voice param-id 0x%lX",
+                                          param_data_ptr->param_id);
+                  result = AR_EOK;
+                 break;
+               }
                case CNTR_PARAM_ID_GET_PROF_INFO:
                {
                   result |= gen_topo_get_prof_info(&me_ptr->topo, param_payload_ptr, &param_data_ptr->param_size);
@@ -521,6 +530,31 @@ ar_result_t olc_process_container_set_get_cfg(cu_base_t *                       
                   param_data_ptr->error_code = result;
                   break;
                }
+	 		   case CNTR_PARAM_ID_SATELLITE_DOMAIN_INFO:
+               {
+                  if (param_data_ptr->param_size < sizeof(cntr_param_id_satellite_domain_info_t))
+                  {
+                     CU_MSG(base_ptr->gu_ptr->log_id,
+                            DBG_ERROR_PRIO,
+                            "Wrong payload size %lu for PID 0x%lx; Min expected size == %lu",
+                            param_data_ptr->param_size,
+                            param_data_ptr->param_id,
+                            sizeof(cntr_param_id_satellite_domain_info_t));
+                     result = AR_EFAILED;
+                     break;
+                  }
+                  cntr_param_id_satellite_domain_info_t *sat_domain_ptr = (cntr_param_id_satellite_domain_info_t *)param_payload_ptr;
+
+                  if (NULL == sat_domain_ptr)
+                  {
+                     CU_MSG(base_ptr->gu_ptr->log_id, DBG_ERROR_PRIO, "sat_domain_ptr is NULL. Failing.");
+                     result = AR_EFAILED;
+                     break;
+                  }
+                  sat_domain_ptr->proc_id = me_ptr->spgm_info.sgm_id.sat_pd;
+                  result = AR_EOK;
+               }
+               break;
                default:
                {
                   CU_MSG(base_ptr->gu_ptr->log_id,

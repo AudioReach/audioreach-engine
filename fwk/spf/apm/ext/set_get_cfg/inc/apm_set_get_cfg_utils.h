@@ -51,6 +51,19 @@ typedef struct apm_port_mf_cfg_t
 
 }apm_port_mf_cfg_t;
 
+typedef struct apm_offload_voice_session_info_t
+{
+   apm_cont_set_get_cfg_hdr_t header;
+   /**< Header for caching the container param */
+   
+   uint32_t sg_id;
+   /**< Subgraph ID.*/
+
+   uint32_t kpps_sf;
+   /**< kpps scale factor to be applied on offload path.*/
+   uint32_t bw_sf;
+   /**< bw scale factor to be applied on offload path.*/
+}apm_offload_voice_session_info_t;
 
 typedef struct apm_cont_aggregate_payload_cfg_t
 {

@@ -266,6 +266,25 @@ ar_result_t gen_cntr_handle_proc_duration_change(cu_base_t *base_ptr)
    return AR_EOK;
 }
 
+ar_result_t gen_cntr_handle_offload_voice_session_info(cu_base_t *base_ptr,  cntr_param_id_offload_voice_session_info_t* voice_session_info_ptr)
+{
+   gen_cntr_t *me_ptr   = (gen_cntr_t *)base_ptr;
+
+   for (gu_sg_list_t *sg_list_ptr = me_ptr->topo.gu.sg_list_ptr; (NULL != sg_list_ptr); LIST_ADVANCE(sg_list_ptr))
+   {
+     if(sg_list_ptr->sg_ptr->id == voice_session_info_ptr->sg_id )
+     {
+       sg_list_ptr->sg_ptr->kpps_scale_factor = voice_session_info_ptr->kpps_sf;
+       sg_list_ptr->sg_ptr->bw_scale_factor = voice_session_info_ptr->bw_sf;
+        GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                       DBG_HIGH_PRIO,
+                      "gen_cntr_handle_offload_voice_session_info: SG_ID 0x%lX, KPPS_SF %d, BW_SF %d",
+                          sg_list_ptr->sg_ptr->id, sg_list_ptr->sg_ptr->kpps_scale_factor, sg_list_ptr->sg_ptr->bw_scale_factor);
+     }
+      
+   }
+   return AR_EOK;
+}
 ar_result_t gen_cntr_handle_cntr_period_change(cu_base_t *base_ptr)
 {
    gen_cntr_t *me_ptr   = (gen_cntr_t *)base_ptr;

@@ -606,6 +606,8 @@ typedef struct cu_cntr_vtable_t
 
    ar_result_t (*handle_cntr_set_calibration_ops_done)(cu_base_t *me_ptr);
 
+   ar_result_t (*handle_cntr_set_offload_voice_session_info)(cu_base_t *me_ptr,   cntr_param_id_offload_voice_session_info_t* voice_session_info_ptr);
+
 } cu_cntr_vtable_t;
 
 /* =======================================================================

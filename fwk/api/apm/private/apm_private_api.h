@@ -151,6 +151,47 @@ struct apm_cont_prop_id_frame_size_samples_t
 ;
 
 typedef struct apm_cont_prop_id_frame_size_samples_t apm_cont_prop_id_frame_size_samples_t;
+  
+/**
+ * This param ID is used as part of #APM_CMD_SET_CFG.
+ *
+ * This parameter is used by  clients (E.g., VCPM) to
+ * set the offload session parameters needed by the subgraphs in satellite domain.
+ *
+ * Payload: apm_param_id_offload_voice_session_info_t
+ */
+#define APM_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO 0x08001B62
+
+#include "spf_begin_pack.h"
+struct apm_param_id_offload_voice_session_info_payload_t
+{
+   uint32_t sg_id;
+   /**< SubGraph ID to which this param payload needs to be applied. */
+   uint32_t kpps_sf;
+   /**< kpps scale factor to be applied on offload path.*/
+   uint32_t bw_sf;
+   /**< bw scale factor to be applied on offload path.*/
+}
+#include "spf_end_pack.h"
+;
+
+typedef struct apm_param_id_offload_voice_session_info_payload_t apm_param_id_offload_voice_session_info_payload_t;
+  
+/**
+ * Payload for APM_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO
+ */
+ #include "spf_begin_pack.h"
+ struct apm_param_id_offload_voice_session_info_t
+{
+  uint32_t num_configs;
+  /**< num of configs.*/
+  /**< Number of %apm_param_id_offload_voice_session_info_payload_t structures  
+        immediately follow this structure. */
+}
+#include "spf_end_pack.h"
+;
+
+typedef struct apm_param_id_offload_voice_session_info_t apm_param_id_offload_voice_session_info_t;
 
 #ifdef __cplusplus
 }

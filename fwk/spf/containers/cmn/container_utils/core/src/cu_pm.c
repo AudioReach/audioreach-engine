@@ -225,8 +225,7 @@ ar_result_t cu_handle_clk_vote_change(cu_base_t *       me_ptr,
 {
    ar_result_t result = AR_EOK;
 
-   bool_t is_voice_scenario =
-      ((NULL != me_ptr->voice_info_ptr) && (FALSE == me_ptr->voice_info_ptr->is_satellite_voice_sid));
+   bool_t is_voice_scenario = (NULL != me_ptr->voice_info_ptr);
    bool_t is_release = (CU_PM_REQ_KPPS_BW != vote_type);
 
    /* Multiply the scale factor and pCPP to the current KPPS value and vote with new floor clock.

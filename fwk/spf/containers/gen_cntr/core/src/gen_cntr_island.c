@@ -89,7 +89,7 @@ const cu_cntr_vtable_t gen_cntr_cntr_funcs = {
 
 
    .handle_cntr_period_change 				 = gen_cntr_handle_cntr_period_change,
-   .handle_cntr_set_calibration_ops_done   = gen_cntr_handle_cntr_set_calibration_ops_done,
+   .handle_cntr_set_offload_voice_session_info = gen_cntr_handle_offload_voice_session_info,
 
    .initiate_duty_cycle_island_entry         = gen_cntr_initiate_duty_cycle_island_entry,
    .initiate_duty_cycle_island_exit          = gen_cntr_initiate_duty_cycle_island_exit,
