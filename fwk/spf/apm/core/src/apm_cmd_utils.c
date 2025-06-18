@@ -198,6 +198,7 @@ ar_result_t apm_clear_pspc_cont_mod_list(apm_t *              apm_info_ptr,
    apm_sub_graph_t *       sub_graph_node_ptr;
    spf_list_node_t *       curr_sg_node_ptr;
    apm_ext_utils_t *       ext_utils_ptr;
+   apm_cmd_ctrl_t *        apm_cmd_ctrl_ptr = (apm_cmd_ctrl_t *)cont_cmd_ctrl_ptr->apm_cmd_ctrl_ptr;
 
    /** Get the pointer to APM ext utils vtbl ptr  */
    ext_utils_ptr = &apm_info_ptr->ext_utils;
@@ -342,6 +343,11 @@ ar_result_t apm_clear_pspc_cont_mod_list(apm_t *              apm_info_ptr,
             ext_utils_ptr->parallel_cmd_utils_vtbl_ptr->apm_update_deferred_gm_cmd_fptr(apm_info_ptr,
                                                                                         sub_graph_node_ptr);
          }
+
+         /** Remove this sub-graph from the current command ctrl processed SG list */
+         apm_db_remove_node_from_list(&apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_proc_info.processed_sg_list_ptr,
+                                      sub_graph_node_ptr,
+                                      &apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_proc_info.num_processed_sg);
 
          AR_MSG(DBG_HIGH_PRIO, SPF_LOG_PREFIX "GRAPH_CLOSE: Destroyed SG_ID[0x%lX]", sub_graph_node_ptr->sub_graph_id);
 
