@@ -113,6 +113,7 @@ typedef struct capi_splitter
    uint32_t                               miid;
    capi_splitter_flags_t                  flags;
    uint8_t                                num_out_ports;
+   intf_extn_data_port_state_t            input_port_state;  //Input port state, based on port operation.
    /* Number of output ports on the SPLITTER Module*/
 } capi_splitter_t;
 
