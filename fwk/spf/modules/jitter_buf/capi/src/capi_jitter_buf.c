@@ -468,7 +468,7 @@ capi_err_t capi_jitter_buf_set_param(capi_t *                capi_ptr,
          me_ptr->buffer_mode            = me_ptr->configured_buffer_mode;
 
          AR_MSG(DBG_HIGH_PRIO,
-                "jitter_buf: input buffering mode %hu [1: BUFFER_AT_INPUT_TRIGGER, 0: BUFFER_AT_OUTPUT_TRIGGER] ",
+                "jitter_buf: input buffering mode %u [1: BUFFER_AT_INPUT_TRIGGER, 0: BUFFER_AT_OUTPUT_TRIGGER] ",
                 me_ptr->configured_buffer_mode);
 
          result = capi_jitter_buf_change_trigger_policy(me_ptr);
