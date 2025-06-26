@@ -206,12 +206,12 @@ capi_err_t capi_spr_avsync_update_session_clock(avsync_t *avsync_ptr, int64_t ad
       return CAPI_EOK;
    }
 
-//#ifdef AVSYNC_DEBUG
+#ifdef AVSYNC_DEBUG
    int64_t prev_session_time = avsync_ptr->session_clock_us;
    int64_t prev_session_time_samples = (avsync_ptr->flags.is_timescaled_data)
                                           ? avsync_ptr->tsm_info.tsm_session_clk_samples
                                           : avsync_ptr->elapsed_session_clock_samples;
-//#endif
+#endif
 
    // Convert adj_bytes to samples
    uint64_t adj_samples = adj_bytes / CAPI_CMN_BITS_TO_BYTES(bps);
@@ -263,7 +263,7 @@ capi_err_t capi_spr_avsync_update_session_clock(avsync_t *avsync_ptr, int64_t ad
       avsync_ptr->base_timestamp_us;
    }
 
-//#ifdef AVSYNC_DEBUG
+#ifdef AVSYNC_DEBUG
    // Note: This message has dependency with the variable prev_session_time (declared above)
    int64_t curr_sess_time_samples = (avsync_ptr->flags.is_timescaled_data)
                                        ? avsync_ptr->tsm_info.tsm_session_clk_samples
@@ -276,7 +276,7 @@ capi_err_t capi_spr_avsync_update_session_clock(avsync_t *avsync_ptr, int64_t ad
            prev_session_time,
            curr_sess_time_samples,
            prev_session_time_samples);
-//#endif
+#endif
 
    // Note: As of today, expected session time is not scaled in accordance to TSM as it needs more changes
    // for render decision/TS handling across fwk and SPR. This will be taken up in the future based on requirements if any.
