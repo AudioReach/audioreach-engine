@@ -9,7 +9,7 @@
  *  
  * 
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -27,6 +27,11 @@ extern "C" {
  */
 
 // ar_result_t apm_parse_cmd_payload(apm_t *apm_info_ptr);
+
+ar_result_t apm_get_prop_data_size(uint8_t * prop_payload_ptr,
+                                   uint32_t  num_prop,
+                                   uint32_t *prop_list_payload_size_ptr,
+                                   uint32_t  cmd_payload_size);
 
 #ifdef __cplusplus
 }

@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -27,6 +27,8 @@
 #include "offload_path_delay_api.h"
 #include "apm_cntr_peer_heap_utils.h"
 #include "apm_runtime_link_hdlr_utils.h"
+#include "apm_gpr_cmd_parser.h"
+#include "apm_ext_cmn.h"
 
 //#define APM_DEBUG_CMD_PARSING
 
@@ -374,12 +376,27 @@ static ar_result_t apm_parse_subgraph_list(apm_t *apm_info_ptr, uint8_t *mod_pid
       {
          /** Trying to create a sub graph which is already existing in the system is considered
           *  as an invalid configuration from HLOS and the open parsing would return a
-          *  failure in the Master PD context.
+          *  failure in the Master PD context for same client and should return Success for a new client.
           */
          if (APM_PROC_DOMAIN_ID_ADSP == local_domain_id) // todo : check with Master PD
          {
-            AR_MSG(DBG_ERROR_PRIO, "SG_PARSE: SG_ID: [0x%lX] already exists", curr_sg_cfg_ptr->sub_graph_id);
+            if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+                apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_parse_sg_list_fptr)
+            {
+               if (AR_EOK != (result = apm_info_ptr->ext_utils.multi_client_vtbl_ptr
+                                          ->apm_multi_client_parse_sg_list_fptr(sub_graph_node_ptr,
+                                                                                apm_cmd_ctrl_ptr,
+                                                                                &curr_payload_ptr)))
+               {
+                  return result;
+               }
+               continue;
+            }
+            else
+            {
+               AR_MSG(DBG_ERROR_PRIO, "SG_PARSE: SG_ID: [0x%lX] already exists", sub_graph_node_ptr->sub_graph_id);
             return AR_EDUPLICATE;
+         }
          }
          else
          {
@@ -462,6 +479,17 @@ static ar_result_t apm_parse_subgraph_list(apm_t *apm_info_ptr, uint8_t *mod_pid
       /** After all successful validations update the number of
        *  sub-graph properties configured */
       sub_graph_node_ptr->prop.num_properties = curr_sg_cfg_ptr->num_sub_graph_prop;
+
+      if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+          apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_add_sg_client_context_fptr)
+      {
+         if (AR_EOK !=
+             (result = apm_info_ptr->ext_utils.multi_client_vtbl_ptr
+                          ->apm_multi_client_add_sg_client_context_fptr(sub_graph_node_ptr, apm_cmd_ctrl_ptr)))
+         {
+            goto _bail_out_sg_list_parse;
+         }
+      }
 
       /** After all the validations are successful, add the
          sub-graph to the APM graph data base. This call also
@@ -1023,6 +1051,8 @@ ar_result_t apm_parse_modules_list(apm_t *apm_info_ptr, uint8_t *mod_pid_payload
    apm_cont_cmd_ctrl_t *        cont_cmd_ctrl_ptr;
    uint32_t                     expected_payload_size;
    uint32_t                     curr_payload_size;
+   apm_cmd_ctrl_t *             apm_cmd_ctrl_ptr;
+   bool_t                       mod_list_parse_req = TRUE;
 
    /** Validate the payload pointer */
    if (!mod_pid_payload_ptr || !payload_size)
@@ -1034,6 +1064,9 @@ ar_result_t apm_parse_modules_list(apm_t *apm_info_ptr, uint8_t *mod_pid_payload
 
       return AR_EFAILED;
    }
+
+   /* Get the pointer to current APM command control obj */
+   apm_cmd_ctrl_ptr = apm_info_ptr->curr_cmd_ctrl_ptr;
 
    /** Get the pointer to sub-graph config payload start */
    pid_data_ptr = (apm_param_id_modules_list_t *)mod_pid_payload_ptr;
@@ -1080,6 +1113,24 @@ ar_result_t apm_parse_modules_list(apm_t *apm_info_ptr, uint8_t *mod_pid_payload
 
       /** Check if the given sub-graph and container ID have been
        *  configured at least once */
+
+      /**
+       * If the module's SG id is present in the skip_sg_id_list_ptr then skip entire current module list
+       * and increment to next module list, in multi-client context
+       */
+      if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+          apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_parse_mod_list_fptr)
+      {
+         apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_parse_mod_list_fptr(apm_cmd_ctrl_ptr,
+                                                                                             module_list_ptr,
+                                                                                             &curr_mod_list_payload_ptr,
+                                                                                             &mod_list_parse_req);
+         if (!mod_list_parse_req)
+         {
+            continue;
+         }
+      }
+
       if (AR_EOK != (result = apm_db_get_sub_graph_node(&apm_info_ptr->graph_info,
                                                         module_list_ptr->sub_graph_id,
                                                         &sub_graph_node_ptr,
@@ -1363,6 +1414,8 @@ ar_result_t apm_parse_module_prop_list(apm_t *apm_info_ptr, uint8_t *mod_pid_pay
    apm_cont_cmd_ctrl_t *       cont_cmd_ctrl_ptr;
    uint32_t                    expected_payload_size;
    uint32_t                    curr_payload_size;
+   apm_cmd_ctrl_t *            apm_cmd_ctrl_ptr;
+   bool_t                      mod_prop_list_parse_req= TRUE;
 
    /** Validate the payload pointer */
    if (!mod_pid_payload_ptr || !payload_size)
@@ -1374,6 +1427,9 @@ ar_result_t apm_parse_module_prop_list(apm_t *apm_info_ptr, uint8_t *mod_pid_pay
 
       return AR_EFAILED;
    }
+
+   /* Get the pointer to current APM command control obj */
+   apm_cmd_ctrl_ptr = apm_info_ptr->curr_cmd_ctrl_ptr;
 
    /** Get the pointer to module config payload start */
    pid_data_ptr = (apm_param_id_module_prop_t *)mod_pid_payload_ptr;
@@ -1460,6 +1516,24 @@ ar_result_t apm_parse_module_prop_list(apm_t *apm_info_ptr, uint8_t *mod_pid_pay
       /** Advance the pointer to start of next property config object */
       curr_payload_ptr += (sizeof(apm_module_prop_cfg_t) + prop_data_size);
 
+      /**
+       * If module host SG id is in skip list (which means same module prop is coming again) then skip module prop list
+       * in multi-client context
+       */
+      if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+          apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_parse_mod_prop_list_fptr)
+      {
+         apm_info_ptr->ext_utils.multi_client_vtbl_ptr
+            ->apm_multi_client_parse_mod_prop_list_fptr(apm_cmd_ctrl_ptr, module_node_ptr, &mod_prop_list_parse_req);
+
+         if (!mod_prop_list_parse_req)
+         {
+            /** Decrement the module config counter */
+            num_mod_prop_cfg--;
+            continue;
+         }
+      }
+
       /** Get the pointer to current container command control
        *  pointer */
       apm_get_cont_cmd_ctrl_obj(module_node_ptr->host_cont_ptr, apm_info_ptr->curr_cmd_ctrl_ptr, &cont_cmd_ctrl_ptr);
@@ -1532,6 +1606,8 @@ ar_result_t apm_parse_module_conn_list(apm_t *apm_info_ptr, uint8_t *mod_pid_pay
    bool_t                      DATA_LINK_TRUE             = TRUE;
    bool_t                      link_start_reqd            = FALSE;
    spf_module_port_type_t      port_type;
+   bool_t                      conn_parse_req = TRUE;
+   bool_t                      conn_skip_req  = FALSE;
 
    enum
    {
@@ -1627,6 +1703,52 @@ ar_result_t apm_parse_module_conn_list(apm_t *apm_info_ptr, uint8_t *mod_pid_pay
          AR_MSG(DBG_ERROR_PRIO, "MOD_DATA_LNK_PARSE: Module IID validation failed");
 
          return result;
+      }
+
+      if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+          apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_parse_mod_conn_list_fptr)
+      {
+         /**Get the connection from db and update client context*/
+         if (AR_EOK != (result = apm_info_ptr->ext_utils.multi_client_vtbl_ptr
+                                    ->apm_multi_client_parse_mod_conn_list_fptr(apm_info_ptr,
+                                                                                curr_conn_cfg_ptr,
+                                                                                &curr_payload_ptr,
+                                                                                &num_connections,
+                                                                                &conn_parse_req)))
+         {
+            return result;
+         }
+
+         /*same connections is ref counted for new client. So continue
+          * parsing new connection */
+         if (!conn_parse_req)
+         {
+            continue;
+         }
+      }
+
+      if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+          apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_cache_connections_fptr)
+      {
+         /**Get the cache the connection & add the 1st client*/
+         if (AR_EOK != (result = apm_info_ptr->ext_utils.multi_client_vtbl_ptr
+                                    ->apm_multi_client_cache_connections_fptr(apm_info_ptr,
+                                                                              module_node_ptr_list,
+                                                                              curr_conn_cfg_ptr,
+                                                                              &conn_skip_req)))
+         {
+            return result;
+         }
+
+         if (conn_skip_req)
+         {
+            /** Advance the pointer to start of next connection object  */
+            curr_payload_ptr += (sizeof(apm_module_conn_cfg_t));
+
+            /** Decrement the num connection counter */
+            num_connections--;
+            continue;
+         }
       }
 
       /** If either of the source or destination module instance
@@ -1973,6 +2095,7 @@ ar_result_t apm_parse_module_ctrl_link_cfg_list(apm_t *  apm_info_ptr,
    bool_t                               is_mixed_heap_ctrl_link    = FALSE;
    bool_t                               CTRL_LINK_TRUE             = FALSE;
    bool_t                               link_start_reqd            = FALSE;
+   bool_t                               conn_parse_req             = TRUE;
    enum
    {
       PEER_1_MODULE = 0,
@@ -2091,6 +2214,41 @@ ar_result_t apm_parse_module_ctrl_link_cfg_list(apm_t *  apm_info_ptr,
          AR_MSG(DBG_ERROR_PRIO, "MOD_CTRL_LNK_PARSE: Module IID validation failed");
 
          return AR_EBADPARAM;
+      }
+
+      if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+          apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_parse_mod_ctrl_link_cfg_fptr)
+      {
+         /**Get the connection from db and update client context*/
+         if (AR_EOK != (result = apm_info_ptr->ext_utils.multi_client_vtbl_ptr
+                                    ->apm_multi_client_parse_mod_ctrl_link_cfg_fptr(apm_info_ptr,
+                                                                                    curr_ctrl_link_cfg_ptr,
+                                                                                    &curr_payload_ptr,
+                                                                                    &num_ctrl_links,
+                                                                                    &conn_parse_req)))
+         {
+            return result;
+         }
+
+         /*same connections is ref counted for new client. So continue
+          * parsing new connection */
+         if (!conn_parse_req)
+         {
+            continue;
+         }
+      }
+
+      if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+          apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_cache_ctrl_links_fptr)
+      {
+         /**Get the cache the connection & add the 1st client*/
+         if (AR_EOK != (result = apm_info_ptr->ext_utils.multi_client_vtbl_ptr
+                                    ->apm_multi_client_cache_ctrl_links_fptr(apm_info_ptr,
+                                                                             module_node_ptr_list,
+                                                                             curr_ctrl_link_cfg_ptr)))
+         {
+            return result;
+         }
       }
 
       /** if both peers are present as a part of open, it can be
@@ -2674,6 +2832,21 @@ ar_result_t apm_parse_graph_mgmt_sg_id_list(apm_t *             apm_info_ptr,
    apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_list.num_cmd_sg_id      = num_sg;
    apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_list.cmd_sg_id_list_ptr = sg_id_list_ptr;
 
+   /**Validates below check when num_reg_sub_graphs is 0 and it's multi-client.
+    * num_reg_sub_graphs can be 0, for this cmd(this client) as previous cmd(client) might have already processed and
+    * send it to sequencer and not needed again to add it to reg_sg_list_ptr.
+    * So num_reg_sub_graphs can be 0 for multi-client and NON zero for default.
+    * */
+
+   if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+       (apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_list.num_reg_sub_graphs == 0))
+   {
+      AR_MSG(DBG_MED_PRIO,
+             "GRAPH_MGMT:[multi-client] returning EOK as num_reg_sub_graphs is %d ",
+             apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_list.num_reg_sub_graphs);
+      return AR_EOK;
+   }
+
    /** If there are any sub-graphs present managed via proxy
     *  manager, separate them out from the regular sub-graph
     *  list. */
@@ -2924,6 +3097,9 @@ static ar_result_t apm_aggregate_module_cfg(apm_t *apm_info_ptr, apm_module_para
    apm_container_t *      host_cont_node_ptr;
    apm_cont_cached_cfg_t *cont_cached_cfg_ptr;
    apm_cont_cmd_ctrl_t *  cont_cmd_ctrl_ptr;
+   apm_sub_graph_t       *sub_graph_node_ptr = NULL;
+   gpr_packet_t          *packet_curr_client;
+   apm_ext_utils_t       *ext_utils_ptr = &apm_info_ptr->ext_utils;
 
    if (AR_EOK != (result = apm_db_get_module_node(&apm_info_ptr->graph_info,
                                                   param_data_ptr->module_instance_id,
@@ -2939,6 +3115,52 @@ static ar_result_t apm_aggregate_module_cfg(apm_t *apm_info_ptr, apm_module_para
       AR_MSG(DBG_HIGH_PRIO, "Module Not Found: (M_IID) = (0x%lX)", param_data_ptr->module_instance_id);
 
       return AR_EBADPARAM;
+   }
+
+   packet_curr_client = (gpr_packet_t *)apm_info_ptr->curr_cmd_ctrl_ptr->cmd_msg.payload_ptr;
+
+   /** For the case of default calibration during Graph Open, checks the calibration state ("is_calibrated" of
+    * apm_subgraph_t) of subgraph. If "is_calibrated' is TRUE, the return from here itself; otherwise proceed further.
+    */
+   if (APM_CMD_DB_DEFAULT_SET_CFG == apm_info_ptr->curr_cmd_ctrl_ptr->cmd_opcode)
+   {
+      /** Check the calibration state of subraph of the module and if TRUE ,skip the calibration of the module */
+
+      if (AR_EOK != (result = apm_db_get_sub_graph_node(&apm_info_ptr->graph_info,
+                                                        module_node_ptr->host_sub_graph_ptr->sub_graph_id,
+                                                        &sub_graph_node_ptr,
+                                                        APM_DB_OBJ_QUERY)))
+      {
+         AR_MSG(DBG_ERROR_PRIO,
+                "[multi-client]:Failed to get Subgraph [0x%lX]",
+                module_node_ptr->host_sub_graph_ptr->sub_graph_id);
+
+         return result;
+      }
+
+      /** Check if the subgraph exist */
+      if (NULL == sub_graph_node_ptr)
+      {
+         AR_MSG(DBG_LOW_PRIO,
+                "[multi-client]:Subgraph Not Found:(0x%lX)",
+                module_node_ptr->host_sub_graph_ptr->sub_graph_id);
+
+         return AR_EBADPARAM;
+      }
+
+      /** If "is_calibrated' is TRUE, the return from here itself */
+
+      if (TRUE == sub_graph_node_ptr->is_calibrated)
+      {
+         AR_MSG(DBG_HIGH_PRIO,
+                "[multi-client]:Client[0x%lX]- Skipping as Module id = (0x%lX) of subgraph (0x%lX) is already "
+                "calibrated",
+                packet_curr_client->src_port,
+                param_data_ptr->module_instance_id,
+                module_node_ptr->host_sub_graph_ptr->sub_graph_id);
+
+         return result;
+      }
    }
 
    AR_MSG(DBG_LOW_PRIO,
@@ -2987,6 +3209,19 @@ static ar_result_t apm_aggregate_module_cfg(apm_t *apm_info_ptr, apm_module_para
       return result;
    }
 
+   if (ext_utils_ptr->multi_client_vtbl_ptr &&
+       ext_utils_ptr->multi_client_vtbl_ptr->apm_multi_client_update_parsed_sg_list_fptr)
+   {
+      /** Add the subgraph containing the module to the parsed subgraph list */
+
+      if (APM_CMD_DB_DEFAULT_SET_CFG == apm_info_ptr->curr_cmd_ctrl_ptr->cmd_opcode)
+      {
+         result = ext_utils_ptr->multi_client_vtbl_ptr
+                     ->apm_multi_client_update_parsed_sg_list_fptr(module_node_ptr->host_sub_graph_ptr->sub_graph_id,
+                                                                   apm_info_ptr);
+      }
+   }
+
    return result;
 }
 
@@ -3000,6 +3235,7 @@ ar_result_t apm_parse_cmd_payload(apm_t *apm_info_ptr)
    uint32_t        cmd_opcode;
    apm_cmd_ctrl_t *curr_cmd_ctrl_ptr;
    uint32_t        aligned_param_size;
+   apm_ext_utils_t *ext_utils_ptr = &apm_info_ptr->ext_utils;
 
    /** Validate if the cmd control object has been initalized */
    if (!apm_info_ptr->curr_cmd_ctrl_ptr)
@@ -3053,6 +3289,7 @@ ar_result_t apm_parse_cmd_payload(apm_t *apm_info_ptr)
                   case APM_CMD_GET_CFG:
                   case APM_CMD_REGISTER_CFG:
                   case APM_CMD_DEREGISTER_CFG:
+                  case APM_CMD_DB_DEFAULT_SET_CFG:
                   {
                      local_result = apm_aggregate_module_cfg(apm_info_ptr, mod_data_ptr);
 
@@ -3094,6 +3331,17 @@ ar_result_t apm_parse_cmd_payload(apm_t *apm_info_ptr)
       curr_config_ptr += (sizeof(apm_module_param_data_t) + aligned_param_size);
 
    } while (curr_config_ptr < config_end_ptr);
+
+   if (ext_utils_ptr->multi_client_vtbl_ptr &&
+       ext_utils_ptr->multi_client_vtbl_ptr->apm_multi_client_update_sg_calibration_state_fptr)
+   {
+      /** Update calibration state of the subgraph node present in the parsed subgraph list */
+
+      if (APM_CMD_DB_DEFAULT_SET_CFG == cmd_opcode)
+      {
+         result = ext_utils_ptr->multi_client_vtbl_ptr->apm_multi_client_update_sg_calibration_state_fptr(apm_info_ptr);
+      }
+   }
 
    return result;
 }

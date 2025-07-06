@@ -2,11 +2,6 @@
    @file CMakeLists.txt
 
    @brief
-
-   @copyright
-   Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
-   SPDX-License-Identifier: BSD-3-Clause-Clear
-
 ]]
 cmake_minimum_required(VERSION 3.10)
 
@@ -35,6 +30,7 @@ include_directories(
                     ../ext/spf_cmd_hdlr/inc
                     ../ext/sys_util/inc
                     ../../amdb/ext/inc
+                    ../ext/multi_client/inc
                    )
 
 #Add the sub directories

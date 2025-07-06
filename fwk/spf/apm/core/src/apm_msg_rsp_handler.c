@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -174,6 +174,17 @@ ar_result_t apm_graph_open_cmd_rsp_hdlr(apm_t *apm_info_ptr, spf_msg_t *rsp_msg_
       if (AR_EOK != (result = apm_connect_peer_containers_ext_ports(apm_info_ptr)))
       {
          apm_cmd_ctrl_ptr->cmd_status = result;
+      }
+
+      /**For multi_client context, remove the client context from SGs if the open failed at container level.
+       * Should be done only in case APM cmd control status is SUCCESS ( in cmd control status failure case
+       * multi-client code already handling it*/
+      if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+          apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_graph_cmd_rsp_hdlr_fptr)
+      {
+         result |=
+            apm_info_ptr->ext_utils.multi_client_vtbl_ptr
+               ->apm_multi_client_graph_cmd_rsp_hdlr_fptr(apm_info_ptr, rsp_msg_ptr, apm_cmd_ctrl_ptr->cmd_opcode);
       }
    }
    else /** Container open failed */
@@ -995,6 +1006,16 @@ ar_result_t apm_graph_mgmt_cmd_rsp_hdlr(apm_t *apm_info_ptr, spf_msg_t *rsp_msg_
    apm_cmd_ctrl_t *apm_cmd_ctrl_ptr;
    /** Get the pointer to current APM command in process */
    apm_cmd_ctrl_ptr = apm_info_ptr->curr_cmd_ctrl_ptr;
+
+   /**In multi-client context undo the client sg-state for the SGs for which this
+    * mgmt cmd is failed*/
+   if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+       apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_graph_cmd_rsp_hdlr_fptr)
+   {
+      apm_info_ptr->ext_utils.multi_client_vtbl_ptr
+         ->apm_multi_client_graph_cmd_rsp_hdlr_fptr(apm_info_ptr, rsp_msg_ptr, apm_cmd_ctrl_ptr->cmd_opcode);
+   }
+
    /** Pending container list is required for completion of this */
    apm_cont_graph_mgmt_rsp_hdlr(apm_info_ptr, rsp_msg_ptr);
 

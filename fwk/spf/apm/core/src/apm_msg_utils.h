@@ -9,7 +9,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -333,6 +333,13 @@ struct apm_graph_open_cmd_ctrl_t
    /**< Pointer to list of sub-graph ID's being
         processed */
 
+   uint32_t                     num_skipped_sg;
+   /**< Number of sub-graphs being processed */
+
+   spf_list_node_t              *skip_sg_id_list_ptr;
+   /**< Pointer to list of sub-graph ID's being
+        skipped */
+
    uint8_t                      *sat_prv_cfg_ptr;
    /**< Start of the Client mod param payload (apm_param_id_imcl_peer_domain_info_t)
         - Memory is from the client*/
@@ -361,7 +368,16 @@ struct apm_get_cfg_cmd_ctrl_t
         Obj Type: apm_module_param_data_t */
 };
 
+typedef struct apm_db_default_set_cfg_cmd_ctrl_t apm_db_default_set_cfg_cmd_ctrl_t;
 
+struct apm_db_default_set_cfg_cmd_ctrl_t
+{
+    uint32_t          num_subgraph_node;
+   /**< Number of subgraph in parsed subgraph list*/
+
+   spf_list_node_t    *parsed_sg_list_ptr;
+   /**<Pointer to parsed subgraph list */
+};
 
 typedef struct apm_debug_info_cfg_t
 {
@@ -453,6 +469,9 @@ struct apm_cmd_ctrl_t
 
          apm_graph_mgmt_cmd_ctrl_t  graph_mgmt_cmd_ctrl;
          /**< Graph management command control */
+
+         apm_db_default_set_cfg_cmd_ctrl_t    db_default_set_cfg_cmd_ctrl;
+            /**<Db_Default_Set config command control */
       };
 
       apm_set_cfg_cmd_ctrl_t     set_cfg_cmd_ctrl;

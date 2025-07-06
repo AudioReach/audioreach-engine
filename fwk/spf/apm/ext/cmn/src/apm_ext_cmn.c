@@ -8,7 +8,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -29,6 +29,7 @@
 #include "apm_parallel_cmd_utils.h"
 #include "apm_db_query.h"
 #include "apm_debug_info_cfg.h"
+#include "apm_multi_client.h"
 
 ar_result_t apm_ext_utils_init(apm_t *apm_info_ptr)
 {
@@ -55,6 +56,8 @@ ar_result_t apm_ext_utils_init(apm_t *apm_info_ptr)
    apm_runtime_link_hdlr_utils_init(apm_info_ptr);
 
    apm_parallel_cmd_utils_init(apm_info_ptr);
+
+   apm_multi_client_init(apm_info_ptr);
 
    apm_db_query_init(apm_info_ptr);
    
