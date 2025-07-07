@@ -649,7 +649,13 @@ ar_result_t gen_topo_set_input_port_media_format(gen_topo_t            *topo_ptr
        !SPF_IS_PCM_DATA_FORMAT(input_port_ptr->common.media_fmt_ptr->data_format))
    {
       topo_ptr->flags.simple_threshold_propagation_enabled = FALSE;
+
+      if (SPF_DEINTERLEAVED_RAW_COMPRESSED == input_port_ptr->common.media_fmt_ptr->data_format)
+      {
+         THIN_TOPO_SET_EXIT_FLAG(topo_ptr, has_unsupported_mf, TRUE);
+      }
    }
+
    return AR_EOK;
 }
 

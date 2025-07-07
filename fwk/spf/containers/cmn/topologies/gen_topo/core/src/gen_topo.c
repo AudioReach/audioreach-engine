@@ -16,6 +16,7 @@
 #include "gen_topo_buf_mgr.h"
 #include "gen_topo_prof.h"
 #include "gen_topo_ctrl_port.h"
+#include "thin_topo_inline.h"
 
 // clang-format off
 static const topo_cu_vtable_t gen_topo_cu_vtable =
@@ -1315,6 +1316,12 @@ static ar_result_t gen_topo_prop_med_fmt_from_prev_out_to_next_in(gen_topo_t *  
    {
       // If media format is updated then update port threshold as well.
       capi_event_flag_ptr->port_thresh = TRUE;
+
+      if (in_port_ptr->common.media_fmt_ptr &&
+          (SPF_DEINTERLEAVED_RAW_COMPRESSED == in_port_ptr->common.media_fmt_ptr->data_format))
+      {
+         THIN_TOPO_SET_EXIT_FLAG(topo_ptr, has_unsupported_mf, TRUE);
+      }
 
       // Even if module is being bypassed, we need to set media fmt as setting media fmt may enable module.
       if (module_ptr->capi_ptr)

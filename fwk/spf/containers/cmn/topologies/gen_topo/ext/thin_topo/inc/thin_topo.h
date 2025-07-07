@@ -66,8 +66,11 @@ typedef union thin_topo_exit_flags_t
        * it cant be supported because these modules might leave partial data after the process.
        */
 
-      uint32_t has_to_preserve_prebuffer : 1;
-      uint32_t num_active_md_nodes_in_cntr:8;  /**< Number of metadata currently present in the container, it can be in the cntr/topo/CAPI modules. */
+      uint32_t has_to_preserve_prebuffer   :1;  // BIT 13
+
+      uint32_t has_unsupported_mf : 1; // BIT 14
+
+      uint32_t num_active_md_nodes_in_cntr :8;  /**< Number of metadata currently present in the container, it can be in the cntr/topo/CAPI modules. */
 
       //uint32_t has_mixed_data_flow_states:1;
             /**< modules with started and AT_GAP cannot be handled in thin topo, because it requires thin topo to check data flow states for the output ports*/

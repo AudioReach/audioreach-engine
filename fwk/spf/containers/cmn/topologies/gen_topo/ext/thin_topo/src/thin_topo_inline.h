@@ -37,10 +37,22 @@ static inline bool_t check_if_cntr_is_processing_with_thin_topo(gen_topo_t *topo
 
 #define THIN_TOPO_CHECK_IF_EXIT_FLAG_SET(topo_ptr, flag) (TRUE == topo_ptr->exit_flags.flag)
 
+#ifdef VERBOSE_DEBUGGING
+
+#define THIN_TOPO_SET_EXIT_FLAG(topo_ptr, flag, VALUE)                                                                 \
+   {                                                                                                                   \
+      topo_ptr->exit_flags.flag = VALUE;                                                                               \
+      TOPO_MSG(topo_ptr->gu.log_id, DBG_HIGH_PRIO, "THIN_TOPO_SET_EXIT_FLAG: updated " #flag "= %lu", VALUE);           \
+   }
+
+#else // !VERBOSE_DEBUGGING
+
 #define THIN_TOPO_SET_EXIT_FLAG(topo_ptr, flag, VALUE)                                                                 \
    {                                                                                                                   \
       topo_ptr->exit_flags.flag = VALUE;                                                                               \
    }
+
+#endif
 
 static inline void thin_topo_incr_active_md_nodes(gen_topo_t *topo_ptr, module_cmn_md_list_t *md_list_ptr)
 {
