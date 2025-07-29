@@ -553,6 +553,11 @@ ar_result_t gen_cntr_gpr_cmd(cu_base_t *base_ptr)
                 packet_ptr->token,
                 cu_is_any_handle_rest_pending(base_ptr));
 
+   /*vote against island in command context,
+     cntr will vote for island entry later
+     in the process context after processing two frames*/
+   gen_cntr_vote_against_island((void *)&me_ptr->cu);
+   
    switch (packet_ptr->opcode)
    {
       case AR_SPF_MSG_GLOBAL_SH_MEM:
