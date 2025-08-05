@@ -11,7 +11,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -89,6 +89,17 @@ typedef struct apm_offload_utils_vtable
 
    ar_result_t (*apm_offload_mem_mgr_reset_fptr)(void);
 
+   ar_result_t (*apm_offload_memorymap_register_loaned_memory_fptr)(uint32_t mem_map_client,
+                                                                    uint32_t unique_shm_id,
+                                                                    uint32_t mem_size,
+                                                                    posal_heap_t heap_mgr_type);
+
+   ar_result_t (*apm_offload_memorymap_check_deregister_loaned_memory_fptr)(uint32_t unique_shm_id);
+
+   ar_result_t (*apm_offload_memorymap_update_peer_domains_access_info_fptr)(uint32_t unique_shm_id,
+                                                                             uint32_t num_peer_proc_domains,
+                                                                             uint32_t peer_proc_domain_list[]);
+
   ar_result_t (*apm_offload_handle_scale_factor_info_fptr)(apm_t *apm_info_ptr, apm_module_param_data_t *mod_data_ptr);
 
 } apm_offload_utils_vtable_t;
@@ -105,6 +116,8 @@ ar_result_t apm_offload_utils_init(apm_t *apm_info_ptr);
 ar_result_t apm_offload_utils_deinit();
 
 ar_result_t apm_offload_utils_handle_svc_status(apm_t *apm_info_ptr, void *status_ptr);
+
+uint32_t apm_offload_get_sat_domain_list_index(uint32_t sat_domain_id);
 
 ar_result_t apm_offload_handle_scale_factor_info(apm_t *apm_info_ptr, apm_module_param_data_t *mod_data_ptr);
 

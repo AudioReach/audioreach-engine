@@ -6,14 +6,15 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #include "apm_internal.h"
 #include "apm_memmap_api.h"
+#include "apm_shmem_util_i.h"
 
-ar_result_t apm_shmem_cmd_handler(uint32_t memory_map_client, spf_msg_t *msg_ptr);
+ar_result_t apm_shmem_cmd_handler(apm_t *apm_info_ptr, spf_msg_t *msg_ptr);
 
 bool_t apm_shmem_is_supported_mem_pool(uint16_t mem_pool_id);
 
@@ -80,14 +81,14 @@ static ar_result_t apm_mem_shared_memory_map_regions_cmd_handler(uint32_t      m
                                                                  POSAL_HEAP_ID heap_id)
 {
    ar_result_t                      result = AR_EOK;
-   void *                           payload_ptr, *dummy_ptr;
+   void                            *payload_ptr, *dummy_ptr;
    apm_cmd_shared_mem_map_regions_t common_mem_map_region_payload = { 0 };
    uint32_t                         mem_map_handle                = 0;
    uint32_t                         resp_opcode, resp_size;
    uint32_t                         heap_mngr_type  = APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_DEFAULT;
    uint32_t                         memory_map_type = APM_MEMORY_MAP_MEMORY_ADDRESS_TYPE_PA_OR_VA;
 
-   gpr_packet_t *                    resp_pkt_ptr = NULL;
+   gpr_packet_t                     *resp_pkt_ptr = NULL;
    POSAL_MEMORYPOOLTYPE              mem_pool;
    apm_shared_map_region_payload_t **region_pptr;
 
@@ -241,17 +242,33 @@ static ar_result_t apm_mem_shared_memory_map_regions_cmd_handler(uint32_t      m
              phy_regions[i].mem_size);
    }
 
+   posal_mem_map_v2_input_args_t in_args = { 0 };
+   if (is_global_shmem_map_cmd)
+   {
+      apm_cmd_global_shared_mem_map_regions_t *mem_map_regions_payload_ptr =
+         (apm_cmd_global_shared_mem_map_regions_t *)payload_ptr;
+
+      in_args.unique_shmem_id_24bit = mem_map_regions_payload_ptr->shmem_id;
+   }
+   else
+   {
+      // if client doesnt set the shm id, posal driver allocates a return handle whcih can be interpreted
+      // as both mem map handle as well as unique shm id.
+      in_args.unique_shmem_id_24bit = 0;
+   }
+
+   in_args.client_token    = mem_map_client;
+   in_args.shm_mem_reg_ptr = phy_regions;
+   in_args.num_shm_reg     = common_mem_map_region_payload.num_regions;
+   in_args.is_cached       = is_cached;
+   in_args.is_offset_map   = is_offset_map;
+   in_args.pool_id         = mem_pool;
+   in_args.heap_id         = heap_id;
+
    if (0 == is_virtual)
    {
       // physical mapping
-      if (AR_DID_FAIL(result = posal_memorymap_shm_mem_map(mem_map_client,
-                                                           phy_regions,
-                                                           common_mem_map_region_payload.num_regions,
-                                                           is_cached,
-                                                           is_offset_map,
-                                                           mem_pool,
-                                                           &mem_map_handle,
-                                                           heap_id)))
+      if (AR_DID_FAIL(result = posal_memorymap_shm_mem_map_v2(&in_args, &mem_map_handle)))
       {
          AR_MSG(DBG_ERROR_PRIO, "apm_shmem_util: Failed to map the physical memory, error code is 0x%x", result);
          goto _apm_mem_shared_memory_map_regions_cmd_handler_bail_3;
@@ -260,14 +277,7 @@ static ar_result_t apm_mem_shared_memory_map_regions_cmd_handler(uint32_t      m
    else if (1 == is_virtual)
    {
       // virtual mapping
-      if (AR_DID_FAIL(result = posal_memorymap_virtaddr_mem_map(mem_map_client,
-                                                                phy_regions,
-                                                                common_mem_map_region_payload.num_regions,
-                                                                is_cached,
-                                                                is_offset_map,
-                                                                mem_pool,
-                                                                &mem_map_handle,
-                                                                heap_id)))
+      if (AR_DID_FAIL(result = posal_memorymap_virtaddr_mem_map_v2(&in_args, &mem_map_handle)))
       {
          AR_MSG(DBG_ERROR_PRIO, "apm_shmem_util: Failed to map the virual memory, error code is 0x%x", result);
          goto _apm_mem_shared_memory_map_regions_cmd_handler_bail_3;
@@ -292,17 +302,7 @@ static ar_result_t apm_mem_shared_memory_map_regions_cmd_handler(uint32_t      m
 
    if (is_global_shmem_map_cmd)
    {
-      gpr_ibasic_rsp_result_t *                resp_payload_ptr;
-      apm_cmd_global_shared_mem_map_regions_t *mem_map_regions_payload_ptr =
-         (apm_cmd_global_shared_mem_map_regions_t *)payload_ptr;
-
-      if (AR_DID_FAIL(
-             result =
-                posal_memorymap_set_shmem_id(mem_map_client, mem_map_handle, mem_map_regions_payload_ptr->shmem_id)))
-      {
-         AR_MSG(DBG_ERROR_PRIO, "apm_shmem_util: Failed to set shmem_id to mem_map_handle 0x%x", result);
-         goto _apm_mem_shared_memory_map_regions_cmd_handler_bail_3;
-      }
+      gpr_ibasic_rsp_result_t *resp_payload_ptr;
 
       /* prepare the Response payload pointer */
       resp_payload_ptr = (gpr_ibasic_rsp_result_t *)GPR_PKT_GET_PAYLOAD(void, resp_pkt_ptr);
@@ -404,7 +404,7 @@ _apm_mem_shared_memory_map_regions_cmd_handler_bail_1:
 static ar_result_t apm_mem_shared_memory_un_map_regions_cmd_handler(uint32_t mem_map_client, gpr_packet_t *pkt_ptr)
 {
    ar_result_t result = AR_EOK;
-   void *      payload_ptr;
+   void       *payload_ptr;
 
    apm_ext_utils_t *ext_utils_ptr;
    uint32_t         mem_map_handle;
@@ -494,9 +494,10 @@ bool_t apm_shmem_is_supported_mem_pool(uint16_t mem_pool_id)
    return result;
 }
 
-ar_result_t apm_shmem_cmd_handler(uint32_t memory_map_client, spf_msg_t *msg_ptr)
+ar_result_t apm_shmem_cmd_handler(apm_t *apm_info_ptr, spf_msg_t *msg_ptr)
 {
-   ar_result_t   result = AR_EOK;
+   uint32_t      memory_map_client = apm_info_ptr->memory_map_client;
+   ar_result_t   result            = AR_EOK;
    gpr_packet_t *gpr_pkt_ptr;
    uint32_t      cmd_opcode;
 
@@ -519,6 +520,13 @@ ar_result_t apm_shmem_cmd_handler(uint32_t memory_map_client, spf_msg_t *msg_ptr
       case APM_CMD_GLOBAL_SHARED_MEM_UNMAP_REGIONS:
       {
          result = apm_mem_shared_memory_un_map_regions_cmd_handler(memory_map_client, gpr_pkt_ptr);
+         break;
+      }
+      case APM_CMD_SHARED_MEM_MAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_UNMAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_REGION_ACCESS_INFO:
+      {
+         result = apm_shmem_cmd_handler_v2(apm_info_ptr, msg_ptr);
          break;
       }
       default:

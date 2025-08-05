@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -105,6 +105,9 @@ static ar_result_t apm_gpr_basic_rsp_handler(apm_t *apm_info_ptr, spf_msg_t *msg
       case APM_CMD_SHARED_MEM_UNMAP_REGIONS:
       case APM_CMD_SET_CFG:
       case APM_CMD_CLOSE_ALL:
+      case APM_CMD_SHARED_MEM_MAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_UNMAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_REGION_ACCESS_INFO:
       {
          if (ext_utils_ptr->offload_vtbl_ptr && ext_utils_ptr->offload_vtbl_ptr->apm_offload_basic_rsp_handler_fptr)
          {

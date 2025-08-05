@@ -4,7 +4,7 @@
  *  	 This file contains utilities for memory mapping and unmapping of shared memory.
  *
  * \copyright
- *    Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *    SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -26,9 +26,6 @@ extern "C" {
 
 /** @addtogroup posal_memorymap
 @{ */
-
-/* Forward declaration. */
-typedef struct posal_memorymap_node_t posal_memorymap_node_t;
 
 //***************************************************************************
 // POSAL_MEMORYPOOLTYPE
@@ -64,6 +61,8 @@ typedef enum
 
 /** Linked list of memory regions.
  */
+typedef struct posal_memorymap_node_t posal_memorymap_node_t;
+
 struct posal_memorymap_node_t
 {
    uint32_t shmem_id;
@@ -304,51 +303,91 @@ ar_result_t posal_memorymap_virtaddr_mem_map(uint32_t                      clien
                                              uint32_t                     *shm_mem_map_handle_ptr,
                                              POSAL_HEAP_ID                 heap_id);
 
-/**
- Maps the shmem_id to the mem_map_handle for a given client.
+typedef struct posal_mem_map_v2_input_args_t
+{
+   uint32_t                      unique_shmem_id_24bit;
+   /** Unique shared memory Id only LSB 24 Bits must be valid. if unique shm id is set, this will be returned as the
+    * mem map handle in the output arguments. */
 
- @param[in]  client_token           Client token.
+   uint32_t                      client_token;
+   /** Posal memorymap driver's registered client token */
 
- @param[in] shm_mem_map_handle      Memory map handle of the shared memory region created.
+   posal_memorymap_shm_region_t *shm_mem_reg_ptr;
+   /** Pointer to an array of shared memory regions to map. */
 
- @param[in] shmem_id                shared memory id set by the client.
+   uint16_t                      num_shm_reg;
+   /** Number of shared memory regions in the array. */
 
- @return
- 0 -- Success
- @par
- Nonzero -- Failure
+   bool_t                        is_cached;
+   /** Indicates if mem is cached or uncached */
 
- @dependencies
- Before calling this function, the client object must be registered and
- valid shared memory regions should be created with shared_mem_map_handle.
- */
-ar_result_t posal_memorymap_set_shmem_id(uint32_t client_token, uint32_t shm_mem_map_handle, uint32_t shmem_id);
+   bool_t                        is_offset_map;
+   /** Indicates if the mapping is offset based as opposed to pointer based.*/
 
-/**
- Gets the associated shmem_id from the mem_map_handle for a given client.
+   POSAL_MEMORYPOOLTYPE          pool_id;
+   /** Memory pool ID to which this region is mapped.*/
 
- @param[in]  client_token           Client token.
+   POSAL_HEAP_ID                 heap_id;
+   /**  heap id required for any allocations required to perform the memory map command. */
 
- @param[in] shm_mem_map_handle      Memory map handle of the shared memory region created.
-
- @param[out] shmem_id_ptr           shared memory id set by the client.
-
- @return
- 0 -- Success
- @par
- Nonzero -- Failure
-
- @dependencies
- Before calling this function, the client object must be registered and
- valid shared memory regions should be created with shared_mem_map_handle.
- */
-ar_result_t posal_memorymap_get_shmem_id(uint32_t client_token, uint32_t shm_mem_map_handle, uint32_t *shmem_id_ptr);
+} posal_mem_map_v2_input_args_t;
 
 /**
- Gets the associated mem_map_handle for a given client based on the shmem_id.
+  Maps the shared memory and adds the memory region to the client linked list.
+  This function enables physical address mapping only.
+
+  @datatypes
+  posal_memorymap_shm_region_t \n
+  #POSAL_MEMORYPOOLTYPE
+
+  @param[in]  posal_mem_map_v2_input_args_t    structure containing input arguments
+  @param[out] ret_mem_map_handle_ptr           Handle returned by the driver. Usually driver returns "unique_shmem_id_24bit"
+                                               if client is passing unique shm id in the posal_mem_map_v2_input_args_t.
+                                               If the client doesnt set any "unique_shmem_id_24bit" in input args, then driver
+                                               creates its own unique shm handle and returns it.
+
+  @return
+  0 -- Success
+  @par
+  Nonzero -- Failure
+
+  @dependencies
+  Before calling this function, the client object must be registered. @newpage
+*/
+
+ar_result_t posal_memorymap_shm_mem_map_v2(posal_mem_map_v2_input_args_t *input_args_ptr,
+                                           uint32_t                      *ret_mem_map_handle_ptr);
+
+/**
+Maps the shared virtual address and adds the memory region to the client
+linked list. This function must be used to map a virtual address.
+
+@datatypes
+posal_memorymap_shm_region_t \n
+#POSAL_MEMORYPOOLTYPE
+
+  @param[in]  posal_mem_map_v2_input_args_t    structure containing input arguments
+  @param[out] ret_mem_map_handle_ptr           Handle returned by the driver. Usually driver returns "shmem_id"
+                                               if client is passing unique shm id in the posal_mem_map_v2_input_args_t.
+                                               If the client doesnt set any "shmem_id" in input args, then driver
+                                               creates its own unique shm handle and returns it.
+
+@return
+0 -- Success
+@par
+Nonzero -- Failure
+
+@dependencies
+Before calling this function, the client object must be registered. @newpage
+*/
+ar_result_t posal_memorymap_virtaddr_mem_map_v2(posal_mem_map_v2_input_args_t *input_args_ptr,
+                                                uint32_t                      *ret_mem_map_handle_ptr);
+
+/**
+ Gets the associated mem_map_handle for a given client based on the unique_shmem_id_24bit.
 
  @param[in]  client_token           Client token.
- @param[in]  shmem_id               Shared memory id set by the client.
+ @param[in]  unique_shmem_id_24bit               Shared memory id set by the client.
  @param[out] shm_mem_map_handle_ptr  Pointer to the memory map handle of the
                                      shared memory region created.
 
@@ -359,10 +398,10 @@ ar_result_t posal_memorymap_get_shmem_id(uint32_t client_token, uint32_t shm_mem
 
  @dependencies
  Before calling this function, the client object must be registered and
- valid shared memory regions should be created with shmem_id.
+ valid shared memory regions should be created with unique_shmem_id_24bit.
  */
 ar_result_t posal_memorymap_get_mem_map_handle(uint32_t  client_token,
-                                               uint32_t  shmem_id,
+                                               uint32_t  unique_shmem_id_24bit,
                                                uint32_t *shm_mem_map_handle_ptr);
 
 /**

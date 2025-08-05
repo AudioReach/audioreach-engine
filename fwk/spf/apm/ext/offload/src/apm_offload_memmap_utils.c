@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -127,9 +127,10 @@ static void apm_offload_sat_book_cleanup(uint32_t sat_domain_id);
 ========================================================================== */
 
 /* Function to memset the global structute, create the mutex*/
-ar_result_t apm_offload_global_mem_mgr_init(POSAL_HEAP_ID heap_id)
+ar_result_t apm_offload_global_mem_mgr_init_v1(POSAL_HEAP_ID heap_id)
 {
-   AR_MSG(DBG_HIGH_PRIO, "In APM Offload Global Mem Mgr Init");
+
+   AR_MSG(DBG_HIGH_PRIO, "In APM Offload Global Mem Mgr Init V1");
    APM_OFFLOAD_MEMSET(&g_offload_mem_mgr, sizeof(apm_offload_mem_mgr_t));
    posal_mutex_create(&g_offload_mem_mgr.map_mutex, heap_id);
    return AR_EOK;
@@ -686,7 +687,7 @@ ar_result_t apm_offload_unloaned_mem_deregister(uint32_t sat_domain_id, uint32_t
    return result;
 }
 
-uint32_t apm_offload_get_persistent_sat_handle(uint32_t sat_domain_id, uint32_t master_handle)
+uint32_t apm_offload_get_persistent_sat_handle_v1(uint32_t sat_domain_id, uint32_t master_handle)
 {
    uint32_t not_found                   = APM_OFFLOAD_INVALID_VAL;
    uint32_t sat_domain_remap_list_index = APM_OFFLOAD_INVALID_VAL;
@@ -697,7 +698,7 @@ uint32_t apm_offload_get_persistent_sat_handle(uint32_t sat_domain_id, uint32_t 
       AR_MSG(DBG_ERROR_PRIO,
              "Offload: get unloaned book sat_handle, Unsupported Satellite domain ID %lu",
              sat_domain_id);
-      return AR_EFAILED;
+      return not_found;
    }
    posal_mutex_lock(g_offload_mem_mgr.map_mutex);
    unloaned_map_t *unloaned_book_ptr = &(g_offload_mem_mgr.unloaned_book[sat_domain_remap_list_index][0]);
@@ -718,9 +719,9 @@ uint32_t apm_offload_get_persistent_sat_handle(uint32_t sat_domain_id, uint32_t 
    return not_found;
 }
 
-ar_result_t apm_offload_global_mem_mgr_deinit()
+ar_result_t apm_offload_global_mem_mgr_deinit_v1()
 {
-   AR_MSG(DBG_HIGH_PRIO, "In APM Offload Global Mem Mgr Deinit");
+   AR_MSG(DBG_HIGH_PRIO, "In APM Offload Global Mem Mgr Deinit V1");
    posal_mutex_destroy(&g_offload_mem_mgr.map_mutex);
    APM_OFFLOAD_MEMSET(&g_offload_mem_mgr, sizeof(apm_offload_mem_mgr_t));
    return AR_EOK;
@@ -830,9 +831,10 @@ static uint32_t apm_offload_find_unloaned_master_handle_idx(unloaned_map_t *unlo
 /* =======================================================================
    Memory Function Implementations
 ========================================================================== */
-void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t req_size, apm_offload_ret_info_t *ret_info_ptr)
+
+void *apm_offload_memory_malloc_v1(uint32_t sat_domain_id, uint32_t req_size, apm_offload_ret_info_t *ret_info_ptr)
 {
-   void *        ret_ptr                     = NULL;
+   void         *ret_ptr                     = NULL;
    bool_t        found_mem                   = FALSE;
    uint32_t      master_idx                  = APM_OFFLOAD_INVALID_VAL;
    POSAL_HEAP_ID master_heap                 = APM_INTERNAL_STATIC_HEAP_ID;
@@ -842,7 +844,9 @@ void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t req_size, apm_o
    sat_domain_remap_list_index = apm_offload_get_sat_domain_list_index(sat_domain_id);
    if (APM_OFFLOAD_INVALID_VAL == sat_domain_remap_list_index)
    {
-      AR_MSG(DBG_ERROR_PRIO, "Offload: alloc memory, Unsupported Satellite domain ID %lu", sat_domain_id);
+      AR_MSG(DBG_ERROR_PRIO,
+             "apm_offload_memory_malloc_v1: alloc memory, Unsupported Satellite domain ID %lu",
+             sat_domain_id);
       return NULL;
    }
 
@@ -861,7 +865,7 @@ void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t req_size, apm_o
    sat_info_t *sat_book_ptr = NULL;
 
    // update the size to align the size to cache line
-   req_size  =  req_size + (APM_OFFLOAD_MEM_ALIGNMENT_BYTES  - req_size % APM_OFFLOAD_MEM_ALIGNMENT_BYTES);
+   req_size = req_size + (APM_OFFLOAD_MEM_ALIGNMENT_BYTES - req_size % APM_OFFLOAD_MEM_ALIGNMENT_BYTES);
 
    posal_mutex_lock(g_offload_mem_mgr.map_mutex);
    sat_book_ptr = &(g_offload_mem_mgr.sat_book[sat_domain_remap_list_index][0]);
@@ -872,7 +876,7 @@ void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t req_size, apm_o
       if (APM_OFFLOAD_INVALID_VAL == master_idx)
       {
 #ifdef APM_OFFLOAD_MEMORY_DBG
-         AR_MSG(DBG_ERROR_PRIO, "sat book at index %lu not valid", i);
+         AR_MSG(DBG_ERROR_PRIO, "apm_offload_memory_malloc_v1: sat book at index %lu not valid", i);
 #endif
          continue;
       }
@@ -881,7 +885,7 @@ void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t req_size, apm_o
       {
 #ifdef APM_OFFLOAD_MEMORY_DBG
          AR_MSG(DBG_MED_PRIO,
-                "Offload: Req Size: %lu, Master idx %lu has heap size %lu. Continuing",
+                "apm_offload_memory_malloc_v1: Req Size: %lu, Master idx %lu has heap size %lu. Continuing",
                 req_size,
                 master_idx,
                 g_offload_mem_mgr.master_book[master_idx].heap_size);
@@ -894,7 +898,8 @@ void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t req_size, apm_o
       {
 #ifdef APM_OFFLOAD_MEMORY_DBG
          AR_MSG(DBG_MED_PRIO,
-                "Offload: Malloc for Req Size: %lu, Master idx %lu from heap id %lu failed. Continuing to next map",
+                "apm_offload_memory_malloc_v1: Malloc for Req Size: %lu, Master idx %lu from heap id %lu failed. "
+                "Continuing to next map",
                 req_size,
                 master_idx,
                 master_heap);
@@ -905,11 +910,12 @@ void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t req_size, apm_o
       heap_start_addr = g_offload_mem_mgr.master_book[master_idx].heap_start_addr_va;
 
       /*Fill the ret info*/
-      ret_info_ptr->master_handle = g_offload_mem_mgr.master_book[master_idx].master_handle;
-      ret_info_ptr->sat_handle    = sat_book_ptr[i].sat_handle;
-      ret_info_ptr->offset        = (uint32_t)ret_ptr - heap_start_addr;
-      ret_info_ptr->heap_id       = (uint32_t)master_heap;
-      ret_info_ptr->ret_ptr       = ret_ptr;
+      ret_info_ptr->is_handle_type_v2 = FALSE;
+      ret_info_ptr->master_handle     = g_offload_mem_mgr.master_book[master_idx].master_handle;
+      ret_info_ptr->sat_handle        = sat_book_ptr[i].sat_handle;
+      ret_info_ptr->offset            = (uint32_t)ret_ptr - heap_start_addr;
+      ret_info_ptr->heap_id           = (uint32_t)master_heap;
+      ret_info_ptr->ret_ptr           = ret_ptr;
       break;
    }
    posal_mutex_unlock(g_offload_mem_mgr.map_mutex);
@@ -917,7 +923,7 @@ void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t req_size, apm_o
    if (!found_mem)
    {
       AR_MSG(DBG_ERROR_PRIO,
-             "Offload: Unable to Malloc Memory of size %lu, for sat domain %lu",
+             "apm_offload_memory_malloc_v1: Unable to Malloc Memory of size %lu, for sat domain %lu",
              req_size,
              sat_domain_id);
       return NULL;
@@ -938,25 +944,25 @@ void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t req_size, apm_o
    return ret_ptr;
 }
 
-
-void apm_offload_memory_free(apm_offload_ret_info_t *shmem_info_ptr)
+void apm_offload_memory_free_v1(apm_offload_ret_info_t *shmem_info_ptr)
 {
    if ((shmem_info_ptr) && (shmem_info_ptr->ret_ptr))
    {
 #ifdef APM_OFFLOAD_MEMORY_DBG
-      AR_MSG(DBG_HIGH_PRIO, "Freeing Offload memory ptr 0x%lx", shmem_info_ptr->ret_ptr);
+      AR_MSG(DBG_HIGH_PRIO, "apm_offload_memory_free_v1: Freeing Offload memory ptr 0x%lx", shmem_info_ptr->ret_ptr);
 #endif
       posal_memory_aligned_free_v2(shmem_info_ptr->ret_ptr, shmem_info_ptr->heap_id);
    }
    else
    {
-      AR_MSG(DBG_ERROR_PRIO, "Freeing Offload memory ptr, invalid arguments");
+      AR_MSG(DBG_ERROR_PRIO, "apm_offload_memory_free_v1: Freeing Offload memory ptr, invalid arguments");
    }
 }
 
 /* =======================================================================
    Memory Utility Function Implementations
 ========================================================================== */
+#if 0
 /*Caller must check for error return value 0xFFFFFFFF*/
 uint32_t apm_offload_get_va_offset_from_sat_handle(uint32_t sat_domain_id, uint32_t sat_handle, void *address)
 {
@@ -1000,9 +1006,10 @@ uint32_t apm_offload_get_va_offset_from_sat_handle(uint32_t sat_domain_id, uint3
 
    return offset;
 }
+#endif
 
 // This function goes over the master book, checks all valid handles which are mapped and it deletes the heap.
-ar_result_t apm_offload_master_memorymap_deregister_all()
+static ar_result_t apm_offload_master_memorymap_deregister_all()
 {
    ar_result_t result = AR_EOK;
    uint32_t    master_handle;
@@ -1040,7 +1047,7 @@ ar_result_t apm_offload_master_memorymap_deregister_all()
    return result;
 }
 
-ar_result_t apm_offload_mem_mgr_reset(void)
+ar_result_t apm_offload_mem_mgr_reset_v1(void)
 {
    ar_result_t result = AR_EOK;
    AR_MSG(DBG_HIGH_PRIO, "Offload: apm_offload_mem_mgr reset");

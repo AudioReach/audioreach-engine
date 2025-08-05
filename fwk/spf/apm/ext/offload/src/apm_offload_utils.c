@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -80,14 +80,28 @@ ar_result_t apm_search_in_sat_prv_peer_cfg_for_miid(uint8_t  *sat_prv_cfg_ptr,
    Global Defines
 ==============================================================================*/
 
-apm_offload_utils_vtable_t offload_util_funcs = {
+apm_offload_utils_vtable_t offload_util_funcs =
+ {
+   // shared memory related callbacks only
    .apm_offload_shmem_cmd_handler_fptr = apm_offload_shmem_cmd_handler,
 
    .apm_offload_basic_rsp_handler_fptr = apm_offload_basic_rsp_handler,
 
-   .apm_offload_master_memorymap_register_fptr = apm_offload_master_memorymap_register,
+   .apm_offload_master_memorymap_register_fptr = apm_offload_master_memorymap_register, // requried only for v1
 
    .apm_offload_master_memorymap_check_deregister_fptr = apm_offload_master_memorymap_check_deregister,
+
+   .apm_offload_mem_mgr_reset_fptr = apm_offload_mem_mgr_reset,
+
+   .apm_offload_sat_cleanup_fptr = apm_offload_sat_cleanup,
+
+   .apm_offload_memorymap_register_loaned_memory_fptr = apm_offload_memorymap_register_loaned_memory,
+
+   .apm_offload_memorymap_check_deregister_loaned_memory_fptr = apm_offload_memorymap_check_deregister_loaned_memory,
+
+   .apm_offload_memorymap_update_peer_domains_access_info_fptr = apm_offload_memorymap_update_peer_domains_access_info,
+
+    // END: shared memory related callbacks
 
    .apm_db_get_sat_contaniners_parent_cont_id_fptr = apm_db_get_sat_contaniners_parent_cont_id,
 
@@ -109,13 +123,9 @@ apm_offload_utils_vtable_t offload_util_funcs = {
 
    .apm_send_close_all_to_sat_fptr = apm_send_close_all_to_sat,
 
-   .apm_offload_sat_cleanup_fptr = apm_offload_sat_cleanup,
-
    .apm_offload_is_master_pid_fptr = apm_offload_is_master_pid,
 
    .apm_debug_info_cfg_hdlr_fptr = apm_send_debug_info_to_sat,
-
-   .apm_offload_mem_mgr_reset_fptr = apm_offload_mem_mgr_reset,
 
    .apm_offload_handle_scale_factor_info_fptr = apm_offload_handle_scale_factor_info
 };
@@ -1326,10 +1336,12 @@ ar_result_t apm_offload_basic_rsp_handler(apm_t          *apm_info_ptr,
    ar_result_t              result               = AR_EOK;
    gpr_ibasic_rsp_result_t *curr_rsp_payload_ptr = NULL;
 
-   AR_MSG(DBG_HIGH_PRIO, "APM: apm_offload_basic_rsp_handler: Received MDF Basic Response");
-
    /** get basic response payload. This has sat memhandle and its domain*/
    curr_rsp_payload_ptr = GPR_PKT_GET_PAYLOAD(gpr_ibasic_rsp_result_t, gpr_pkt_ptr);
+
+   AR_MSG(DBG_HIGH_PRIO,
+          "APM: apm_offload_basic_rsp_handler: Received MDF Basic Response opcode 0x%lx",
+          curr_rsp_payload_ptr->opcode);
 
    /** We can get the basic response in two main cases:
        1. A response for the MDF Unmap command, or
@@ -1341,6 +1353,13 @@ ar_result_t apm_offload_basic_rsp_handler(apm_t          *apm_info_ptr,
       case APM_CMD_SHARED_MEM_MAP_REGIONS:
       {
          result = apm_offload_mem_basic_rsp_handler(apm_info_ptr, apm_cmd_ctrl_ptr, gpr_pkt_ptr);
+         break;
+      }
+      case APM_CMD_SHARED_MEM_UNMAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_MAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_REGION_ACCESS_INFO:
+      {
+         result = apm_offload_mem_basic_rsp_handler_v2(apm_info_ptr, apm_cmd_ctrl_ptr, gpr_pkt_ptr);
          break;
       }
       case APM_CMD_SET_CFG:
@@ -1387,7 +1406,9 @@ ar_result_t apm_offload_utils_init(apm_t *apm_info_ptr)
    g_apm_sat_pd_info.master_proc_domain     = host_domain_id;
    apm_info_ptr->ext_utils.offload_vtbl_ptr = &offload_util_funcs;
 
-   apm_offload_global_mem_mgr_init(APM_INTERNAL_STATIC_HEAP_ID);
+   apm_offload_global_mem_mgr_init_v1(APM_INTERNAL_STATIC_HEAP_ID);
+
+   apm_offload_global_mem_mgr_init_v2(APM_INTERNAL_STATIC_HEAP_ID);
 
    return result;
 }
@@ -1395,7 +1416,70 @@ ar_result_t apm_offload_utils_init(apm_t *apm_info_ptr)
 ar_result_t apm_offload_utils_deinit()
 {
    memset((void *)&g_apm_sat_pd_info, 0, sizeof(g_apm_sat_pd_info));
-   apm_offload_global_mem_mgr_deinit();
+   apm_offload_global_mem_mgr_deinit_v1();
+
+   apm_offload_global_mem_mgr_deinit_v2();
 
    return AR_EOK;
+}
+
+uint32_t apm_offload_get_persistent_sat_handle(uint32_t sat_domain_id, uint32_t master_handle)
+{
+
+   uint32_t sat_handle = 0;
+   // first check if the given mem handle is registered with v1 api, else check with v2 apis.
+   if (APM_OFFLOAD_INVALID_VAL != (sat_handle = apm_offload_get_persistent_sat_handle_v1(sat_domain_id, master_handle)))
+   {
+      return sat_handle;
+   }
+   else if (APM_OFFLOAD_INVALID_VAL !=
+            (sat_handle = apm_offload_get_persistent_sat_handle_v2(sat_domain_id, master_handle)))
+   {
+      return sat_handle;
+   }
+
+   return APM_OFFLOAD_INVALID_VAL;
+}
+
+void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t req_size, apm_offload_ret_info_t *ret_info_ptr)
+{
+   void *ret = NULL;
+   if (NULL != (ret = apm_offload_memory_malloc_v1(sat_domain_id, req_size, ret_info_ptr)))
+   {
+      return ret;
+   }
+   else if (NULL != (ret = apm_offload_memory_malloc_v2(sat_domain_id, req_size, ret_info_ptr)))
+   {
+      return ret;
+   }
+   else
+   {
+      AR_MSG(DBG_ERROR_PRIO,
+             "apm_offload_memory_malloc: Unable to Malloc Memory of size %lu, for sat domain %lu",
+             req_size,
+             sat_domain_id);
+   }
+   return ret;
+}
+
+void apm_offload_memory_free(apm_offload_ret_info_t *shmem_info_ptr)
+{
+   if (shmem_info_ptr->is_handle_type_v2)
+   {
+      apm_offload_memory_free_v2(shmem_info_ptr);
+   }
+   else
+   {
+      apm_offload_memory_free_v1(shmem_info_ptr);
+   }
+   return;
+}
+
+ar_result_t apm_offload_mem_mgr_reset(void)
+{
+   ar_result_t result = AR_EOK;
+   result             = apm_offload_mem_mgr_reset_v1();
+
+   result = apm_offload_mem_mgr_reset_v2();
+   return result;
 }
