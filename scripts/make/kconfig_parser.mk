@@ -9,10 +9,22 @@ ifeq ($(PROJECT_SOURCE_DIR),)
    $(error "PROJECT_SOURCE_DIR must be defined before calling this makefile.")
 endif
 
-CONFIG := defconfig
+ifdef TARGET_BOARD_PLATFORM
+    CONFIG := $(TARGET_BOARD_PLATFORM)_defconfig
+else
+    CONFIG := defconfig
+endif
+
 SPF_DOT_CONFIG_PATH := $(PROJECT_BINARY_DIR)/.config
 $(shell mkdir -p $(PROJECT_BINARY_DIR))
-$(shell cp $(PROJECT_SOURCE_DIR)/arch/linux/configs/$(CONFIG) $(SPF_DOT_CONFIG_PATH))
+
+ifdef TARGET_VENDOR
+    CONFIG_PATH = $(PROJECT_SOURCE_DIR)/arch/$(TARGET_ARCH)/$(TARGET_VENDOR)
+else
+    CONFIG_PATH = $(PROJECT_SOURCE_DIR)/arch/$(TARGET_ARCH)/qcom
+endif
+
+$(shell cp $(CONFIG_PATH)/$(CONFIG) $(SPF_DOT_CONFIG_PATH))
 
 kconfig_lines := $(file < $(SPF_DOT_CONFIG_PATH))
 
