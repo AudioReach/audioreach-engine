@@ -1,2 +1,11 @@
 source arch/hexagon/Kconfig
 source arch/linux/Kconfig
+
+config PROC_DOMAIN
+    string "Target Processor Domain ID for ARE modules"
+    default "APPS"
+    help
+      Specify the target processor domain ID for the module. This valus is
+      used by H2XML parser to indicate the intended processor domain for
+      module execution in the generated module XML's.
+      Options: ADSP, MDSP, APPS, SDSP, CDSP, CC_DSP, GDSP_0, GDSP_1, APPS_2
