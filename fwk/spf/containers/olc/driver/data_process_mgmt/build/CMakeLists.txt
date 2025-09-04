@@ -10,29 +10,28 @@
 ]]
 cmake_minimum_required(VERSION 3.10)
 
-#Include directories
 set (lib_incs_list
-     $(LIB_ROOT)/src
+     ../../inc
+     ${LIB_ROOT}/inc
+     ${LIB_ROOT}/src
     )
 
 #Add the source files
 set (lib_srcs_list
-     ${LIB_ROOT}/src/olc_buf_util.c
-     ${LIB_ROOT}/src/olc.c
-     ${LIB_ROOT}/src/olc_calib_utils.c
-     ${LIB_ROOT}/src/olc_cmd_handler.c
-     ${LIB_ROOT}/src/olc_data_handler.c
-     ${LIB_ROOT}/src/olc_eos_util.c
-     ${LIB_ROOT}/src/olc_pm.c
-     ${LIB_ROOT}/src/olc_rsp_handler.c
-     ${LIB_ROOT}/src/olc_servreg_event_handler.c
-     ${LIB_ROOT}/src/olc_sp_utils.c
-     ${LIB_ROOT}/src/olc_timestamp.c
-     ${LIB_ROOT}/src/olc_util.c
+     ${LIB_ROOT}/src/spdm_data_buf_handler.c
+     ${LIB_ROOT}/src/spdm_data_handler.c
+     ${LIB_ROOT}/src/spdm_data_msg_handler.c
+     ${LIB_ROOT}/src/spdm_data_port_handler.c
+     ${LIB_ROOT}/src/spdm_media_fmt_handler.c
+     ${LIB_ROOT}/src/spdm_meta_data_handler.c
+     ${LIB_ROOT}/src/spdm_port_config_handler.c
+     ${LIB_ROOT}/src/spdm_port_event_handler.c
+     ${LIB_ROOT}/src/spdm_state_prop_handler.c
+     ${LIB_ROOT}/src/spdm_utils.c
     )
 
 #Call spf_build_static_library to generate the static library
-spf_build_static_library(olc_core
+spf_build_static_library(data_process
                          "${lib_incs_list}"
                          "${lib_srcs_list}"
                          "${lib_defs_list}"
