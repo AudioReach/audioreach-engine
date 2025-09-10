@@ -108,6 +108,14 @@ spf_parse_kconfig()
 
 include(scripts/cmake/${ARCH}-toolchain.cmake OPTIONAL)
 
+# Check for supported PROC_DOMAIN configuration
+if(NOT DEFINED CONFIG_PROC_DOMAIN OR "${CONFIG_PROC_DOMAIN}" STREQUAL "")
+   message(FATAL_ERROR "Undefined/Empty PROC_DOMAIN configuration.\n")
+endif()
+
+check_supported_proc_domain(${CONFIG_PROC_DOMAIN})
+set(PROC_DOMAIN_NAME "PROC_DOMAIN_${CONFIG_PROC_DOMAIN}")
+
 if ( ARCH MATCHES "^(hexagon)")
    set(hexagon_INCLUDE
       ${PROJECT_SOURCE_DIR}/ar_osal/api

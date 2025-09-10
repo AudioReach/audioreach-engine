@@ -38,6 +38,18 @@ function(spf_parse_kconfig)
 	endforeach()
 endfunction()
 
+function(check_supported_proc_domain CONFIG_PROC_DOMAIN)
+    set(SUPPORTED_PROC_DOMAINS "ADSP" "MDSP" "APPS" "SDSP" "CDSP" "CC_DSP" "GDSP_0" "GDSP_1" "APPS_2")
+    list(FIND SUPPORTED_PROC_DOMAINS "${CONFIG_PROC_DOMAIN}" DOMAIN_INDEX)
+    if(DOMAIN_INDEX EQUAL -1)
+        message(FATAL_ERROR
+            "Unsupported CONFIG_PROC_DOMAIN value: '${CONFIG_PROC_DOMAIN}'.\n"
+            "Supported values are: ${SUPPORTED_PROC_DOMAINS}")
+    else()
+        message(STATUS "CONFIG_PROC_DOMAIN value: '${CONFIG_PROC_DOMAIN}' is supported.")
+    endif()
+endfunction()
+
 function(get_absolute_path given_path abs_path)
 		if(IS_ABSOLUTE ${given_path})
 			set(${abs_path} ${given_path} PARENT_SCOPE)
@@ -109,7 +121,7 @@ function(spf_module_sources)
 				COMMAND
 				mkdir -p ${PROJECT_BINARY_DIR}/h2xml_autogen
 				COMMAND
-				${H2XML} -conf ${H2XML_CONFIG} ${H2XML_FLAGS} -o ${PROJECT_BINARY_DIR}/h2xml_autogen ${H2XML_INCLUDES} -t spfModule ${abs_path}
+				${H2XML} -conf ${H2XML_CONFIG} ${H2XML_FLAGS} -o ${PROJECT_BINARY_DIR}/h2xml_autogen ${H2XML_INCLUDES} -t spfModule -a "@h2xml_processors{${PROC_DOMAIN_NAME}}" ${abs_path}
 			)
 		endforeach()
 
@@ -160,7 +172,7 @@ function(spf_module_sources)
 				COMMAND
 				mkdir -p ${PROJECT_BINARY_DIR}/h2xml_autogen
 				COMMAND
-				${H2XML} -conf ${H2XML_CONFIG} ${H2XML_FLAGS} -o ${PROJECT_BINARY_DIR}/h2xml_autogen ${H2XML_INCLUDES} -t spfModule ${abs_path}
+				${H2XML} -conf ${H2XML_CONFIG} ${H2XML_FLAGS} -o ${PROJECT_BINARY_DIR}/h2xml_autogen ${H2XML_INCLUDES} -t spfModule -a "@h2xml_processors{${PROC_DOMAIN_NAME}}" ${abs_path}
 			)
 		endforeach()
 
@@ -224,7 +236,7 @@ function(spf_module_sources)
 				COMMAND
 				mkdir -p ${PROJECT_BINARY_DIR}/h2xml_autogen
 				COMMAND
-				${H2XML} -conf ${H2XML_CONFIG} ${H2XML_FLAGS} -o ${PROJECT_BINARY_DIR}/h2xml_autogen ${H2XML_INCLUDES} -t spfModule ${abs_path}
+				${H2XML} -conf ${H2XML_CONFIG} ${H2XML_FLAGS} -o ${PROJECT_BINARY_DIR}/h2xml_autogen ${H2XML_INCLUDES} -t spfModule -a "@h2xml_processors{${PROC_DOMAIN_NAME}}" ${abs_path}
 			)
 		endforeach()
 		set_target_properties(${SPF_MODULE_NAME} PROPERTIES PREFIX "" SOVERSION ${SPF_MODULE_MAJOR_VER})
