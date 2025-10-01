@@ -113,39 +113,9 @@ ar_result_t posal_thread_launch3(posal_thread_t     *posal_obj_ptr,
    ar_result_t        result      = AR_EOK;
    int                unix_result = 0;
    pthread_t          thread_handle;
-   pthread_attr_t     attr;
    char              *stack_ptr;
    uint32_t           affinity_temp = affinity;
    struct sched_param sch_param = {0};
-
-#ifdef DEBUG_POSAL_THREAD
-   MSG_5(MSG_SSID_QDSP6,
-         DBG_HIGH_PRIO,
-         "THREAD CREATE: Name = %s, Stack Size=%d, sched_policy 0x%x, prio %u, affinity 0x%x",
-         threadname,
-         stack_size,
-         sched_policy,
-         nPriority,
-         affinity_temp
-         );
-#endif /* DBG_BUFFER_ADDRESSES */
-
-   int max_prio = 99, min_prio = 0;
-   if (0xFFFFFFFF == sched_policy)
-   {
-	   AR_MSG(DBG_LOW_PRIO, "Incoming sched_policy overridden ");
-	   sched_policy = SCHED_FIFO;
-   }
-      max_prio = sched_get_priority_max(sched_policy);
-      min_prio = sched_get_priority_min(sched_policy);
-
-   if (min_prio > nPriority || max_prio < nPriority)
-   {
-      int temp = (nPriority < min_prio) ? min_prio: ((nPriority > max_prio) ? max_prio : nPriority);
-      AR_MSG(DBG_HIGH_PRIO, "Warning: given thread priority %d is beyond range (%d, %d). using %d",
-            nPriority, min_prio, max_prio, temp);
-      nPriority = temp;
-   }
 
    /* Allocate memory for the object */
    _thread_args_t *thrd_obj_ptr = (_thread_args_t *)posal_memory_malloc(sizeof(_thread_args_t), heap_id);
@@ -159,111 +129,13 @@ ar_result_t posal_thread_launch3(posal_thread_t     *posal_obj_ptr,
    /* Assign return object */
    *posal_obj_ptr = (posal_thread_t)thrd_obj_ptr;
 
-   /* Init attributes */
-   unix_result = pthread_attr_init(&attr);
-   if (unix_result)
-   {
-      AR_MSG(DBG_ERROR_PRIO, "Error: failed to init attributes");
-      *posal_obj_ptr = NULL;
-      result         = AR_EBADPARAM;
-      goto err_attr;
-   }
-
-#ifndef PTHREAD_STACK_MIN
-#define PTHREAD_STACK_MIN 8192
-#endif
-
-   /* round up stack size */
-   stack_size = (stack_size + 7) & (-8);
-   if (stack_size < PTHREAD_STACK_MIN)
-   {
-      stack_size += PTHREAD_STACK_MIN;
-      AR_MSG(DBG_HIGH_PRIO, "Warning: stack_size increased %u", stack_size);
-   }
-
-   unix_result = pthread_attr_setstacksize(&attr, stack_size);
-   if (unix_result)
-      AR_MSG(DBG_HIGH_PRIO, "Warning: set stack size %d failed with %d", stack_size, unix_result);
-
-   memset(&sch_param, 0, sizeof(sch_param));
-
-   unix_result = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
-   if (unix_result)
-   {
-      AR_MSG(DBG_ERROR_PRIO, "Error: pthread_attr_setinheritsched failed with status 0x%x", unix_result);
-      result = AR_EFAILED;
-      goto err_set;
-   }
-
-   unix_result = pthread_attr_setschedpolicy(&attr, sched_policy);
-   if (unix_result)
-   {
-      AR_MSG(DBG_ERROR_PRIO, "Error: pthread_attr_setschedpolicy failed with status 0x%x", unix_result);
-      result = AR_EFAILED;
-      goto err_set;
-   }
-
-   sch_param.sched_priority = nPriority;
-   unix_result = pthread_attr_setschedparam(&attr, &sch_param);
-   if (unix_result)
-   {
-      AR_MSG(DBG_ERROR_PRIO, "Error: pthread_attr_setschedparam failed with status 0x%x", unix_result);
-      result = AR_EFAILED;
-      goto err_set;
-   }
-   unix_result = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-   if (unix_result)
-   {
-      AR_MSG(DBG_ERROR_PRIO, "Error: pthread_attr_setdetachstate failed with status 0x%x", unix_result);
-      result = AR_EFAILED;
-      goto err_set;
-   }
-
-// Thread Affinity is not supported via this api on QNX and Linux Android
-#if defined (POSAL_THREAD_AFFINITY)
-   if (0 != affinity)
-   {
-      cpu_set_t cs;
-      CPU_ZERO(&cs);
-
-      for (int i = 0; i < sizeof(affinity)*8; i++)
-      {
-         if (affinity & 1)
-         {
-            CPU_SET(i, &cs);
-         }
-         affinity = (affinity>>1);
-      }
-
-      unix_result = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), (cpu_set_t *)&cs);
-      if (unix_result)
-      {
-         AR_MSG(DBG_ERROR_PRIO, "Error: pthread_attr_setdetachstate failed with status 0x%x", unix_result);
-         result = AR_EFAILED;
-         goto err_set;
-      }
-   }
-#endif
-
-#ifdef DEBUG_POSAL_THREAD
-   MSG_5(MSG_SSID_QDSP6,
-         DBG_HIGH_PRIO,
-         "THRD: Name = %s, Stack Size=%d, sched_policy 0x%x, prio %u, affinity 0x%x",
-         threadname,
-         stack_size,
-         sched_policy,
-         nPriority,
-         affinity_temp
-         );
-#endif /* DBG_BUFFER_ADDRESSES */
-
-   unix_result = pthread_create(&thread_handle, &attr, (void*)pfStartRoutine, arg);
+   unix_result = pthread_create(&thread_handle, NULL, (void*)pfStartRoutine, arg);
 
    if (unix_result)
    {
       AR_MSG(DBG_ERROR_PRIO, "Error: pthread_create failed with status 0x%x", unix_result);
       result = AR_EFAILED;
-      goto err_set;
+      goto err_attr;
    }
 
    AR_MSG(DBG_MED_PRIO, "thread created(0x%x)", thread_handle);
@@ -273,20 +145,11 @@ ar_result_t posal_thread_launch3(posal_thread_t     *posal_obj_ptr,
    thrd_obj_ptr->arg            = arg;
    thrd_obj_ptr->thread_handle  = thread_handle;
    size_t _tmp;                                  // unused, required to get the stack ptr
-   unix_result = pthread_attr_getstack(&attr, &thrd_obj_ptr->stack_ptr, &_tmp);
 
    unix_result = pthread_setname_np(thread_handle, threadname);
    if (unix_result)
    {
       AR_MSG(DBG_ERROR_PRIO, "Error: pthread_setname_np failed with status 0x%x", unix_result);
-      result = AR_EFAILED;
-      goto err_destroy;
-   }
-
-   unix_result = pthread_attr_destroy(&attr);
-   if (unix_result)
-   {
-      AR_MSG(DBG_ERROR_PRIO, "Error:  Failed to destroy attributes, unix_result = 0x%x", unix_result);
       result = AR_EFAILED;
       goto err_destroy;
    }
@@ -324,9 +187,6 @@ ar_result_t posal_thread_launch3(posal_thread_t     *posal_obj_ptr,
 
 err_destroy:
    pthread_join(thread_handle, NULL);
-
-err_set:
-   pthread_attr_destroy(&attr);
 
 err_attr:
    free(thrd_obj_ptr);

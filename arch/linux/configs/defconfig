@@ -55,6 +55,7 @@ CONFIG_SH_MEM_PUSH_MODE=y
 # Containers
 #
 CONFIG_WR_SH_MEM_EP=y
+CONFIG_RD_SH_MEM_EP=y
 
 #
 # Platform Modules
