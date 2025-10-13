@@ -6,7 +6,8 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/core/inc \
     $(LOCAL_PATH)/ext/offload/inc \
     $(LOCAL_PATH)/ext/debug_info_dump/inc \
-    $(LOCAL_PATH)/ext/debug_info_cfg/inc
+    $(LOCAL_PATH)/ext/debug_info_cfg/inc \
+    $(LOCAL_PATH)/ext/multi_client/inc
 
 LOCAL_PROPRIETARY_MODULE := true
 include $(BUILD_HEADER_LIBRARY)
@@ -23,7 +24,10 @@ LOCAL_C_INCLUDES := \
     $(wildcard $(LOCAL_PATH)/ext/**/src) \
     $(LOCAL_PATH)/ext/proxy/proxy_cmn/inc \
     $(LOCAL_PATH)/ext/proxy/proxy_vcpm/inc \
-    $(LOCAL_PATH)/ext/offload/src
+    $(LOCAL_PATH)/ext/offload/inc \
+    $(LOCAL_PATH)/ext/offload/src \
+    $(LOCAL_PATH)/ext/multi_client/inc \
+    $(LOCAL_PATH)/ext/shared_mem/src
 
 LOCAL_SRC_FILES := \
     core/src/apm.c \
@@ -56,9 +60,14 @@ LOCAL_SRC_FILES := \
     ext/runtime_link_hdlr/src/apm_runtime_link_hdlr_utils.c \
     ext/set_get_cfg/src/apm_set_get_cfg_utils.c \
     ext/shared_mem/src/apm_shmem_util.c \
+    ext/shared_mem/src/apm_shmem_util_v2.c \
     ext/spf_cmd_hdlr/src/apm_spf_cmd_hdlr.c \
-    ext/sys_util/src/apm_sys_util.c
-
+    ext/sys_util/src/apm_sys_util.c \
+    ext/multi_client/src/apm_multi_client_db.c \
+    ext/multi_client/src/apm_multi_client_msg_rsp_handler.c \
+    ext/multi_client/src/apm_multi_client_utils.c \
+    ext/multi_client/src/apm_multi_client.c \
+    ext/offload/src/apm_offload_memmap_utils_v2.c
 
 LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
 

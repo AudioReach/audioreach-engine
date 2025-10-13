@@ -8,6 +8,7 @@ cmake_minimum_required(VERSION 3.10)
 #Include directories
 set (lib_incs_list
      ${LIB_ROOT}/inc
+     ${LIB_ROOT}/src
     )
 
 #Add the source files
