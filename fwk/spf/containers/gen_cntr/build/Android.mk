@@ -92,7 +92,7 @@ LOCAL_SRC_FILES := \
     ext/thin_topo_cntr_utils/src/thin_topo_cntr_utils.c
 
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
@@ -122,7 +122,7 @@ LOCAL_C_INCLUDES := \
 LOCAL_SRC_FILES := \
     ext/wr_sh_mem_ep/src/gen_cntr_wr_sh_mem_ep.c
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
@@ -164,7 +164,7 @@ LOCAL_C_INCLUDES := \
 LOCAL_SRC_FILES := \
     ext/rd_sh_mem_ep/src/gen_cntr_rd_sh_mem_ep.c
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
@@ -205,7 +205,7 @@ LOCAL_C_INCLUDES := \
 LOCAL_SRC_FILES := \
     ext/placeholder/src/gen_cntr_placeholder.c
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
@@ -246,7 +246,7 @@ LOCAL_C_INCLUDES := \
 LOCAL_SRC_FILES := \
     ext/placeholder/src/gen_cntr_placeholder.c
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto

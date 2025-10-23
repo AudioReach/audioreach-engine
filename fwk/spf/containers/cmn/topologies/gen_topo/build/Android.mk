@@ -17,7 +17,8 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/ext/pure_st_topo/inc \
     $(LOCAL_PATH)/ext/sync_fwk_ext/inc \
     $(LOCAL_PATH)/../topo_interface/inc \
-    $(LOCAL_PATH)/ext/thin_topo/inc
+    $(LOCAL_PATH)/ext/thin_topo/inc \
+    $(LOCAL_PATH)/ext/thin_topo/src
 
 LOCAL_PROPRIETARY_MODULE := true
 include $(BUILD_HEADER_LIBRARY)
@@ -89,7 +90,7 @@ LOCAL_SRC_FILES := \
     ext/thin_topo/src/thin_topo.c
 
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
