@@ -117,8 +117,8 @@ typedef struct posal_memorymap_shm_map_hashnode_t
    spf_hash_node_t hash_node;
    /**< Hash node */
 
-   uint32_t unique_shm_id_24bit;
-   /**< Key - unique_shm_id_24bit is used as a key to hashnode */
+   uint32_t unique_shmem_id_24bit;
+   /**< Key - unique_shmem_id_24bit is used as a key to hashnode */
 
    posal_memorymap_node_t *shm_node;
    /**< Value - shm map handle returned to client */
@@ -132,7 +132,7 @@ typedef struct posal_memorymap_internal_t
    /**< Hash table to hold client ID to client token mapping */
 
    spf_hashtable_t shmmap_ht;
-   /**< Hash table to hold "unique_shm_id_24bit" to shm map handle mapping */
+   /**< Hash table to hold "unique_shmem_id_24bit" to shm map handle mapping */
 } posal_memorymap_internal_t;
 
 posal_memorymap_internal_t          g_posal_memorymap_internal;
@@ -547,8 +547,8 @@ ar_result_t posal_memorymap_shm_mem_map_v2(posal_mem_map_v2_input_args_t *in_arg
    memset(new_shm_map_hashnode_ptr, 0, sizeof(new_shm_map_hashnode_ptr));
 
 #ifdef POSAL_MMAP_VFIO
-   new_shm_map_hashnode_ptr->hash_node.key_ptr  = &new_shm_map_hashnode_ptr->unique_shm_id_24bit;
-   new_shm_map_hashnode_ptr->hash_node.key_size = sizeof(new_shm_map_hashnode_ptr->unique_shm_id_24bit);
+   new_shm_map_hashnode_ptr->hash_node.key_ptr  = &new_shm_map_hashnode_ptr->unique_shmem_id_24bit;
+   new_shm_map_hashnode_ptr->hash_node.key_size = sizeof(new_shm_map_hashnode_ptr->unique_shmem_id_24bit);
    new_shm_map_hashnode_ptr->hash_node.next_ptr = NULL;
 
    new_shm_map_hashnode_ptr->shm_node = mem_map_node_ptr;
@@ -593,8 +593,8 @@ ar_result_t posal_memorymap_shm_mem_map_v2(posal_mem_map_v2_input_args_t *in_arg
    }
 #else
 
-   new_shm_map_hashnode_ptr->hash_node.key_ptr  = &new_shm_map_hashnode_ptr->unique_shm_id_24bit;
-   new_shm_map_hashnode_ptr->hash_node.key_size = sizeof(new_shm_map_hashnode_ptr->unique_shm_id_24bit);
+   new_shm_map_hashnode_ptr->hash_node.key_ptr  = &new_shm_map_hashnode_ptr->unique_shmem_id_24bit;
+   new_shm_map_hashnode_ptr->hash_node.key_size = sizeof(new_shm_map_hashnode_ptr->unique_shmem_id_24bit);
    new_shm_map_hashnode_ptr->hash_node.next_ptr = NULL;
 
    new_shm_map_hashnode_ptr->shm_node = mem_map_node_ptr;
@@ -815,7 +815,7 @@ ar_result_t posal_memorymap_virtaddr_mem_map_v2(posal_mem_map_v2_input_args_t *i
    if (in_args->unique_shmem_id_24bit)
    {
       mem_map_node_ptr->shmem_id                      = in_args->unique_shmem_id_24bit;
-      new_shm_map_hashnode_ptr->unique_shmem_id_24bit = n_args->unique_shmem_id_24bit;
+      new_shm_map_hashnode_ptr->unique_shmem_id_24bit = in_args->unique_shmem_id_24bit;
    }
    else
    {
@@ -838,7 +838,7 @@ ar_result_t posal_memorymap_virtaddr_mem_map_v2(posal_mem_map_v2_input_args_t *i
    spf_hashtable_insert(&g_posal_memorymap_internal_ptr->shmmap_ht, &new_shm_map_hashnode_ptr->hash_node);
 
    /* return mem map handle pointer */
-   *shm_mem_map_handle_ptr = new_shm_map_hashnode_ptr->unique_shm_id_24bit;
+   *shm_mem_map_handle_ptr = new_shm_map_hashnode_ptr->unique_shmem_id_24bit;
 
    /* Set the mapping mode  */
    if (is_offset_map)
@@ -1504,11 +1504,11 @@ ar_result_t posal_memorymap_get_mem_map_handle(uint32_t  client_token,
    ar_result_t result = AR_EOK;
    /* no lock to access the Client, since the assumption is ideally client register once and does not unregister.
     * Even if it unregister, Client must call unregister after ensuring all its dynamic services have exit. */
-   if (AR_EOK != (rc = memorymap_util_find_client(client_token)) || (0 == unique_shmem_id_24bit) ||
+   if (AR_EOK != (result = memorymap_util_find_client(client_token)) || (0 == unique_shmem_id_24bit) ||
        (NULL == shm_mem_map_handle_ptr))
    {
       AR_MSG(DBG_HIGH_PRIO, "posal_memorymap_get_mem_map_handle failed. Invalid input params.");
-      return rc;
+      return result;
    }
 
    posal_memorymap_hashnode_t *memorymap_hashnode_ptr =
