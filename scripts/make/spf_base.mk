@@ -126,7 +126,7 @@ $(call generate_static_json_file, $(LOCAL_JSON_FILE))
 
 # H2XML generator
 $(foreach h2xm_header, $(LOCAL_SPF_MODULE_H2XML_HEADERS), \
-   $(eval RET := $(shell $(H2XML) -conf $(H2XML_CONFIG) $(H2XML_FLAGS) -o $(H2XML_OUTPUT) $(H2XML_INCLUDES) -t spfModule $(h2xm_header))) \
+   $(eval RET := $(shell $(H2XML) -conf $(H2XML_CONFIG) $(H2XML_FLAGS) -o $(H2XML_OUTPUT) $(H2XML_INCLUDES) -t spfModule -i $(h2xm_header) -a "@h2xml_processors{${PROC_DOMAIN_NAME}}")) \
 )
 
 # refresh amdb autogen
@@ -145,7 +145,7 @@ $(call generate_dynamic_json_file, $(LOCAL_JSON_FILE))
 
 # H2XML generator
 $(foreach h2xm_header, $(LOCAL_SPF_MODULE_H2XML_HEADERS), \
-   $(eval RET := $(shell $(H2XML) -conf $(H2XML_CONFIG) $(H2XML_FLAGS) -o $(H2XML_OUTPUT) $(H2XML_INCLUDES) -t spfModule $(h2xm_header))) \
+   $(eval RET := $(shell $(H2XML) -conf $(H2XML_CONFIG) $(H2XML_FLAGS) -o $(H2XML_OUTPUT) $(H2XML_INCLUDES) -t spfModule -i $(h2xm_header) -a "@h2xml_processors{${PROC_DOMAIN_NAME}}")) \
 )
 
 # refresh amdb autogen
