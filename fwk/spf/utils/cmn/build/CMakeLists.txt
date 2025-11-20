@@ -13,6 +13,7 @@ cmake_minimum_required(VERSION 3.10)
 #Include directories
 set (lib_incs_list
      ../../../apm/ext/debug_info_dump/inc
+     ../../../interfaces/module/offload/api
     )
 
 #Add the source files
