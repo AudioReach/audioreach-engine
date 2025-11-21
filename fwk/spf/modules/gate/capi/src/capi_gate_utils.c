@@ -14,9 +14,12 @@
 /*==========================================================================
   Function Definitions
 ========================================================================== */
-
+static inline uint64_t capi_gate_rounded_up_time(uint64_t time_us)
+{
+    return 1000*((time_us + 999)/1000);
+}
 /*------------------------------------------------------------------------
- Function name: capi_gate_get_param
+ Function name: capi_gate_until_deadline_process
   1. If the control link is opened and connected
 *       a. If proc delay is received and deadline time is received from depack
 *           First frame should be sent to encoder only if
@@ -29,13 +32,11 @@
 *           time to deadline and check whether the deadline is reached
 *           or not.
 *
-*           If deadline is reached (within 1ms) and does not have
-*           complete frame worth of data at input, then
-*           need to add pre-zeroes such that complete frame worth
-*           of data is provided to encoder.
+*           If deadline is reached (within 1ms) then data is sent to
+*           the encoder for processing.
 *
-*           Once deadline is serviced then, for every device interrupt,
-*           need to share whatever is left in  buffer to encoder.
+*           Once deadline is serviced then, module is bypassed.
+*
 *       b.If they are not received wait and drop data till then
 * 2. If open not set and not connected its a error scenario*
  * -----------------------------------------------------------------------*/
@@ -53,12 +54,17 @@ capi_err_t capi_gate_until_deadline_process(capi_gate_t *       me_ptr,
       {
          uint64_t deadline_us = 0, calc_deadline_time_us = 0, cur_time_us = 0;
 
-         // slimbus 3 bam descriptor delay= 3ms, to ensure packet is not too early(enc processing time is lesser than
-         // estimated) we only add 1ms. Extra 2ms is added to help guard against jitters for arrival eg. malloc like overheads
-         uint64_t const_delay_us = 1000 + 2000;
+         // 1. slimbus/swr delay = 3ms
+         // 2. RT-Jitter delay = 1ms (delay between when encoder generated the frame and next signal trigger)
+         uint64_t const_delay_us = 3000 + 1000;
 
-         // encoder will take +-round up us to collect data and process on alternate process calls
-         uint32_t round_up_us = (me_ptr->frame_interval_us % 1000);
+         // encoder sometime will take rounded up ms to collect data and process.
+         // if frame interval in 7.3 ms then it will take 8ms or 7ms to buffer.
+         uint32_t rounded_up_frame_interval_us = capi_gate_rounded_up_time(me_ptr->frame_interval_us);
+         
+         // EP runs at 1ms frame size, if packetized encoded frame size length in time is not multiple of 1ms then it should be rounded up.
+         // if encoded frame size length in time after COP pack is 5.3ms then it will take 6 ep intrrupts to transmit this frame completely.
+         uint32_t rounded_up_ep_transmit_delay_us = capi_gate_rounded_up_time(me_ptr->ep_transmit_delay_us);
 
          cur_time_us = (uint64_t)posal_timer_get_time();
          deadline_us = me_ptr->deadline_time_us;
@@ -75,8 +81,8 @@ capi_err_t capi_gate_until_deadline_process(capi_gate_t *       me_ptr,
          // Calc deadline time is the estimated time at which our encoded packet will reach bt controller for OTA
          // This includes= data collection time(1ms data already available) + round up time(enc jitter)
          // + enc proc time + ep transmit time + const delay
-         calc_deadline_time_us = cur_time_us + (me_ptr->frame_interval_us - bytes_us_available) + round_up_us +
-                                 me_ptr->proc_dur_us + me_ptr->ep_transmit_delay_us + const_delay_us;
+         calc_deadline_time_us = cur_time_us + (rounded_up_frame_interval_us - bytes_us_available) +
+                                 me_ptr->proc_dur_us + rounded_up_ep_transmit_delay_us + const_delay_us;
 
          AR_MSG(DBG_HIGH_PRIO,
                 "capi_gate: Process: BT deadline time msw:%lu lsw:%lu, "
@@ -91,12 +97,12 @@ capi_err_t capi_gate_until_deadline_process(capi_gate_t *       me_ptr,
                 (uint32_t)(cur_time_us >> 32),
                 (uint32_t)(cur_time_us),
                 me_ptr->proc_dur_us,
-                me_ptr->ep_transmit_delay_us);
+                rounded_up_ep_transmit_delay_us);
 
          AR_MSG(DBG_HIGH_PRIO,
-                "capi_gate: Process: bytes_available %d round up us %d  const delay %d",
+                "capi_gate: Process: bytes_available %d round up frame us %d  const delay %d",
                 bytes_us_available,
-                round_up_us,
+                rounded_up_frame_interval_us,
                 const_delay_us);
 
          /* deadline time in the past*/
