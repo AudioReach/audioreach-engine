@@ -1030,6 +1030,15 @@ static ar_result_t simp_topo_process_attached_modules(spl_topo_t *topo_ptr, spl_
          );
          // clang-format on
 
+#if SPL_TOPO_DEBUG_LEVEL >= SPL_TOPO_DEBUG_LEVEL_4
+
+        TOPO_MSG(topo_ptr->t_base.gu.log_id,DBG_LOW_PRIO,"M_iid 0x%lX output ts_valid - %d , TS[MSW, LSW] - [%d, %d]",
+                out_attached_module_ptr->t_base.gu.module_instance_id,
+                out_port_sdata_ptr[out_port_idx].flags.is_timestamp_valid,
+                (uint32_t )(out_port_sdata_ptr[out_port_idx].timestamp >>32),
+                (uint32_t )out_port_sdata_ptr[out_port_idx].timestamp);
+#endif
+
          simp_topo_set_process_end(topo_ptr);
 
 #if SPL_TOPO_DEBUG_LEVEL >= SPL_TOPO_DEBUG_LEVEL_2

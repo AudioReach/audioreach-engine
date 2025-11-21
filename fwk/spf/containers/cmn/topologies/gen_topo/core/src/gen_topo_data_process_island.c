@@ -1532,6 +1532,13 @@ void gen_topo_process_attached_module_to_output(gen_topo_t             *topo_ptr
          // clang-format on
 
 #ifdef VERBOSE_DEBUGGING
+
+         TOPO_MSG(topo_ptr->gu.log_id,DBG_LOW_PRIO,"M_iid 0x%lX output ts_valid - %d , TS[MSW, LSW] - [%d, %d]",
+                 out_attached_module_ptr->gu.module_instance_id,
+                 topo_ptr->proc_context.out_port_sdata_pptr[out_port_idx]->flags.is_timestamp_valid,
+                 (uint32_t )(topo_ptr->proc_context.out_port_sdata_pptr[out_port_idx]->timestamp >>32),
+                 (uint32_t )topo_ptr->proc_context.out_port_sdata_pptr[out_port_idx]->timestamp );
+
          PRINT_PORT_INFO_AT_PROCESS(out_attached_module_ptr->gu.module_instance_id,
                                     out_port_ptr->gu.cmn.id,
                                     out_port_ptr->common,
@@ -1686,6 +1693,14 @@ GEN_TOPO_STATIC ar_result_t gen_topo_module_process(gen_topo_t *       topo_ptr,
 #endif
 
       pc->in_port_sdata_pptr[ip_idx] = &in_port_ptr->common.sdata;
+
+#ifdef VERBOSE_DEBUGGING
+      TOPO_MSG(topo_ptr->gu.log_id,DBG_LOW_PRIO,"M_iid 0x%lX input ts_valid - %d , TS[MSW, LSW] - [%d, %d]",
+               module_ptr->gu.module_instance_id,
+               pc->in_port_sdata_pptr[ip_idx]->flags.is_timestamp_valid,
+              (uint32_t )(pc->in_port_sdata_pptr[ip_idx]->timestamp >>32),
+              (uint32_t )pc->in_port_sdata_pptr[ip_idx]->timestamp );
+#endif
 
 #ifdef ERROR_CHECK_MODULE_PROCESS
       result = gen_topo_validate_port_sdata(topo_ptr->gu.log_id,
@@ -1968,6 +1983,12 @@ GEN_TOPO_STATIC ar_result_t gen_topo_module_process(gen_topo_t *       topo_ptr,
       }
 
 #ifdef VERBOSE_DEBUGGING
+
+        TOPO_MSG(topo_ptr->gu.log_id,DBG_LOW_PRIO,"M_iid 0x%lX output ts_valid - %d TS[MSW, LSW] - [%d, %d]",
+                 module_ptr->gu.module_instance_id,
+                 sdata_ptr->flags.is_timestamp_valid,
+                 (uint32_t )(sdata_ptr->timestamp >>32),
+                 (uint32_t )sdata_ptr->timestamp);
       PRINT_PORT_INFO_AT_PROCESS(m_iid, out_port_ptr->gu.cmn.id, out_port_ptr->common, proc_result, "output", "after");
 #endif
 

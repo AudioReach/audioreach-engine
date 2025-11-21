@@ -442,6 +442,15 @@ GEN_TOPO_STATIC ar_result_t st_topo_module_process(gen_topo_t *topo_ptr, gen_top
 
       pc->in_port_sdata_pptr[ip_idx] = &in_port_ptr->common.sdata;
 
+#ifdef VERBOSE_DEBUGGING
+      
+      TOPO_MSG(topo_ptr->gu.log_id,DBG_LOW_PRIO,"M_iid 0x%lX input ts_valid - %d , TS[MSW, LSW] - [%d, %d]",
+               m_iid,
+              pc->in_port_sdata_pptr[ip_idx]->flags.is_timestamp_valid,
+              (uint32_t )(pc->in_port_sdata_pptr[ip_idx]->timestamp >>32),
+              (uint32_t )pc->in_port_sdata_pptr[ip_idx]->timestamp );
+#endif
+
 #ifdef ERROR_CHECK_MODULE_PROCESS
       result = gen_topo_validate_port_sdata(topo_ptr->gu.log_id,
                                             &in_port_ptr->common,
@@ -726,6 +735,12 @@ GEN_TOPO_STATIC ar_result_t st_topo_module_process(gen_topo_t *topo_ptr, gen_top
 #endif
 
 #ifdef VERBOSE_DEBUGGING
+         TOPO_MSG(topo_ptr->gu.log_id,DBG_LOW_PRIO,"M_iid 0x%lX output ts_valid - %d TS[MSW, LSW] - [%d, %d]",
+                 m_iid,
+                 sdata_ptr->flags.is_timestamp_valid,
+                 (uint32_t )(sdata_ptr->timestamp >>32),
+                 (uint32_t )sdata_ptr->timestamp);
+
       PRINT_PORT_INFO_AT_PROCESS(m_iid, out_port_ptr->gu.cmn.id, out_port_ptr->common, proc_result, "output", "after");
 #endif
 
