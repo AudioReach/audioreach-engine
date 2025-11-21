@@ -212,6 +212,7 @@ typedef struct cu_flags_t
    uint32_t        is_cntr_started : 1;              /**< cntr is started if at least one SG is in start state */
    uint32_t        apm_cmd_context : 1;              /**< Indicates if in apm command handling context, this is to ensure that
                                                           any pm_server voting in this context is non-blocking. */
+   uint32_t        is_real_time: 1;                  /**< flag to indicate if any external port of the container is real time or not. */
 } cu_flags_t;
 
 typedef enum
@@ -756,6 +757,8 @@ ar_result_t cu_ext_in_handle_prebuffer(cu_base_t        *me_ptr,
                                        uint32_t          min_num_buffer_to_hold);
 ar_result_t cu_ext_in_requeue_prebuffers(cu_base_t *me_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr);
 ar_result_t cu_ext_in_release_prebuffers(cu_base_t *me_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr);
+bool_t cu_is_realtime(cu_base_t *base_ptr);
+
 /**-------------------------------- cu_pm ---------------------------------*/
 ar_result_t cu_handle_island_vote(cu_base_t *me_ptr, posal_pm_island_vote_t island_vote);
 ar_result_t cu_vote_latency(cu_base_t *me_ptr, bool_t is_release, bool_t is_realtime_usecase);

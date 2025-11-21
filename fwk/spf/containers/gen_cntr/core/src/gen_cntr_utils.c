@@ -172,7 +172,7 @@ ar_result_t gen_cntr_get_set_thread_priority(gen_cntr_t         *me_ptr,
       }
       else
       {
-         is_real_time = gen_cntr_is_realtime(me_ptr);
+         is_real_time = me_ptr->cu.flags.is_real_time;
          has_stm      = gen_cntr_is_signal_triggered(me_ptr);
          if (!is_real_time && !has_stm)
          {
@@ -508,77 +508,6 @@ ar_result_t gen_cntr_ext_out_port_reset(gen_cntr_t *me_ptr, gen_cntr_ext_out_por
    }
 
    return result;
-}
-
-static bool_t gen_cntr_is_ext_out_port_us_or_ds_rt(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr)
-{
-   gen_topo_output_port_t *out_port_ptr           = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
-   uint32_t                is_downstream_realtime = FALSE;
-   uint32_t                is_upstream_realtime   = FALSE;
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_OUTPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_UPSTREAM_RT,
-                              out_port_ptr,
-                              &is_upstream_realtime);
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_OUTPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_DOWNSTREAM_RT,
-                              out_port_ptr,
-                              &is_downstream_realtime);
-
-   return (is_downstream_realtime || is_upstream_realtime);
-}
-
-static bool_t gen_cntr_is_ext_in_port_us_or_ds_rt(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr)
-{
-   gen_topo_input_port_t *in_port_ptr            = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
-   uint32_t               is_downstream_realtime = FALSE;
-   uint32_t               is_upstream_realtime   = FALSE;
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_INPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_UPSTREAM_RT,
-                              in_port_ptr,
-                              &is_upstream_realtime);
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_INPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_DOWNSTREAM_RT,
-                              in_port_ptr,
-                              &is_downstream_realtime);
-
-   return (is_downstream_realtime || is_upstream_realtime);
-}
-
-/**
- * GEN_CNTR is real time if
- * any of its external ports is connected to an RT entity.
- */
-bool_t gen_cntr_is_realtime(gen_cntr_t *me_ptr)
-{
-   me_ptr->topo.flags.is_real_time_topo = FALSE;
-   for (gu_ext_out_port_list_t *ext_out_port_list_ptr = me_ptr->topo.gu.ext_out_port_list_ptr;
-        (NULL != ext_out_port_list_ptr);
-        LIST_ADVANCE(ext_out_port_list_ptr))
-   {
-      gen_cntr_ext_out_port_t *ext_out_port_ptr = (gen_cntr_ext_out_port_t *)ext_out_port_list_ptr->ext_out_port_ptr;
-      if (gen_cntr_is_ext_out_port_us_or_ds_rt(me_ptr, ext_out_port_ptr))
-      {
-         me_ptr->topo.flags.is_real_time_topo = TRUE;
-         return TRUE;
-      }
-   }
-   // AKR TBD: Revisit this logic - OR instead of and  (RT vs NRT)
-   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = me_ptr->topo.gu.ext_in_port_list_ptr;
-        (NULL != ext_in_port_list_ptr);
-        LIST_ADVANCE(ext_in_port_list_ptr))
-   {
-      gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
-      if (gen_cntr_is_ext_in_port_us_or_ds_rt(me_ptr, ext_in_port_ptr))
-      {
-         me_ptr->topo.flags.is_real_time_topo = TRUE;
-         return TRUE;
-      }
-   }
-   return FALSE;
 }
 
 void gen_cntr_set_stm_ts_to_module(gen_cntr_t *me_ptr)
@@ -1800,6 +1729,11 @@ ar_result_t gen_cntr_handle_fwk_events_util_(gen_cntr_t *                me_ptr,
       capi_event_flag_ptr->port_prop_is_down_strm_rt_change = FALSE;
       cu_inform_upstream_about_downstream_property(&me_ptr->cu);
       fwk_event_flag_ptr->rt_ftrt_change = TRUE;
+   }
+
+   if (fwk_event_flag_ptr->rt_ftrt_change)
+   {
+      cu_is_realtime(&me_ptr->cu);
    }
 
    if (capi_event_flag_ptr->dynamic_inplace_change)

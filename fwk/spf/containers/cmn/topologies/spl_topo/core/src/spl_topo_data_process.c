@@ -2103,7 +2103,7 @@ ar_result_t spl_topo_process(spl_topo_t *topo_ptr, uint8_t path_index)
 
             // In realtime use cases, we can't allow data to stall due to a not connected graph. So, we should
             // drop data when it reaches a module that is not fully connected.
-            bool_t is_realtime = topo_ptr->t_base.flags.is_real_time_topo;
+            bool_t is_realtime = topo_ptr->flags.is_real_time_topo;
             if (is_realtime && curr_module_ptr->flags.is_skip_process)
             {
                bool_t data_was_dropped = FALSE;

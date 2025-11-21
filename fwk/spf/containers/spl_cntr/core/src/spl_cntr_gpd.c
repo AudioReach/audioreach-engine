@@ -1817,7 +1817,7 @@ static ar_result_t spl_cntr_topo_process(spl_cntr_t *me_ptr)
       SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id, DBG_MED_PRIO, "Using simp topo.");
 #endif
 
-      if (me_ptr->topo.simpt_flags.is_bypass_container)
+      if (me_ptr->topo.flags.is_bypass_container)
       {
          TRY(result, simp_topo_bypass(&me_ptr->topo));
       }
