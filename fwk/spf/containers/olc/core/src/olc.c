@@ -104,6 +104,7 @@ static const cu_cntr_vtable_t olc_cntr_funcs = {
    .dcm_topo_set_param 						= NULL,
    .rtm_dump_data_port_media_fmt     = gen_topo_rtm_dump_data_port_mf_for_all_ports,
 
+   .handle_cntr_set_calibration_ops_done    = NULL,
 };
 
 static const topo_to_cntr_vtable_t topo_to_olc_vtable = {

@@ -9,7 +9,7 @@
  *  
  * 
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -180,6 +180,24 @@ struct spf_event_clock_vote_change_t
    /**< VSID of the VCPM sesion to which this event is being sent. */
 };
 
+/**
+ * This param ID is used as part of #SPF_MSG_CMD_SET_CFG.
+ *
+ * This parameter is used by container clients (e.g., VCPM) to notify  
+ * that all the calibration has been applied for the container in question.
+ * 
+ * On receiving this param, the container can in turn notify all 
+ * the modules subscribing to the INTF_EXTN_CALIBRATION_OPS
+ * 
+ * There is no payload for CNTR_PARAM_ID_CALIBRATION_OPS_DONE 
+ * 
+ * Payload: cntr_param_id_calibration_ops_t
+ */
+#define CNTR_PARAM_ID_CALIBRATION_OPS_DONE 0x0800FFFF                            /*TODO - Reserve PID */
+
+/**
+ * Payload for CNTR_PARAM_ID_CALIBRATION_OPS_DONE is not supported.
+ */
 
 #ifdef __cplusplus
 }

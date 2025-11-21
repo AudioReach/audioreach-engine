@@ -50,6 +50,7 @@ ar_result_t gen_cntr_get_set_thread_priority(gen_cntr_t *        me_ptr,
                                              posal_thread_prio_t original_prio);
 ar_result_t gen_cntr_handle_proc_duration_change(cu_base_t *base_ptr);
 ar_result_t gen_cntr_handle_cntr_period_change(cu_base_t *base_ptr);
+ar_result_t gen_cntr_handle_cntr_set_calibration_ops_done(cu_base_t *base_ptr);
 ar_result_t gen_cntr_handle_frame_done(gen_topo_t *gen_topo_ptr, uint8_t path_index);
 ar_result_t gen_cntr_ext_out_port_reset(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 ar_result_t gen_cntr_ext_out_port_basic_reset(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);

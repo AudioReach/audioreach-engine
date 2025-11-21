@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -95,6 +95,12 @@ static ar_result_t cu_set_cntr_params(cu_base_t *base_ptr,
       case CNTR_PARAM_ID_VOICE_SESSION_INFO:
       {
          result          = cu_voice_session_cfg(base_ptr, param_payload_ptr, param_size_ptr);
+         *error_code_ptr = result;
+         break;
+      }
+      case CNTR_PARAM_ID_CALIBRATION_OPS_DONE:
+      {
+         result          = cu_set_calibration_ops_done(base_ptr, param_payload_ptr, param_size_ptr);
          *error_code_ptr = result;
          break;
       }

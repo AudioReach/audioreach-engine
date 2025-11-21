@@ -782,6 +782,7 @@ typedef union gen_topo_module_flags_t
       uint64_t supports_prop_is_rt_port_prop : 1; /**< INTF_EXTN_PROP_IS_RT_PORT_PROPERTY */
       uint64_t supports_module_allow_duty_cycling : 1;  /**< INTF_EXTN_DUTY_CYCLING_ISLAND: Module to raise allow/disallow duty cycling to container unblock island entry */
       uint64_t supports_period : 1; /** < INTF_EXTN_PERIOD */
+      uint64_t supports_calibration_ops_done : 1; /** < INTF_EXTN_CALIBRATION_OPS_DONE */
       uint64_t supports_stm_ts : 1; /**< INTF_EXTN_STM_TS: Module requires the latest signal-triggered timestamp value*/
    };
    uint64_t word;

@@ -5,7 +5,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -114,6 +114,40 @@ ar_result_t cu_voice_session_cfg(cu_base_t *base_ptr, int8_t *param_payload_ptr,
    CU_MSG(base_ptr->gu_ptr->log_id,
           DBG_HIGH_PRIO,
           "CMD:VOICE_SESSION_CFG: Done Executing voice session cfg cmd, current channel mask=0x%x. result=%lu",
+          base_ptr->curr_chan_mask,
+          result);
+
+   return result;
+}
+
+ar_result_t cu_set_calibration_ops_done(cu_base_t *base_ptr, int8_t *param_payload_ptr, uint32_t *param_size_ptr)
+{
+   ar_result_t result = AR_EOK;
+   INIT_EXCEPTION_HANDLING
+
+   VERIFY(result, (NULL != base_ptr->voice_info_ptr));
+
+   CU_MSG(base_ptr->gu_ptr->log_id,
+          DBG_HIGH_PRIO,
+          "CMD:CALIBRATION_OPS: Executing dynamic calibration ops done SET-param. current channel mask=0x%x",
+          base_ptr->curr_chan_mask);
+
+   if(NULL != base_ptr->cntr_vtbl_ptr->handle_cntr_set_calibration_ops_done)
+   {
+      result |= base_ptr->cntr_vtbl_ptr->handle_cntr_set_calibration_ops_done(base_ptr);
+   }
+   else
+   {
+      result = AR_EUNSUPPORTED;
+   }
+
+   CATCH(result, CU_MSG_PREFIX, base_ptr->gu_ptr->log_id)
+   {
+   }
+
+   CU_MSG(base_ptr->gu_ptr->log_id,
+          DBG_HIGH_PRIO,
+          "CMD:VOICE_CALIBRATION_OPS: Done Executing voice set calibration ops, current channel mask=0x%x. result=%lu",
           base_ptr->curr_chan_mask,
           result);
 
