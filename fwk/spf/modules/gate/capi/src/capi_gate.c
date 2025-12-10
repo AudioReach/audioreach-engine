@@ -360,6 +360,34 @@ static capi_err_t capi_gate_set_param(capi_t *                _pif,
 
    switch (param_id)
    {
+      case PARAM_ID_GATE_DEADLINE_OFFSET:
+      {
+         if (params_ptr->actual_data_len < sizeof(param_id_gate_deadline_offset_t))
+         {
+            AR_MSG(DBG_HIGH_PRIO,
+                   "capi_gate: Invalid payload size for param %x, size %d",
+                   param_id,
+                   params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
+         }
+
+         param_id_gate_deadline_offset_t *payload_ptr =
+            (param_id_gate_deadline_offset_t *)params_ptr->data_ptr;
+
+         const int32_t max_deadline_offset_in_us = 10000;
+         const int32_t min_deadline_offset_in_us = -10000;
+         if ((payload_ptr->deadline_offset_us > max_deadline_offset_in_us) ||
+             (payload_ptr->deadline_offset_us < min_deadline_offset_in_us))
+         {
+            AR_MSG(DBG_ERROR_PRIO,
+                   "capi_gate: Invalid deadline offset value %ld", payload_ptr->deadline_offset_us);
+            return CAPI_EBADPARAM;
+         }
+         me_ptr->deadline_offset_us = payload_ptr->deadline_offset_us;
+
+         AR_MSG(DBG_HIGH_PRIO, "capi_gate: Setting deadline offset in us %d", payload_ptr->deadline_offset_us);
+         break;
+      }
       case FWK_EXTN_PARAM_ID_CONTAINER_PROC_DURATION:
       {
          if (params_ptr->actual_data_len < sizeof(fwk_extn_param_id_container_proc_duration_t))

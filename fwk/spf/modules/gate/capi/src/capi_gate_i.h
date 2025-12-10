@@ -91,6 +91,9 @@ typedef struct capi_gate_t
 
    bool_t gate_opened;
    /*Flag to indicate gate is opened */
+
+   int32_t deadline_offset_us;
+   /* Deadline offset in micro seconds */
 } capi_gate_t;
 
 /* clang-format on */
