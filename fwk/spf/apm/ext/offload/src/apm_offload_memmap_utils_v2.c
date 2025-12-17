@@ -169,7 +169,7 @@ ar_result_t apm_offload_memorymap_register_loaned_memory(uint32_t     mem_map_cl
                                                            heap_mgr_type,
                                                            NULL,
                                                            NULL,
-                                                           NULL)))
+                                                           0)))
    {
       AR_MSG(DBG_ERROR_PRIO, "apm_offload_memorymap_register_loaned_memory: Failed to create heap manager");
       apm_offload_free_shm_reg_info(shm_info_ptr);
