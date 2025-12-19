@@ -167,10 +167,12 @@ include_directories(
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--export-dynamic")
 
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/empty.c" "")
+
 if (${CONFIG_SPF_AS_STATIC_LIB} MATCHES "y")
    add_library(spf STATIC "" )
 else()
-   add_library(spf SHARED "" )
+   add_library(spf SHARED "${CMAKE_CURRENT_BINARY_DIR}/empty.c" )
 endif()
 
 message (STATUS "Generating AMDB configs")
