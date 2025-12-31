@@ -697,9 +697,21 @@ static ar_result_t gen_cntr_stm_fwk_extn_handle_enable(gen_cntr_t *me_ptr, gen_t
             on the container on every DMA interrupt or every time the timer expires */
       bit_mask = GEN_CNTR_TIMER_BIT_MASK;
 
-      /* initialize the signal */
-      TRY(result,
+      /* initialize the signal handler, this function can be called in the signal miss recovery context, hence need to
+       * check if processing with thin topo to switch.*/
+      if (check_if_cntr_is_processing_with_thin_topo(&me_ptr->topo))
+      {
+         TRY(result,
+             cu_init_signal(&me_ptr->cu,
+                            bit_mask,
+                            thin_topo_signal_trigger_handler,
+                            &me_ptr->st_module.trigger_signal_ptr));
+      }
+      else
+      {
+         TRY(result,
              cu_init_signal(&me_ptr->cu, bit_mask, gen_cntr_signal_trigger, &me_ptr->st_module.trigger_signal_ptr));
+      }
 
       /* Initialize interrupt counter */
       me_ptr->st_module.raised_interrupt_counter = 0;
