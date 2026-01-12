@@ -547,11 +547,11 @@ ar_result_t olc_operate_on_ext_in_port(void *             base_ptr,
    stop_listen_mask |= ((TOPO_SG_OP_SUSPEND & sg_ops) && is_self_sg);
    if (stop_listen_mask)
    {
-		 cu_stop_listen_to_mask(&me_ptr->cu, ext_in_port_ptr->cu.bit_mask);
-         if (ext_in_port_ptr->wdp_ctrl_cfg_ptr)
-         {
-            cu_stop_listen_to_mask(&me_ptr->cu, ext_in_port_ptr->wdp_ctrl_cfg_ptr->sat_rw_bit_mask);
-         }
+       cu_stop_listen_to_mask(&me_ptr->cu, ext_in_port_ptr->cu.bit_mask);
+       if (ext_in_port_ptr->wdp_ctrl_cfg_ptr)
+       {
+          cu_stop_listen_to_mask(&me_ptr->cu, ext_in_port_ptr->wdp_ctrl_cfg_ptr->sat_rw_bit_mask);
+       }
    }
 
    if (TOPO_SG_OP_CLOSE == sg_ops)
@@ -1843,7 +1843,7 @@ ar_result_t olc_ctrl_path_media_fmt_handler(cu_base_t *base_ptr)
 
    // Media format comes for external input port only
    gu_ext_in_port_ptr  = (gu_ext_in_port_t *)header_ptr->dst_handle_ptr;
-   ext_in_port_ptr     = (cu_ext_in_port_t *)(gu_ext_in_port_ptr + base_ptr->ext_in_port_cu_offset);
+   ext_in_port_ptr     = (cu_ext_in_port_t *)((uint8_t *)gu_ext_in_port_ptr + base_ptr->ext_in_port_cu_offset);
    cnt_ext_in_port_ptr = (olc_ext_in_port_t *)gu_ext_in_port_ptr;
 
    topo_port_state_t port_state;
