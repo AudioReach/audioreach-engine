@@ -60,6 +60,10 @@
     Configuration for the input buffering mode of the Jitter Buf module. */
 #define PARAM_ID_JITTER_BUF_INPUT_BUFFER_MODE   0x08001A61
 
+/** @ingroup ar_spf_mod_jitter_buf_macros
+    Configuration for the state propagation in input buffer trigger mode of the Jitter Buf module. */
+#define PARAM_ID_JITTER_BUF_STATE_PROP_CONFIG   0x08001B93
+
 /*==============================================================================
    Type Definitions
 ==============================================================================*/
@@ -180,6 +184,36 @@ struct param_id_jitter_buf_input_buffer_mode_t
 ;
 
 typedef struct param_id_jitter_buf_input_buffer_mode_t param_id_jitter_buf_input_buffer_mode_t;
+
+
+/** @h2xmlp_parameter   {"PARAM_ID_JITTER_BUF_STATE_PROP_CONFIG",
+                          PARAM_ID_JITTER_BUF_STATE_PROP_CONFIG}
+    @h2xmlp_description { This param ID is used to configure the state propagation in input buffer trigger mode. }
+    @h2xmlp_toolPolicy  {CALIBRATION} */
+
+/** @ingroup ar_spf_mod_jitter_buf_macros
+    Configure the state propagation in input buffer trigger mode. */
+
+#include "spf_begin_pack.h"
+#include "spf_begin_pragma.h"
+struct param_id_jitter_buf_state_prop_config_t
+{
+   uint32_t allow_state_propagation;
+   /**< Parameter to is used to configure the output state propagation in input buffer trigger mode 
+        by default state propagation will be blocked for input buffer trigger mode
+    */
+
+   /**< @h2xmle_description { Parameter to is used to configure the output state propagation in input buffer trigger mode 
+                              by default state propagation will be blocked for input buffer trigger mode }
+        @h2xmle_default     {FALSE}
+        @h2xmle_rangeList   {"FALSE"=0, "TRUE"=1}
+        @h2xmle_policy      {Advanced} */
+}
+#include "spf_end_pragma.h"
+#include "spf_end_pack.h"
+;
+
+typedef struct param_id_jitter_buf_state_prop_config_t param_id_jitter_buf_state_prop_config_t;
 
 /*------------------------------------------------------------------------------
    Module

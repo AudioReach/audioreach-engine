@@ -65,6 +65,9 @@ capi_err_t capi_jitter_buf_init(capi_t *capi_ptr, capi_proplist_t *init_set_prop
    // default is to mark input non-triggerable optional.
    me_ptr->configured_buffer_mode = JBM_BUFFER_INPUT_AT_OUTPUT_TRIGGER;
    me_ptr->buffer_mode            = me_ptr->configured_buffer_mode;
+   
+   // by default blocking the output state propagation 
+   me_ptr->allow_state_propagation = FALSE;
 
    /* Set the init properties. */
    result = capi_jitter_buf_set_properties((capi_t *)me_ptr, init_set_prop_ptr);
@@ -166,6 +169,11 @@ capi_err_t capi_jitter_buf_set_properties(capi_t *capi_ptr, capi_proplist_t *pro
             if (NULL == me_ptr->driver_hdl.stream_buf || 0 == me_ptr->frame_duration_in_us)
             {
                break;
+            }
+            if((prop_ptr[i].port_info.is_input_port == FALSE)&& (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == me_ptr->configured_buffer_mode))
+            {
+                AR_MSG(DBG_HIGH_PRIO,"jitter_buf: avoiding the algo reset for output port in input trigger mode");
+                break;
             }
 
             jitter_buf_driver_t *drv_ptr = &me_ptr->driver_hdl;
@@ -339,6 +347,8 @@ capi_err_t capi_jitter_buf_get_properties(capi_t *capi_ptr, capi_proplist_t *pro
                   case INTF_EXTN_IMCL:
                   case INTF_EXTN_METADATA:
                   case INTF_EXTN_PROP_IS_RT_PORT_PROPERTY:
+                  case INTF_EXTN_PROP_PORT_DS_STATE:
+
                      curr_intf_extn_desc_ptr->is_supported = TRUE;
                      break;
                   default:
@@ -570,6 +580,80 @@ capi_err_t capi_jitter_buf_set_param(capi_t *                capi_ptr,
 #endif
          break;
       }
+
+//ID of the parameter that the container uses to send the downstream state of an output port to a module.
+      case INTF_EXTN_PARAM_ID_PORT_DS_STATE:
+      { 
+         intf_extn_param_id_port_ds_state_t *port_state_ptr =
+            (intf_extn_param_id_port_ds_state_t *)(params_ptr->data_ptr);
+
+         if (params_ptr->actual_data_len < sizeof(intf_extn_param_id_port_ds_state_t))
+         {
+            AR_MSG(DBG_ERROR_PRIO, "Insufficient size for port downstream state setparam.");
+            return CAPI_ENEEDMORE;
+         }
+         if (NULL == me_ptr->event_cb_info.event_cb )
+         {
+             AR_MSG(DBG_ERROR_PRIO, "me_ptr->event_cb_info.event_cb is null.");
+             return CAPI_EOK;
+         }
+
+         AR_MSG(DBG_HIGH_PRIO, "PID_PORT_DS_STATE  output port index %d and port state %d ", port_state_ptr->output_port_index,port_state_ptr->port_state);
+
+
+         //during HO/device switch, ds stop state propagation needs to be stopped to allow JBM to continue reading input data
+         if ((INTF_EXTN_PROP_DATA_PORT_STATE_STOPPED == port_state_ptr->port_state)&& (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == me_ptr->configured_buffer_mode)&& (me_ptr->allow_state_propagation == FALSE))
+         {
+             AR_MSG(DBG_HIGH_PRIO, "down stream stop propagation is skipped for input triggered mode");
+             return CAPI_EOK;
+         }
+
+         AR_MSG(DBG_HIGH_PRIO, "down stream stop propagation is skipped for input triggered mode");
+         intf_extn_event_id_port_ds_state_t event;
+         event.input_port_index = 0;
+         event.port_state       = port_state_ptr->port_state;
+
+         capi_event_info_t event_info;
+         event_info.port_info.is_valid = FALSE;
+
+         // Package the fwk event within the data_to_dsp capi event.
+         capi_event_data_to_dsp_service_t evt = { 0 };
+
+         evt.param_id                = INTF_EXTN_EVENT_ID_PORT_DS_STATE;
+         evt.token                   = 0;
+         evt.payload.actual_data_len = sizeof(event);
+         evt.payload.data_ptr        = (int8_t *)&event;
+         evt.payload.max_data_len    = sizeof(event);
+
+         event_info.payload.actual_data_len = sizeof(capi_event_data_to_dsp_service_t);
+         event_info.payload.data_ptr        = (int8_t *)&evt;
+         event_info.payload.max_data_len    = sizeof(capi_event_data_to_dsp_service_t);
+         result                             = me_ptr->event_cb_info.event_cb(me_ptr->event_cb_info.event_context,
+                                                 CAPI_EVENT_DATA_TO_DSP_SERVICE,
+                                                 &event_info);
+
+         return result;
+      }
+      case PARAM_ID_JITTER_BUF_STATE_PROP_CONFIG:
+      {
+         if (params_ptr->actual_data_len < sizeof(param_id_jitter_buf_state_prop_config_t))
+         {
+            AR_MSG(DBG_ERROR_PRIO,
+                   "jitter_buf: Invalid payload size for param_id=0x%lx actual_data_len=%lu  ",
+                   param_id,
+                   params_ptr->actual_data_len);
+            result = CAPI_ENEEDMORE;
+            break;
+         }
+
+         param_id_jitter_buf_state_prop_config_t *cfg_ptr = (param_id_jitter_buf_state_prop_config_t *)params_ptr->data_ptr;
+
+         /* copy configuration */
+         me_ptr->allow_state_propagation = cfg_ptr->allow_state_propagation;
+
+         break;
+      }
+
       default:
       {
          AR_MSG(DBG_ERROR_PRIO, "jitter_buf: Unsupported Param id= 0x%x \n", param_id);

@@ -196,6 +196,9 @@ typedef struct capi_jitter_buf_t
 
    uint32_t debug_settlement_ms;
    /* Debug settlement time for jitter buffer */
+   
+   uint32_t allow_state_propagation;
+   /* allowing output state propagation  */
 
 } capi_jitter_buf_t;
 
