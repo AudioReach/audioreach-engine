@@ -53,4 +53,8 @@ config IRM
             capabilities
 
             When disabled, stub implementation is compiled.
+config HISTORY_BUFFER
+        tristate "Enable HISTORY_BUFFER Library"
+        default y
+
 endmenu
