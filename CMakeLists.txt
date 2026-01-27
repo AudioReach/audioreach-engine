@@ -173,30 +173,6 @@ else()
    add_library(spf SHARED "" )
 endif()
 
-message (STATUS "Generating AMDB configs")
-
-# Execute before amdb target is configured as amdb target uses generated
-# ouput files from spf_libs_config_parser.py execution.
-execute_process(
-   COMMAND ${CMAKE_COMMAND} -E env
-      BUILDPATH=""
-      OPENSRC="y"
-      PROJECT_BINARY_DIR=${PROJECT_BINARY_DIR}
-      PROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}
-      CHIPSET=${SPF_CHIPSET}
-      TGT_SPECIFIC_FOLDER=${TGT_SPECIFIC_FOLDER}
-      TIMESTAMP=${SPF_TIME_STAMP}
-      ARCH=${ARCH}
-      AR_VERSION=${AR_VERSION}
-      AR_MAJOR_VERSION=${AR_MAJOR_VERSION}
-      AR_MINOR_VERSION=${AR_MINOR_VERSION}
-      AR_PATCHLEVEL=${AR_PATCHLEVEL}
-      ${PYTHON3} ${PROJECT_SOURCE_DIR}/scripts/spf/spf_libs_config_parser.py -c ${SPF_CHIPSET} -f "GEN_SHARED_LIBS,AVS_TEST"
-   RESULTS_VARIABLE AMDB_AUTOGEN_OUTPUT
-)
-
-message(STATUS "AMDB config generation result: ${AMDB_AUTOGEN_OUTPUT}")
-
 add_custom_target(
    menuconfig
    COMMAND ${CMAKE_COMMAND} -E env
@@ -218,6 +194,29 @@ add_custom_target(
 add_compile_definitions(AMDB_REG_SPF_MODULES)
 add_subdirectory(fwk/build)
 add_subdirectory(modules)
+
+message (STATUS "Generating AMDB configs")
+
+# Note: Need to explicitely list AMDB autogen configuration files in AMDB CMake.
+execute_process(
+   COMMAND ${CMAKE_COMMAND} -E env
+      BUILDPATH=""
+      OPENSRC="y"
+      PROJECT_BINARY_DIR=${PROJECT_BINARY_DIR}
+      PROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}
+      CHIPSET=${SPF_CHIPSET}
+      TGT_SPECIFIC_FOLDER=${TGT_SPECIFIC_FOLDER}
+      TIMESTAMP=${SPF_TIME_STAMP}
+      ARCH=${ARCH}
+      AR_VERSION=${AR_VERSION}
+      AR_MAJOR_VERSION=${AR_MAJOR_VERSION}
+      AR_MINOR_VERSION=${AR_MINOR_VERSION}
+      AR_PATCHLEVEL=${AR_PATCHLEVEL}
+      ${PYTHON3} ${PROJECT_SOURCE_DIR}/scripts/spf/spf_libs_config_parser.py -c ${SPF_CHIPSET} -f "GEN_SHARED_LIBS,AVS_TEST"
+   RESULTS_VARIABLE AMDB_AUTOGEN_OUTPUT
+)
+
+message(STATUS "AMDB config generation result: ${AMDB_AUTOGEN_OUTPUT}")
 
 #Read the list of libraries that were added using the global property
 get_property(spf_static_libs GLOBAL PROPERTY GLOBAL_SPF_LIBS_LIST)

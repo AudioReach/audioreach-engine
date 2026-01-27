@@ -20,7 +20,13 @@ set (lib_incs_list
 
 #Add the auto-generated source files
 set(AUTO_GENERATE_DIR ${LIB_ROOT}/autogen/${TGT_SPECIFIC_FOLDER}/)
-file(GLOB_RECURSE amdb_autogen_SOURCES CONFIGURE_DEPENDS ${AUTO_GENERATE_DIR}/*.c)
+
+set(amdb_autogen_SOURCES
+    ${AUTO_GENERATE_DIR}/spf_static_build_config.c
+    ${AUTO_GENERATE_DIR}/spf_shared_build_config.c
+    ${AUTO_GENERATE_DIR}/spf_static_build_config_private.c
+    ${AUTO_GENERATE_DIR}/spf_shared_build_config_private.c
+)
 
 #Add the core source files
 set (lib_srcs_list
