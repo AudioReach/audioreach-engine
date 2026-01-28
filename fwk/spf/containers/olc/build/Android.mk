@@ -11,14 +11,14 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/driver/satellite_graph_mgmt/inc
 
 
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 include $(BUILD_HEADER_LIBRARY)
 
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libspf_olc
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/inc \
     $(LOCAL_PATH)/cmn/inc \

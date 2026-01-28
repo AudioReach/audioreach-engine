@@ -13,14 +13,14 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
 	$(LOCAL_PATH)/thread_pool/src \
 	$(LOCAL_PATH)/watchdog_svc/inc
 
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 include $(BUILD_HEADER_LIBRARY)
 
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libspf_utils
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/circular_buffer/inc \
 	$(LOCAL_PATH)/circular_buffer/src \

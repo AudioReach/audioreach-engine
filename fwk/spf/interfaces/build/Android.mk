@@ -18,14 +18,14 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/module/shared_lib_api/inc \
     $(LOCAL_PATH)/module/shared_lib_api/inc/generic
 
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 include $(BUILD_HEADER_LIBRARY)
 
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libspf_interfaces
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/fwk/api \
     $(LOCAL_PATH)/module/audio_cmn_lib \

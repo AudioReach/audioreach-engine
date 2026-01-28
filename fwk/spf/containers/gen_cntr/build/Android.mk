@@ -23,14 +23,14 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/ext/thin_topo_cntr_utils/inc
 
 
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 include $(BUILD_HEADER_LIBRARY)
 
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libspf_gen_cntr
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/cmn/inc \
     $(LOCAL_PATH)/core/inc \
@@ -115,7 +115,7 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := lib_wr_shmem_ep
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/ext/wr_sh_mem_ep/inc
 
@@ -157,7 +157,7 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := lib_rd_shmem_ep
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/ext/rd_sh_mem_ep/inc
 
@@ -198,7 +198,7 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := lib_placeholder_dec
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/ext/placeholder/inc
 
@@ -239,7 +239,7 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := lib_placeholder_enc
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/ext/placeholder/inc
 
