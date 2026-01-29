@@ -12,6 +12,41 @@
 #include "ar_osal_error.h"
 #include <stdlib.h>
 
+#ifdef __ZEPHYR__
+/* Allocate aligned memory using manual alignment.
+ * Allocates extra space to store the offset to the original malloc
+ * address in the word immediately before the returned pointer, so
+ * ar_heap_aligned_free() can recover and free the original pointer. */
+static void *ar_heap_aligned_alloc(size_t bytes, size_t alignment)
+{
+    char *ptr, *ptr2, *aligned_ptr;
+    uintptr_t align_mask = ~((uintptr_t)alignment - 1);
+
+    ptr = (char *)malloc(bytes + alignment + sizeof(uintptr_t));
+    if (ptr == NULL)
+        return NULL;
+
+    ptr2        = ptr + sizeof(uintptr_t);
+    aligned_ptr = (char *)(((uintptr_t)(ptr2 - 1)) & align_mask) + alignment;
+
+    ptr2                    = aligned_ptr - sizeof(uintptr_t);
+    *((uintptr_t *)ptr2)    = (uintptr_t)(aligned_ptr - ptr);
+    return aligned_ptr;
+}
+
+/* Free a pointer returned by ar_heap_aligned_alloc().
+ * Reads the offset stored just before the aligned pointer to recover
+ * the original malloc address and free it. */
+static void ar_heap_aligned_free(void *ptr)
+{
+    uintptr_t *pTemp = (uintptr_t *)ptr;
+    uintptr_t *ptr2  = pTemp - 1;
+
+    pTemp = (uintptr_t *)((char *)ptr - *ptr2);
+    free(pTemp);
+}
+#endif /* __ZEPHYR__ */
+
 /**
  * \brief ar_heap_init
  *        initialize heap memory interface.
@@ -73,9 +108,13 @@ void* ar_heap_malloc(_In_ size_t bytes, _In_ par_heap_info heap_info)
         if (alignment < sizeof(void *)) {
             alignment = sizeof(void *);
         }
+#ifdef __ZEPHYR__
+        pBuff = ar_heap_aligned_alloc(bytes, alignment);
+#else
         if (posix_memalign(&pBuff, alignment, bytes) != 0) {
             pBuff = NULL;
         }
+#endif /* __ZEPHYR__ */
     }
 
 end:
@@ -117,8 +156,14 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void ar_heap_free(_In_ void* heap_ptr, _In_ par_heap_info heap_info)
 {
     if (NULL != heap_ptr && NULL != heap_info) {
+#ifdef __ZEPHYR__
+        if (AR_HEAP_ALIGN_DEFAULT == heap_info->align_bytes)
+            free(heap_ptr);
+        else
+            ar_heap_aligned_free(heap_ptr);
+#else
         free(heap_ptr);
+#endif /* __ZEPHYR__ */
     }
     return;
 }
-
