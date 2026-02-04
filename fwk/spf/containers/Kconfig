@@ -12,4 +12,10 @@ config PLACEHOLDER_ENC_DEC
         tristate "Enable PLACEHOLDER Library"
         default n
 
+config SPECIAL_TOPOLOGY
+        bool "Enable Special Topology"
+        default n
+        help
+            Enable compilation of special topology components (spl_topo).
+
 endmenu
