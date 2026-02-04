@@ -29,3 +29,8 @@ ar_result_t apm_ext_utils_init(apm_t *apm_info_ptr)
    return result ;
 }
 
+ar_result_t apm_ext_utils_deinit(apm_t *apm_info_ptr)
+{
+   ar_result_t result = AR_EOK;
+   return result;
+}
