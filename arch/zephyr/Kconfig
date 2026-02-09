@@ -1,0 +1,30 @@
+menuconfig ARCH_ZEPHYR
+    bool "Zephyr Architecture"
+    help
+        Say yes if you need Zephyr Architecture support
+
+if ARCH_ZEPHYR
+
+config DISABLE_PLATFORM
+    bool "Disable compiling platform."
+    default y
+    help
+        Select y to disable platform compilation,
+        say n to compile platform.
+
+config COMPILE_POSAL
+    bool "Compile POSAL source files."
+    default y
+    help
+        Select y to compile posal source files,
+        say n to skip posal source files compilation.
+
+config ARE_LOG_LEVEL
+	int "AudioReach Engine log level (0=None, 1=Error, 2=Warning, 3=Info, 4=Debug)"
+	default 1
+	range 0 4
+	help
+	  Set the compile-time log level for AudioReach Engine.
+	  0=None, 1=Error, 2=Warning, 3=Info, 4=Debug
+	  Default is 1 (Error level).
+endif
