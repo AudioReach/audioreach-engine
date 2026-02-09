@@ -1,0 +1,9 @@
+sample:
+  description: AudioReach Engine initialization sample for Zephyr RTOS
+  name: audioreach_engine_sample
+common:
+  tags:
+    - audio
+    - signal-processing
+  modules:
+    - audioreach-engine
