@@ -4,4 +4,25 @@ config WR_SH_MEM_EP
         bool "Enable Write Share Memory Endpoint"
         default y
 
+config SPECIAL_TOPOLOGY
+        bool "Enable Special Topology"
+        default y
+        help
+            Enable compilation of special topology components (spl_topo).
+
+config SPL_CNTR
+        bool "Enable Special Container"
+        default y
+        help
+            Enable the Special Container module. When disabled, a stub
+            implementation is compiled to maintain API compatibility.
+
+config SPL_CNTR_EXT
+        bool "Enable Special Container Extensions"
+        depends on SPL_CNTR
+        default y
+        help
+            Enable compilation of Special Container extension modules.
+            This includes framework extensions for processing, synchronization,
+            and voice delivery.
 endmenu

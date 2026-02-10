@@ -15,6 +15,8 @@ set (lib_incs_list
     )
 
 #Add the source files
+
+if (${CONFIG_SPL_CNTR} MATCHES "y")
 set (lib_srcs_list
      ${LIB_ROOT}/src/spl_cntr_buf_util.c
      ${LIB_ROOT}/src/spl_cntr_cmd_handler.c
@@ -27,6 +29,12 @@ set (lib_srcs_list
      ${LIB_ROOT}/src/spl_cntr_pm.c
      ${LIB_ROOT}/src/spl_cntr.c
     )
+else()
+# Stub compilation
+set (lib_srcs_list
+     ${LIB_ROOT}/stub_src/spl_cntr.c
+     )
+endif()
 
 #Call spf_build_static_library to generate the static library
 spf_build_static_library(spl_cntr_main
