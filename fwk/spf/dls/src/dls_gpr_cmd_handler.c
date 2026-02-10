@@ -109,7 +109,7 @@ static ar_result_t dls_buffer_return(dls_t *dls_info_ptr,
       dls_buf->buf_state = (dls_buf_state_t)DLS_BUF_AVAILABLE;
       g_dls_current_buf_count++; //increment the available buffer counter
 
-      AR_MSG(DBG_LOW_PRIO, "dls_buffer_return(): Buffer starting at addess 0x%p set to DLS_BUF_AVAILABLE state", buf_start_addr);
+      AR_MSG(DBG_LOW_PRIO, "dls_buffer_return(): Buffer starting at addess 0x%p set to DLS_BUF_AVAILABLE state", buf_addr);
    }
    posal_mutex_unlock(dls_info_ptr->buf_return_mutex);
 

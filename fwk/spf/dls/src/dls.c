@@ -191,7 +191,7 @@ uint64_t dls_acquire_buffer(uint16_t log_code,
          g_dls_current_buf_count--; // decrement the available buffer counter
          dls_buffer->buf_in_use = (uint32_t)(((float)g_dls_current_buf_count / (float)g_dls_total_buf_count) * 100);
          AR_MSG(DBG_LOW_PRIO, "DLS: Buffer starting address = 0x%p state = 0x%x buf availabity in % = %d",
-                buf_start_addr, dls_buffer->buf_state, dls_buffer->buf_in_use);
+                buf_offset_addr, dls_buffer->buf_state, dls_buffer->buf_in_use);
 
          // populate the log_hdr_type information in the buffer
          hdr_ptr = (dls_log_hdr_type *)(buf_offset_addr + sizeof(dls_buf_hdr_t));
