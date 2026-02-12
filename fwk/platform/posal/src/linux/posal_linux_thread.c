@@ -11,6 +11,7 @@
 /* ----------------------------------------------------------------------------
  * Include Files
  * ------------------------------------------------------------------------- */
+#define _GNU_SOURCE
 #include "posal.h"
 #include "posal_thread_profiling.h"
 #include "posal_internal.h"
