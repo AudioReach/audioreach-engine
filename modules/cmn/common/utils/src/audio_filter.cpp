@@ -450,7 +450,7 @@ void biquad_process_io
 )
 {
     
-/*#if ((defined __hexagon__) || (defined __qdsp6__))
+#if ((defined __hexagon__) || (defined __qdsp6__))
     
     int16 *bufPtr = srcBuf;
     int16 *coeffptr = &filter->coeffsL16Q13[filter->coeffIndex];
@@ -459,7 +459,7 @@ void biquad_process_io
 
 
 
-#else  */  
+#else
     int32 i;
     int16 xInL16;
     int16 *yL16 = filter->yL16;
@@ -520,7 +520,7 @@ void biquad_process_io
     }
     /*-- store accumulator value back --*/
     filter->yL32 = s32_extract_s40_l(yL40);
-//#endif
+#endif
 }  /*----------------- end of function biquad_process_io --------------------*/
 
 
