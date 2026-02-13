@@ -44,4 +44,13 @@ config SH_MEM_PUSH_MODE
         tristate "Enable SH_MEM_PUSH_MODE Library"
         default y
 
+config IRM
+        bool "Enable Integrated Resource Monitor (IRM)"
+        default y
+        help
+            Enable the Integrated Resource Monitor module for tracking and
+            managing system resources. The IRM module provides real-time monitoring
+            capabilities
+
+            When disabled, stub implementation is compiled.
 endmenu
