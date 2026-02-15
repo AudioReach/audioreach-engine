@@ -25,8 +25,13 @@ uint64_t ar_timer_get_time_in_us(void)
     uint64_t us = 0;
     struct timespec ts;
 
+#ifdef __ZEPHYR__
+    if (!clock_gettime(CLOCK_MONOTONIC, &ts))
+        us = ((ts.tv_sec * 1000000LL) + (ts.tv_nsec / 1000LL));
+#else
     if (!clock_gettime(CLOCK_BOOTTIME, &ts))
         us = ((ts.tv_sec * 1000000LL) + (ts.tv_nsec / 1000LL));
+#endif /* __ZEPHYR__ */
 
     return us;
 }
@@ -42,8 +47,13 @@ uint64_t ar_timer_get_time_in_ms(void)
     uint64_t ms = 0;
     struct timespec ts;
 
+#ifdef __ZEPHYR__
+    if(!clock_gettime(CLOCK_MONOTONIC, &ts))
+        ms = ((ts.tv_sec * 1000LL) + (ts.tv_nsec / 1000000LL));
+#else
     if(!clock_gettime(CLOCK_BOOTTIME, &ts))
         ms = ((ts.tv_sec * 1000LL) + (ts.tv_nsec / 1000000LL));
+#endif /* __ZEPHYR__ */
 
     return ms;
 }
