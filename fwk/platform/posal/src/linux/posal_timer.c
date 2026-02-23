@@ -52,9 +52,28 @@ ar_result_t posal_timer_destroy(posal_timer_t *pp_obj)
 ar_result_t posal_timer_destroy_v2(posal_timer_t *pp_obj)
 {
    posal_timer_info_t *p_timer = NULL;
-   int                 nStatus = 0;
+   int nStatus = AR_EOK;
 
-   return AR_EOK;
+   if (!pp_obj || !*pp_obj)
+      return AR_EBADPARAM;
+
+   p_timer = (posal_timer_info_t *)(*pp_obj);
+   if (!p_timer->timer_obj)
+      return AR_EBADPARAM;
+
+   timer_t *timerId = (timer_t *)p_timer->timer_obj;
+
+   nStatus = timer_delete(*timerId);
+   if (nStatus != 0) {
+      AR_MSG(DBG_ERROR_PRIO, "Failed to destroy timer");
+      return AR_EFAILED;
+   }
+
+   free(timerId);
+   free(p_timer);
+   *pp_obj = NULL;
+
+   return nStatus;
 }
 
 static void posal_timer_expire_cb(union sigval sv)
@@ -294,6 +313,46 @@ uint64_t posal_timer_get_time_in_msec(void)
 int32_t posal_timer_oneshot_start_duration(posal_timer_t p_obj, int64_t duration)
 {
    return AR_EOK;
+}
+
+/**
+  Starts the oneshot absolute timer.
+
+  @datatypes
+  posal_timer_t
+
+  @param[in] pTimer    Pointer to the POSAL timer object.
+  @param[in] duration  Duration of the timer, in microseconds.
+
+  @return
+  An indication of success (0) or failure (nonzero).
+
+  @dependencies
+  The timer must be created using posal_timer_create().
+ */
+int32_t posal_timer_oneshot_start_absolute(posal_timer_t p_obj, int64_t time)
+{
+   int nStatus = AR_EOK;
+   posal_timer_info_t *p_timer = (posal_timer_info_t *)p_obj;
+   timer_t *timer = (timer_t*) p_timer->timer_obj;
+   struct itimerspec its = {0};
+
+   // Set the timer delay and interval
+   its.it_interval.tv_sec = 0;
+   its.it_interval.tv_nsec = 0;
+
+   //Indicates when the timer will fire next
+   its.it_value.tv_sec = time / 1000000;
+   its.it_value.tv_nsec = (time % 1000000) * 1000;
+
+   nStatus = timer_settime(*timer, TIMER_ABSTIME, &its, NULL);
+   if (nStatus != 0)
+   {
+      AR_MSG(DBG_ERROR_PRIO, "Failed to start oneshot absolute timer for time: %lld", time);
+      return AR_EFAILED;
+   }
+
+   return nStatus;
 }
 
 /**
