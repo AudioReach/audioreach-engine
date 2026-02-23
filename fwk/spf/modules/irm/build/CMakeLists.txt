@@ -17,6 +17,8 @@ set (lib_incs_list
     )
 
 #Add the source files
+
+if (${CONFIG_IRM} MATCHES "y")
 set (lib_srcs_list
      ${LIB_ROOT}/src/irm.c
      ${LIB_ROOT}/src/irm_apm_if_utils.c
@@ -28,6 +30,11 @@ set (lib_srcs_list
      ${LIB_ROOT}/src/irm_static_module_utils.c
      ${LIB_ROOT}/src/irm_sim_utils.c
     )
+else()
+set (lib_srcs_list
+     ${LIB_ROOT}/stub_src/irm_stub.c
+    )
+endif()
 
 #Call spf_build_static_library to generate the static library
 spf_build_static_library(irm
