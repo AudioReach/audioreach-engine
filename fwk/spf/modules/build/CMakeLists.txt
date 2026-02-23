@@ -19,9 +19,7 @@ include_directories(
 
 #Add the sub directories
 add_subdirectory(../data_logging/build data_logging)
-if (CONFIG_ARCH_LINUX)
 add_subdirectory(../irm/build irm)
-endif()
 add_subdirectory(../mux_demux/build mux_demux)
 add_subdirectory(../rat/build rat)
 add_subdirectory(../latency/build latency)
