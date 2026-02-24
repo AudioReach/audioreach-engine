@@ -51,10 +51,6 @@ mid_stack_pair_info_t *get_platform_prop_info(platform_prop_t prop, uint32_t *el
    return NULL;
 }
 
-int32 posal_timer_oneshot_start_absolute(posal_timer_t pTimer, int64_t time){
-   return AR_EOK;
-}
-
 ar_result_t posal_power_mgr_send_command(uint32_t msg_opcode, void *payload_ptr , uint32_t payload_size){
    return AR_EOK;
 }
