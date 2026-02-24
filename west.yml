@@ -1,0 +1,34 @@
+# West manifest for AudioReach Engine Zephyr application
+manifest:
+  version: "0.13"
+
+  defaults:
+    remote: upstream
+    revision: main
+
+  remotes:
+    - name: upstream
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    # Zephyr RTOS - pinned to specific revision
+    - name: zephyr
+      remote: upstream
+      revision: 5eecc55398708d6944046a0379343fea1279c831
+      path: zephyr
+      west-commands: scripts/west-commands.yml
+      import:
+        name-allowlist:
+          - cmsis
+          - hal_xtensa
+          - hal_nxp
+          - mbedtls
+          - mcuboot
+          - tinycrypt
+          - littlefs
+          - libmetal
+          - open-amp
+
+  self:
+    # This repository contains the AudioReach Engine application
+    path: audioreach-engine
