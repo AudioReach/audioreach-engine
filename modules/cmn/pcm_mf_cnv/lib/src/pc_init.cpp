@@ -1498,7 +1498,7 @@ void pc_get_kpps_and_bw(pc_lib_t *pc_ptr, uint32_t *kpps, uint32_t *bw)
       // out ch * (-8 + num_samples(4 + (5* in_ch* num_active_coeff/(in_ch * out_ch)))) + c
       // => out_ch * (-8 + (num_samples * 4) + (num_samples * 5* num_coeff/out_ch)) + c
       // sr/1000 translates to num samples
-      uint64_t chmixer_kpps = (out_ch * (-8 + ((sr * 4) + (sr * 5 * num_active_coeff / out_ch)) / 1000)) + 225;
+      uint64_t chmixer_kpps = (out_ch * (-8LL + ((sr * 4) + (sr * 5 * num_active_coeff / out_ch)) / 1000)) + 225;
 
       new_kpps += chmixer_kpps;
       // for ch mixer, bandwidth based on num of bytes, sampling rate and sum of input and output channels

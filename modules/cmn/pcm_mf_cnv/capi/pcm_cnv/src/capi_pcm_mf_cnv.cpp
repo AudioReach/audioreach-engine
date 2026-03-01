@@ -575,8 +575,9 @@ capi_err_t capi_pcm_mf_cnv_set_param(capi_t *                _pif,
             param_id_mfc_output_media_fmt_t *data_ptr =
                reinterpret_cast<param_id_mfc_output_media_fmt_t *>(params_ptr->data_ptr);
 
+            int16_t num_ch = data_ptr->num_channels < 0 ? 0 : data_ptr->num_channels;
             uint32_t required_size =
-               sizeof(param_id_mfc_output_media_fmt_t) + (data_ptr->num_channels * sizeof(uint16));
+               sizeof(param_id_mfc_output_media_fmt_t) + (num_ch * sizeof(uint16));
             if (params_ptr->max_data_len < required_size)
             {
                CNV_MSG(me_ptr->miid,
