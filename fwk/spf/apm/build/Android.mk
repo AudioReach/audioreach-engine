@@ -63,11 +63,18 @@ LOCAL_SRC_FILES := \
     ext/shared_mem/src/apm_shmem_util_v2.c \
     ext/spf_cmd_hdlr/src/apm_spf_cmd_hdlr.c \
     ext/sys_util/src/apm_sys_util.c \
-    ext/multi_client/src/apm_multi_client_db.c \
-    ext/multi_client/src/apm_multi_client_msg_rsp_handler.c \
-    ext/multi_client/src/apm_multi_client_utils.c \
-    ext/multi_client/src/apm_multi_client.c \
     ext/offload/src/apm_offload_memmap_utils_v2.c
+
+ifeq ($(CONFIG_APM_MULTI_CLIENT),y)
+    LOCAL_SRC_FILES += \
+          ext/multi_client/src/apm_multi_client_db.c \
+          ext/multi_client/src/apm_multi_client_msg_rsp_handler.c \
+          ext/multi_client/src/apm_multi_client_utils.c \
+          ext/multi_client/src/apm_multi_client.c
+else
+    LOCAL_SRC_FILES += \
+          ext/multi_client/stub_src/apm_multi_client_stub.c
+endif
 
 LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
 
