@@ -17,8 +17,15 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/ext/pure_st_topo/inc \
     $(LOCAL_PATH)/ext/sync_fwk_ext/inc \
     $(LOCAL_PATH)/../topo_interface/inc \
-    $(LOCAL_PATH)/ext/thin_topo/inc \
-    $(LOCAL_PATH)/ext/thin_topo/src
+    $(LOCAL_PATH)/ext/thin_topo/inc
+
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_EXPORT_C_INCLUDE_DIRS += \
+          $(LOCAL_PATH)/ext/thin_topo/src
+else
+    LOCAL_EXPORT_C_INCLUDE_DIRS += \
+          $(LOCAL_PATH)/ext/thin_topo/stub_src
+endif
 
 LOCAL_VENDOR_MODULE := true
 include $(BUILD_HEADER_LIBRARY)
@@ -45,8 +52,15 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/ext/pure_st_topo/src \
     $(LOCAL_PATH)/ext/sync_fwk_ext/inc \
     $(LOCAL_PATH)/../topo_interface/inc \
-    $(LOCAL_PATH)/ext/thin_topo/inc \
-    $(LOCAL_PATH)/ext/thin_topo/src
+    $(LOCAL_PATH)/ext/thin_topo/inc
+
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_C_INCLUDES += \
+          $(LOCAL_PATH)/ext/thin_topo/src
+else
+    LOCAL_C_INCLUDES += \
+          $(LOCAL_PATH)/ext/thin_topo/stub_src
+endif
 
 LOCAL_SRC_FILES := \
     core/src/gen_topo.c \
@@ -86,11 +100,21 @@ LOCAL_SRC_FILES := \
     ext/prof/src/gen_topo_prof.c \
     ext/pure_st_topo/src/gen_topo_pure_st_process.c \
     ext/pure_st_topo/src/gen_topo_pure_st_process_island.c \
-    ext/sync_fwk_ext/src/gen_topo_sync_fwk_ext.c \
-    ext/thin_topo/src/thin_topo.c
+    ext/sync_fwk_ext/src/gen_topo_sync_fwk_ext.c
 
+ifeq ($(CONFIG_THIN_TOPO),y)
+    LOCAL_SRC_FILES += \
+          ext/thin_topo/src/thin_topo.c
+else
+    LOCAL_SRC_FILES += \
+          ext/thin_topo/stub_src/thin_topo.c
+endif
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_CFLAGS += -DUSES_THIN_TOPO
+endif
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto

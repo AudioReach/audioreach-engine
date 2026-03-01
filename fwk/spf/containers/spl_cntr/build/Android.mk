@@ -42,7 +42,11 @@ LOCAL_SRC_FILES := \
     ext/sync_fwk_ext/src/spl_cntr_sync_fwk_ext.c \
     ext/voice_delivery_fwk_ext/src/spl_cntr_voice_delivery_fwk_ext.c
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_CFLAGS += -DUSES_THIN_TOPO
+endif
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
