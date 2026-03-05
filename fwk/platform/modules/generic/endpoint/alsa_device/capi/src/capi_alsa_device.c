@@ -555,25 +555,22 @@ capi_err_t capi_alsa_device_end(capi_t *_pif)
 
    capi_alsa_device_t *me_ptr = (capi_alsa_device_t *)_pif;
 
-   if (&me_ptr->alsa_device_driver)
+   ar_result = alsa_device_driver_stop(&me_ptr->alsa_device_driver);
+   if (ar_result != AR_EOK)
    {
-      ar_result = alsa_device_driver_stop(&me_ptr->alsa_device_driver);
-      if (ar_result != AR_EOK)
-      {
-         AR_MSG(DBG_ERROR_PRIO,
-               "CAPI_ALSA_DEVICE: alsa_device_driver_stop failed with error code %d",
-               ar_result);
-         capi_result = CAPI_EFAILED;
-      }
+      AR_MSG(DBG_ERROR_PRIO,
+            "CAPI_ALSA_DEVICE: alsa_device_driver_stop failed with error code %d",
+            ar_result);
+      capi_result = CAPI_EFAILED;
+   }
 
-      ar_result = alsa_device_driver_close(&me_ptr->alsa_device_driver);
-      if (ar_result != AR_EOK)
-      {
-         AR_MSG(DBG_ERROR_PRIO,
-               "CAPI_ALSA_DEVICE: alsa_device_driver_close failed with error code %d",
-               ar_result);
-         capi_result = CAPI_EFAILED;
-      }
+   ar_result = alsa_device_driver_close(&me_ptr->alsa_device_driver);
+   if (ar_result != AR_EOK)
+   {
+      AR_MSG(DBG_ERROR_PRIO,
+            "CAPI_ALSA_DEVICE: alsa_device_driver_close failed with error code %d",
+            ar_result);
+      capi_result = CAPI_EFAILED;
    }
 
    me_ptr->state = ALSA_DEVICE_INTERFACE_STOP;
@@ -1021,16 +1018,14 @@ capi_err_t capi_alsa_device_process_sink(capi_t *_pif, capi_stream_data_t *input
 
    total_bytes_copied = min(scratch_buf.actual_data_len, scratch_buf.max_data_len);
 
-   if (&me_ptr->alsa_device_driver)
+   ar_result = alsa_device_driver_write(&me_ptr->alsa_device_driver, me_ptr->out_data_buffer, total_bytes_copied);
+   if (ar_result != AR_EOK)
    {
-      ar_result = alsa_device_driver_write(&me_ptr->alsa_device_driver, me_ptr->out_data_buffer, total_bytes_copied);
-      if (ar_result != AR_EOK)
-      {
-         AR_MSG(DBG_ERROR_PRIO, "alsa_device_driver_write failed with error code %d", ar_result);
-         return CAPI_EFAILED;
-      }
-      AR_MSG_ISLAND(DBG_HIGH_PRIO, "CAPI: alsa_device_driver_write successful, total bytes copied: %d", total_bytes_copied);
+      AR_MSG(DBG_ERROR_PRIO, "alsa_device_driver_write failed with error code %d", ar_result);
+      return CAPI_EFAILED;
    }
+
+   AR_MSG_ISLAND(DBG_HIGH_PRIO, "CAPI: alsa_device_driver_write successful, total bytes copied: %d", total_bytes_copied);
 
    return capi_result;
 }
