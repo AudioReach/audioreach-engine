@@ -343,25 +343,22 @@ static capi_err_t capi_history_buffer_process(capi_t *_pif, capi_stream_data_t *
    if (TRUE == me_ptr->is_trigger_detected)
    {
       /* Populate flow control param payload. */
-      param_id_audio_dam_data_flow_ctrl_t flow_ctrl_cfg;
-      flow_ctrl_cfg.is_gate_open = TRUE;
-      flow_ctrl_cfg.read_offset_in_us = keyword_length_in_us;
+      param_id_audio_dam_data_flow_ctrl_v2_t flow_ctrl_cfg;
+      memset(&flow_ctrl_cfg, 0, sizeof(param_id_audio_dam_data_flow_ctrl_v2_t));
 
-      flow_ctrl_cfg.num_best_channels = 0; // TODO: update best channels info if needed. This is optional.
+      flow_ctrl_cfg.gate_ctrl = AUDIO_DAM_GATE_OPEN;
+      flow_ctrl_cfg.read_offset_in_us = keyword_length_in_us;
 
       /* Send flow control param to DAM module through control port.*/
       if (CAPI_EOK !=
-          capi_history_buffer_send_flow_ctrl_msg_to_dam(me_ptr, &flow_ctrl_cfg))
+          capi_history_buffer_send_flow_ctrl_v2_msg_to_dam(me_ptr, &flow_ctrl_cfg))
       {
          AR_MSG(DBG_ERROR_PRIO, "CAPI History Buffer: Sending GATE OPEN to DAM Failed.");
          me_ptr->is_trigger_detected = FALSE;
          return CAPI_EFAILED;
       }
-      else
-      {
-         AR_MSG(DBG_MED_PRIO, "CAPI History Buffer: Sent gate open to audio DAM module");
-      }
 
+      AR_MSG(DBG_MED_PRIO, "0x%lx: CAPI History Buffer: Sent Gate open with flow 0x%lx and batch_size 0x%lx to Cntrl Port", me_ptr->miid, flow_ctrl_cfg.gate_ctrl, keyword_length_in_us);
       /* If keyword is detected, module needs to send the detection event to the
          DSP clients. Detection module populates the current detection info into the
          event payload and raises the detection event.
@@ -672,13 +669,13 @@ static capi_err_t capi_history_buffer_set_param(capi_t *_pif,
                 "Received history buffer reset, sending gate close to DAM");
 
          /* Populate dam gate control IMC param payload. */
-         param_id_audio_dam_data_flow_ctrl_t ctrl_cfg;
-         memset(&ctrl_cfg, 0, sizeof(param_id_audio_dam_data_flow_ctrl_t));
+         param_id_audio_dam_data_flow_ctrl_v2_t ctrl_cfg;
+         memset(&ctrl_cfg, 0, sizeof(param_id_audio_dam_data_flow_ctrl_v2_t));
 
          // populate payload for gate close
-         ctrl_cfg.is_gate_open = FALSE;
+         ctrl_cfg.gate_ctrl = AUDIO_DAM_GATE_CLOSE;
 
-         result = capi_history_buffer_send_flow_ctrl_msg_to_dam(me_ptr, &ctrl_cfg);
+         result = capi_history_buffer_send_flow_ctrl_v2_msg_to_dam(me_ptr, &ctrl_cfg);
 
          // update flag to show, detection event is finished.
          me_ptr->is_event_inprogess = FALSE;
@@ -743,18 +740,42 @@ static capi_err_t capi_history_buffer_set_param(capi_t *_pif,
 
          param_id_history_buffer_mode_t *cfg_ptr = (param_id_history_buffer_mode_t *)params_ptr->data_ptr;
 
-         me_ptr->mode.data_flow_mode = cfg_ptr->data_flow_mode;
-
-         if (me_ptr->mode.data_flow_mode != HISTORY_BUFFER_ON_DEMAND)
+         switch(cfg_ptr->data_flow_mode)
          {
-            me_ptr->mode.data_flow_mode = HISTORY_BUFFER_ON_DEMAND;
-            me_ptr->mode.batch_size_ms = 0;
+            case HISTORY_BUFFER_BATCHING:
+            {
+               me_ptr->data_flow_mode = HISTORY_BUFFER_BATCHING;
 
-            DE_DBG(me_ptr->miid, DBG_HIGH_PRIO, "Unsupported mode %u, switched to ON_DEMAND", me_ptr->mode.data_flow_mode);
+              if(cfg_ptr->batch_size_ms)
+               {
+                  me_ptr->hist_buffer_duration_msec = cfg_ptr->batch_size_ms;
+                  me_ptr->max_dam_buffer_size_us = (me_ptr->hist_buffer_duration_msec * 1000);
+               }
+
+               me_ptr->is_event_inprogess = TRUE;
+
+               if (CAPI_FAILED(capi_history_buffer_resize_and_batch_gate_open_to_dam(me_ptr)))
+               {
+                  AR_MSG(DBG_HIGH_PRIO, "Unable to send buffer resize and gate open to DAM");
+               }
+
+               break;
+            }
+            case HISTORY_BUFFER_ON_DEMAND:
+            {
+               me_ptr->data_flow_mode = HISTORY_BUFFER_ON_DEMAND;
+               break;
+            }
+            default:
+            {
+               me_ptr->data_flow_mode = HISTORY_BUFFER_ON_DEMAND;
+               DE_DBG(me_ptr->miid, DBG_HIGH_PRIO, "Unsupported mode %u, switched to ON_DEMAND", me_ptr->data_flow_mode);
+               break;
+            }
          }
 
          DE_DBG(me_ptr->miid, DBG_HIGH_PRIO, "Configured data flow mode is: %u and batch size in msec: %u",
-                me_ptr->mode.data_flow_mode, me_ptr->mode.batch_size_ms);
+                me_ptr->data_flow_mode, me_ptr->hist_buffer_duration_msec);
 
          break;
       }

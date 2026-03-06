@@ -380,6 +380,46 @@ struct module_cmn_md_eos_t
 
 /**************************************** DFG - End *************************************/
 
+/*
+ * The custom event is raised if the SPF internal metadata is set as custom tracking metadata.
+ * The event will be sent to the GPR client from SPF in the following scenarios.
+ *
+ *  Metadata is dropped in the SPF.
+ *  Metadata is consumed by the the module and not propagated further.
+ *  All sink modules including the hardware end-points would consume the metadata.
+*/
+#define EVENT_ID_MODULE_CMN_METADATA_CUSTOM_TRACKING_EVENT 0x0300100F
+
+typedef struct module_cmn_md_tracking_md_event_rsp_handle_t module_cmn_md_tracking_md_event_rsp_handle_t;
+
+/*==============================================================================
+   Type Definitions
+==============================================================================*/
+typedef enum
+{
+   TRACKING_MD_EVENT_RSP_INVALID = 0,
+   /* Invalid option for the tracking cmd */
+
+   TRACKING_MD_EVENT_RSP_SET_CFG = 1,
+   /* Handle the tracking event as SET config after reciving it at the CU layer. */
+
+} module_cmn_tracking_event_rsp_cfg_t;
+
+/** Custom tracking event payload for metadata
+*/
+struct module_cmn_md_tracking_md_event_rsp_handle_t
+{
+   metadata_tracking_event_t tracking_payload;
+   /* Tracking payload for the metadata used for generic events*/
+
+   module_cmn_tracking_event_rsp_cfg_t tracking_rsp_cfg;
+   /* GPR Tracking event command configuration */
+
+   uint32_t tracking_event_payload_size;
+   /* Size of the tracking metadata event payload */
+
+};
+
 /** @} */ /* end_addtogroup capi_if_ext_metadata */
 
 #ifdef __cplusplus

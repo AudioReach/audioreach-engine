@@ -314,6 +314,16 @@ typedef enum
     * will exit island when the buffer is full, enter when the DAM is buffering
     * and Downstream module is done processing, wait for PARAM_ID_AUDIO_DAM_ALLOW_DCM_ISLAND_ENTRY */
 
+   AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING_MD_TRACKING_EVENT = 5,
+   /* Open gate for corresponding gate and send out data in batches along with
+    * the metadata i.e. only after batch amount of data is accumulated in the
+    * dam buffer, DAM sends the batch data and metadata repeatedly till gate
+    * close is requested. The metadata is inserted at the end of the batch.
+    * This metadata is consumed by the downstream and a GPR event is raised
+    * to DAM indicating that the batch is consumed. DAM will exit island when
+    * the buffer is full, enters back when the DAM is buffering and the metadata
+    * is consumed, wait for PARAM_ID_AUDIO_DAM_HANDLE_BATCH_TRACKING_EVENT */
+
    AUDIO_DAM_BATCH_INVALID = 0xFFFFFFFF
    /* Invalid option for gate_open */
 } audio_dam_gate_ctrl_op_t;

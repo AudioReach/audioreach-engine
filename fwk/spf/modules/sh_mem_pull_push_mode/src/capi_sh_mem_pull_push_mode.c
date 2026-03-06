@@ -597,6 +597,55 @@ static capi_err_t capi_pm_set_param(capi_t                 *_pif,
          capi_pm_check_n_enable_module_buffer_access_extension(me_ptr);
          break;
       }
+      case INTF_EXTN_PARAM_ID_CNTR_DUTY_CYCLING_ENABLED:
+      {
+         if (params_ptr->actual_data_len < sizeof(intf_extn_param_id_cntr_duty_cycling_enabled_t))
+         {
+            AR_MSG(DBG_ERROR_PRIO,
+                   "Invalid payload size for CNTR_DUTY_CYCLING_ENABLED %d",
+                   params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
+         }
+         intf_extn_param_id_cntr_duty_cycling_enabled_t *payload_ptr =
+             (intf_extn_param_id_cntr_duty_cycling_enabled_t *)params_ptr->data_ptr;
+
+         me_ptr->is_cntr_duty_cycle_enabled = payload_ptr->is_cntr_duty_cycling;
+
+         bool_t allow_duty_cycling = TRUE;
+         intf_extn_event_id_allow_duty_cycling_v2_t event_payload;
+         PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "Raise allow_duty_cycling: %d", allow_duty_cycling);
+
+         event_payload.allow_duty_cycling = allow_duty_cycling;
+
+         /* Create event */
+         capi_event_data_to_dsp_service_t to_send;
+         to_send.param_id = INTF_EXTN_EVENT_ID_ALLOW_DUTY_CYCLING;
+         to_send.payload.actual_data_len = sizeof(intf_extn_event_id_allow_duty_cycling_v2_t);
+         to_send.payload.max_data_len = sizeof(intf_extn_event_id_allow_duty_cycling_v2_t);
+         to_send.payload.data_ptr = (int8_t *)&event_payload;
+
+         /* Create event info */
+         capi_event_info_t event_info;
+         event_info.port_info.is_input_port = FALSE;
+         event_info.port_info.is_valid = FALSE;
+         event_info.payload.actual_data_len = sizeof(to_send);
+         event_info.payload.max_data_len = sizeof(to_send);
+         event_info.payload.data_ptr = (int8_t *)&to_send;
+
+         capi_result = me_ptr->cb_info.event_cb(me_ptr->cb_info.event_context, CAPI_EVENT_DATA_TO_DSP_SERVICE, &event_info);
+
+         if (CAPI_EOK != capi_result)
+         {
+            PULL_PUSH_MSG(miid, DBG_ERROR_PRIO, "Failed to raise INTF_EXTN_EVENT_ID_ALLOW_DUTY_CYCLING event");
+         }
+         else
+         {
+            PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "Raised INTF_EXTN_EVENT_ID_ALLOW_DUTY_CYCLING event allow_duty_cycling:%d", event_payload.allow_duty_cycling);
+         }
+
+         PULL_PUSH_MSG(miid, DBG_LOW_PRIO, "is_cntr_duty_cycle_enabled configured to %lu", me_ptr->is_cntr_duty_cycle_enabled);
+         break;
+      }
       default:
       {
          CAPI_SET_ERROR(capi_result, CAPI_EUNSUPPORTED);
@@ -1111,7 +1160,7 @@ static capi_err_t capi_pm_process_get_properties(capi_pm_t *me_ptr, capi_proplis
          {
             /** Can pass the list of IE list supported by this module to
              *  be updated in the common utlitlity */
-            uint32_t supported_extension_list[] = { INTF_EXTN_IMCL, INTF_EXTN_MODULE_BUFFER_ACCESS };
+            uint32_t supported_extension_list[] = { INTF_EXTN_IMCL, INTF_EXTN_MODULE_BUFFER_ACCESS, INTF_EXTN_DUTY_CYCLING_ISLAND_MODE };
             uint32_t num_supported_extns        = sizeof(supported_extension_list) / sizeof(uint32_t);
             capi_result                         = capi_cmn_check_and_update_intf_extn_status(num_supported_extns,
                                                                      supported_extension_list,

@@ -289,3 +289,56 @@ capi_err_t capi_dam_insert_flushing_eos_at_out_port(capi_audio_dam_t   *me_ptr,
 
    return capi_result;
 }
+
+capi_err_t capi_dam_insert_tracking_md_at_out_port(capi_audio_dam_t   *me_ptr,
+                                                    capi_stream_data_t *output,
+                                                    uint32_t            output_port_index)
+{
+   capi_err_t             capi_result    = CAPI_EOK;
+   capi_stream_data_v2_t *out_stream_ptr = (capi_stream_data_v2_t *)output;
+   module_cmn_md_tracking_t batch_tracking_md_info;
+   memset(&batch_tracking_md_info, 0, sizeof(batch_tracking_md_info));
+
+   if (CAPI_STREAM_V2 != out_stream_ptr->flags.stream_data_version)
+   {
+      DAM_MSG_ISLAND(me_ptr->miid, DBG_ERROR_PRIO, "capi_audio_dam: stream version must be 1");
+      return CAPI_EFAILED;
+   }
+   module_cmn_md_list_t   **md_list_pptr     =     &out_stream_ptr->metadata_list_ptr;
+   module_cmn_md_t        *new_md_ptr        =     NULL;
+   dam_batch_end_md_gen_t *md_payload_ptr    =     NULL;
+   capi_heap_id_t         heap;
+   heap.heap_id = (uint32_t)me_ptr->heap_id;
+   module_cmn_md_flags_t    flags;
+
+   batch_tracking_md_info.heap_info.heap_id              = heap.heap_id;
+   batch_tracking_md_info.tracking_payload.flags.requires_custom_event = MODULE_CMN_MD_TRACKING_USE_CUSTOM_EVENT;
+   batch_tracking_md_info.tracking_payload.dest_port      = me_ptr->miid;
+   batch_tracking_md_info.tracking_payload.src_port      = me_ptr->miid;
+
+   flags.word          = 0;
+   flags.version       = MODULE_CMN_MD_VERSION;
+   flags.tracking_mode = MODULE_CMN_MD_TRACKING_CONFIG_ENABLE_FOR_DROP_OR_CONSUME;
+   flags.tracking_policy = MODULE_CMN_MD_TRACKING_EVENT_POLICY_LAST;
+   /*if metadata splits into multiple path, DAM should be informed only when last event done*/
+
+   capi_result = me_ptr->metadata_handler.metadata_create_with_tracking(me_ptr->metadata_handler.context_ptr,
+                                                                        md_list_pptr,
+                                                                        sizeof(dam_batch_end_md_gen_t),
+                                                                        heap,
+                                                                        DAM_BATCH_END_MD_ID_MARKER,
+                                                                        flags,
+                                                                        &batch_tracking_md_info,
+                                                                        &new_md_ptr);
+
+   new_md_ptr->metadata_id                     = DAM_BATCH_END_MD_ID_MARKER;
+   new_md_ptr->offset                          = output->buf_ptr[0].actual_data_len/me_ptr->operating_mf.bytes_per_sample;
+   md_payload_ptr                              = (dam_batch_end_md_gen_t *)&new_md_ptr->metadata_buf;
+   md_payload_ptr->output_port_idx             = output_port_index;                                    //output port index to handle Duty cycling
+   md_payload_ptr->param_id                    = PARAM_ID_AUDIO_DAM_HANDLE_BATCH_END_TRACKING_EVENT;   //Param ID to set after tracking event
+
+   DAM_MSG_ISLAND(me_ptr->miid, DBG_HIGH_PRIO, "DAM: Created and inserted tracking MD at output port index:%lu with offset: %lu",
+                  output_port_index, new_md_ptr->offset);
+
+   return capi_result;
+}

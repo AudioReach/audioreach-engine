@@ -1456,6 +1456,52 @@ capi_err_t capi_audio_dam_buffer_set_param_non_island(capi_t                 *ca
 
          break;
       }
+      case PARAM_ID_AUDIO_DAM_HANDLE_BATCH_END_TRACKING_EVENT:
+      {
+
+         if (params_ptr->actual_data_len < sizeof(dam_batch_end_md_gen_t))
+         {
+            DAM_MSG(me_ptr->miid,
+                    DBG_ERROR_PRIO,
+                    "capi_audio_dam: Param id 0x%lx Bad param size %lu",
+                    (uint32_t)param_id,
+                    params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
+         }
+
+         dam_batch_end_md_gen_t *md_event_ptr = (dam_batch_end_md_gen_t *)params_ptr->data_ptr;
+
+         uint32_t op_port_index = md_event_ptr->output_port_idx;
+
+         uint32_t op_arr_index = get_arr_index_from_port_index(me_ptr, op_port_index, FALSE);
+
+         if(UMAX_32 == op_arr_index)
+         {
+            DAM_MSG(me_ptr->miid,
+                    DBG_ERROR_PRIO,
+                    "capi_audio_dam: Param id 0x%lx, recieved invalid port index %lu",
+                    (uint32_t)param_id,
+                    params_ptr->actual_data_len);
+            return CAPI_EBADPARAM;
+         }
+
+         // Store the flag
+         me_ptr->out_port_info_arr[op_arr_index].ready_for_island_entry = TRUE;
+
+         bool_t can_enter_island = capi_audio_dam_check_island_entry_cond(me_ptr);
+
+         // island entry conditions, pending_bytes -> 0, DCM mode enabled and port is intialized
+         if (can_enter_island)
+         {
+            result |= capi_dam_duty_cycling_buf_send_message_to_dcm(me_ptr, (uint32_t)SPF_MSG_CMD_DCM_REQ_FOR_UNBLOCK_ISLAND_ENTRY);
+         }
+         else
+         {
+            DAM_MSG(me_ptr->miid, DBG_MED_PRIO, "Island entry conditions not met.. Buffering data");
+         }
+
+         break;
+      }
       default:
       {
          DAM_MSG(me_ptr->miid, DBG_ERROR_PRIO, "capi_audio_dam: Unsupported Param id ::0x%x \n", param_id);
@@ -2391,6 +2437,7 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
                me_ptr->out_port_info_arr[arr_index].is_open = FALSE;
                me_ptr->out_port_info_arr[arr_index].gate_ctrl_op                = AUDIO_DAM_BATCH_INVALID;
                me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = FALSE;
+               me_ptr->out_port_info_arr[arr_index].handle_md_batch_tracking = FALSE;
             }
 
             break;

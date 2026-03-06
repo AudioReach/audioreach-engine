@@ -253,12 +253,14 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
             }
          }
 
+         bool_t is_batch_sent = false;
          result = audio_dam_stream_read(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr,
                                         num_output_chs,
                                         output[port_index]->buf_ptr,
                                         &is_timestamp_valid,
                                         &output[port_index]->timestamp,
-                                        &output_frame_len_us);
+                                        &output_frame_len_us,
+                                        &is_batch_sent);
 
          if (AR_ENEEDMORE == result)
          {
@@ -271,6 +273,16 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
             {
                posal_island_trigger_island_exit();
                capi_audio_dam_handle_pending_eos(me_ptr, output, arr_idx, port_index);
+            }
+
+            if(me_ptr->out_port_info_arr[arr_idx].handle_md_batch_tracking && is_batch_sent)           //send the marker metadata as batch is sent
+            {
+               if (CAPI_EOK == (result = capi_dam_insert_tracking_md_at_out_port(me_ptr, output[port_index], port_index)))
+               {
+                  DAM_MSG_ISLAND(me_ptr->miid,
+                                 DBG_HIGH_PRIO,
+                                 "DAM: Inserted tracking MD after Batch");
+               }
             }
 
             output[port_index]->flags.is_timestamp_valid = is_timestamp_valid;

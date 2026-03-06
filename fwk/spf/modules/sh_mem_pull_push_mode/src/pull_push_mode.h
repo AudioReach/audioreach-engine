@@ -121,6 +121,9 @@ typedef struct capi_pm_t
 
    // container frame duration.
    uint32_t frame_dur_us;
+
+   bool_t is_cntr_duty_cycle_enabled;
+
 } capi_pm_t;
 
 /*------------------------------------------------------------------------

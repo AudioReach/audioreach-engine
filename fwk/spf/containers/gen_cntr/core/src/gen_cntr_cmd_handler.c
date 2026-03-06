@@ -591,6 +591,11 @@ ar_result_t gen_cntr_gpr_cmd(cu_base_t *base_ptr)
          cu_set_get_cfgs_packed(base_ptr, packet_ptr, SPF_CFG_DATA_SHARED_PERSISTENT);
          break;
       }
+      case EVENT_ID_MODULE_CMN_METADATA_CUSTOM_TRACKING_EVENT:
+      {
+         cu_handle_md_tracking_internal_event(base_ptr, packet_ptr, SPF_CFG_DATA_TYPE_DEFAULT);
+         break;
+      }
       default:
       {
          TRY(result, cu_gpr_cmd(base_ptr));
