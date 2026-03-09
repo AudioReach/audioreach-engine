@@ -54,6 +54,15 @@ include_directories(
                     ../spl_cntr/inc
                    )
 
+#[[
+   Define USES_THIN_TOPO for:
+   1. Libraries compiled statically and linked later to spf target.
+   2. Modules compiled directly as part of spf target
+      (e.g. wr_sh_mem_ep, rd_sh_mem_ep)
+]]
+add_compile_definitions(USES_THIN_TOPO)
+target_compile_definitions(spf PUBLIC USES_THIN_TOPO)
+
 #Add the sub directories
 add_subdirectory(../cmn/build cmn)
 add_subdirectory(../gen_cntr/build gen_cntr)
