@@ -615,16 +615,10 @@ capi_err_t capi_mux_demux_process(capi_t *_pif, capi_stream_data_t *input[], cap
    {
       uint32_t out_port_index = me_ptr->output_port_info_ptr[out_port_arr_index].port_index;
       if (DATA_PORT_STATE_STARTED != me_ptr->output_port_info_ptr[out_port_arr_index].port_state ||
-          NULL == output[out_port_index])
+          NULL == output[out_port_index] || NULL == output[out_port_index]->buf_ptr[0].data_ptr)
       {
          continue;
       }
-#ifdef SIM
-      if (NULL == output[out_port_index]->buf_ptr[0].data_ptr)
-      {
-         continue;
-      }
-#endif
 
       // maximum number of bytes copied from an input buffer to an output buffer for this output port
       uint32_t maximum_bytes_copied_from_input_port_bufs = 0;
