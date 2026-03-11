@@ -7,7 +7,7 @@
  *        This file contains CAPI API's published by Congestion Buffer module API.
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -151,6 +151,26 @@ void congestion_buf_change_trigger_policy(capi_congestion_buf_t *me_ptr);
 capi_err_t capi_congestion_buf_parse_md_num_frames(capi_congestion_buf_t *me_ptr, capi_stream_data_t *input);
 
 capi_err_t capi_congestion_buf_init_create_buf(capi_congestion_buf_t *me_ptr, bool_t is_debug);
+
+capi_vtbl_t *capi_congestion_buf_get_vtbl();
+
+capi_err_t capi_congestion_buf_end(capi_t *_pif);
+
+capi_err_t capi_congestion_buf_set_param(capi_t *                _pif,
+                                          uint32_t                param_id,
+                                          const capi_port_info_t *port_info_ptr,
+                                          capi_buf_t *            params_ptr);
+
+capi_err_t capi_congestion_buf_get_param(capi_t *                _pif,
+                                          uint32_t                param_id,
+                                          const capi_port_info_t *port_info_ptr,
+                                          capi_buf_t *            params_ptr);
+
+capi_err_t capi_congestion_buf_set_properties(capi_t *_pif, capi_proplist_t *props_ptr);
+
+capi_err_t capi_congestion_buf_get_properties(capi_t *_pif, capi_proplist_t *props_ptr);
+
+capi_err_t capi_congestion_buf_process(capi_t *_pif, capi_stream_data_t *input[], capi_stream_data_t *output[]);
 
 #ifdef __cplusplus
 }
