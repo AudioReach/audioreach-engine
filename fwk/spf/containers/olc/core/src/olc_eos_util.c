@@ -132,7 +132,7 @@ ar_result_t olc_process_eos_md_from_peer_cntr(olc_t *                me_ptr,
                  node_ptr,
                  md_ptr->offset);
 
-         //gen_topo_eos_cargo_t *cargo_ptr = NULL;
+         // gen_topo_eos_cargo_t *cargo_ptr = NULL;
 
          if (FALSE == is_internal_eos)
          {
@@ -165,14 +165,14 @@ ar_result_t olc_process_eos_md_from_peer_cntr(olc_t *                me_ptr,
          // even though EoS is also input_discontinuity, it's handled separately
          // process any partially processed data
       }
-      else if (MD_ID_TTR == md_ptr->metadata_id)
+      else if ((MD_ID_TTR == md_ptr->metadata_id) && (NULL == me_ptr->cu.voice_info_ptr))
       {
          gen_topo_capi_metadata_destroy((void *)ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr,
                                         node_ptr,
                                         TRUE /*is_dropped*/,
                                         md_list_head_pptr,
-										0,
-										FALSE);
+                                        0,
+                                        FALSE);
       }
       else
       {

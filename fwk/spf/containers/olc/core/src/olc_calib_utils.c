@@ -457,26 +457,50 @@ ar_result_t olc_process_container_set_get_cfg(cu_base_t *                       
                      break;
                   }
 
-                  base_ptr->cntr_proc_duration = proc_dur_ptr->proc_duration_us;
+                  base_ptr->cntr_proc_duration                 = proc_dur_ptr->proc_duration_us;
+                  base_ptr->flags.is_cntr_proc_dur_set_paramed = TRUE;
+                  CU_SET_ONE_FWK_EVENT_FLAG(base_ptr, proc_dur_change);
+
+                  if (base_ptr->voice_info_ptr)
+                  {
+                     base_ptr->voice_info_ptr->safety_margin_us =
+                        MAX(proc_dur_ptr->safety_margin_us, proc_dur_ptr->proc_duration_us);
+                  }
 
                   CU_MSG(base_ptr->gu_ptr->log_id,
                          DBG_HIGH_PRIO,
-                         "Proc Duration (Scaled FS) %lu us set on the container",
-                         base_ptr->cntr_proc_duration);
+                         "Container Proc Duration %lu us set on the container, safety margin %lu us (max is chosen). "
+                         "voice info "
+                         "0x%p",
+                         base_ptr->cntr_proc_duration,
+                         proc_dur_ptr->safety_margin_us,
+                         base_ptr->voice_info_ptr);
+
+                  // todo : evaluate
+                  // result = base_ptr->cntr_vtbl_ptr->handle_proc_duration_change(base_ptr);
 
                   // result = base_ptr->cntr_vtbl_ptr->handle_thread_prio_change(base_ptr);
 
                   break;
                }
                case CNTR_PARAM_ID_CFG_SRC_MOD_DELAY_LIST:
-               case CNTR_PARAM_ID_DESTROY_SRC_MOD_DELAY_LIST:
-               case CNTR_PARAM_ID_VOICE_SESSION_INFO:
+               case CNTR_PARAM_ID_DESTROY_SRC_MOD_DELAY_LIST: //todo : review once again
                {
                   CU_MSG(base_ptr->gu_ptr->log_id,
                          DBG_ERROR_PRIO,
                          "Unsupported param-id 0x%lX",
                          param_data_ptr->param_id);
                   result = AR_EBADPARAM;
+                  break;
+               }
+               case CNTR_PARAM_ID_VOICE_SESSION_INFO:
+               {
+                  CU_MSG(base_ptr->gu_ptr->log_id,
+                         DBG_ERROR_PRIO,
+                         "voice param-id 0x%lX",
+                         param_data_ptr->param_id);
+                  // todo : check handling
+                  result = AR_EOK;
                   break;
                }
                case CNTR_PARAM_ID_GET_PROF_INFO:

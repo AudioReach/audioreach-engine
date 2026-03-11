@@ -426,6 +426,8 @@ ar_result_t olc_destroy_module(gen_topo_t *       topo_ptr,
 
 ar_result_t olc_create_send_eos_md(olc_t *me_ptr, olc_ext_out_port_t *ext_out_port_ptr);
 
+ar_result_t olc_aggregate_hw_acc_proc_delay(void *cu_ptr, uint32_t *hw_acc_proc_delay_ptr);
+
 /**--------------------------- olc calib utils ----------------------------*/
 ar_result_t olc_process_satellite_set_get_cfg(cu_base_t *                       base_ptr,
                                               spgm_set_get_cfg_cmd_extn_info_t *cmd_extn_ptr,
