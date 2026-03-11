@@ -29,8 +29,9 @@ GEN_TOPO_STATIC void thin_topo_reset_topo_buf_info(gen_topo_common_port_t *cmn_p
 }
 
 /** Iterate backwards from the given input till the external input port(nblc_start_ptr)*/
-GEN_CNTR_STATIC gen_cntr_ext_in_port_t *thin_topo_is_inplace_nblc_from_cur_in_to_ext_in(uint32_t               log_id,
-                                                                               gen_topo_input_port_t *cur_in_port_ptr)
+GEN_CNTR_STATIC gen_cntr_ext_in_port_t *thin_topo_is_inplace_nblc_from_cur_in_to_ext_in(
+   uint32_t               log_id,
+   gen_topo_input_port_t *cur_in_port_ptr)
 {
    gen_topo_input_port_t *nblc_start_ptr = cur_in_port_ptr->nblc_start_ptr;
 
@@ -41,22 +42,23 @@ GEN_CNTR_STATIC gen_cntr_ext_in_port_t *thin_topo_is_inplace_nblc_from_cur_in_to
    }
 
    /** If current input iterator reached external input terminate the loop */
-   while(nblc_start_ptr != cur_in_port_ptr)
+   while (nblc_start_ptr != cur_in_port_ptr)
    {
       /** this is unexpected if external output, shouldnt have entered the while loop*/
-      if(!cur_in_port_ptr->gu.conn_out_port_ptr)
+      if (!cur_in_port_ptr->gu.conn_out_port_ptr)
       {
          GEN_CNTR_MSG(log_id,
-                     DBG_ERROR_PRIO,
-                     " Potential issue with NBLC assignment, reached unexpected external input (MIID,PID)(0x%lx,0x%lx)",
-                     cur_in_port_ptr->gu.cmn.module_ptr->module_instance_id,
-                     cur_in_port_ptr->gu.cmn.id);
+                      DBG_ERROR_PRIO,
+                      " Potential issue with NBLC assignment, reached unexpected external input "
+                      "(MIID,PID)(0x%lx,0x%lx)",
+                      cur_in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                      cur_in_port_ptr->gu.cmn.id);
          return FALSE;
       }
 
       /** check if the prev module is inplace*/
-      gen_topo_module_t *prev_module_ptr = (gen_topo_module_t*)cur_in_port_ptr->gu.conn_out_port_ptr->cmn.module_ptr;
-      if(!gen_topo_is_inplace_or_disabled_siso(prev_module_ptr))
+      gen_topo_module_t *prev_module_ptr = (gen_topo_module_t *)cur_in_port_ptr->gu.conn_out_port_ptr->cmn.module_ptr;
+      if (!gen_topo_is_inplace_or_disabled_siso(prev_module_ptr))
       {
          return NULL;
       }
@@ -74,17 +76,17 @@ GEN_CNTR_STATIC gen_cntr_ext_in_port_t *thin_topo_is_inplace_nblc_from_cur_in_to
       {
          /** unexpected, didnt reach the external input portential issue with NBLC assignment */
          GEN_CNTR_MSG(log_id,
-                     DBG_ERROR_PRIO,
-                     " Potential issue with NBLC assignment, reached unexpected external input (MIID,PID)(0x%lx,0x%lx)",
-                     cur_in_port_ptr->gu.cmn.module_ptr->module_instance_id,
-                     cur_in_port_ptr->gu.cmn.id);
+                      DBG_ERROR_PRIO,
+                      " Potential issue with NBLC assignment, reached unexpected external input "
+                      "(MIID,PID)(0x%lx,0x%lx)",
+                      cur_in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                      cur_in_port_ptr->gu.cmn.id);
          return NULL;
       }
    }
 
    return (gen_cntr_ext_in_port_t *)nblc_start_ptr->gu.ext_in_port_ptr;
 }
-
 
 GEN_CNTR_STATIC ar_result_t thin_topo_reset_ext_in_pass_thru_upstream_buf_flag(gen_cntr_t             *me_ptr,
                                                                                gen_cntr_ext_in_port_t *ext_in_port_ptr,
@@ -128,7 +130,20 @@ GEN_CNTR_STATIC ar_result_t thin_topo_reset_ext_in_pass_thru_upstream_buf_flag(g
 }
 
 /**
- * Module is active if it and its ports are started + capi etc are created.
+ * Module activeness is checked to see if a module process needs to be called in thin topo context.
+ *
+ * Note that the main difference between thin topo' and gen topo's version of module activeness check if
+ * data flow state. todo: Potentially these two functions can be merged in future.
+ *
+ * A module is considered active if,
+ * 1. Its SG is started
+ * 2. If atleast one input && one output is trigger is satisifed. port trigger is considered satisfied only
+ *    if port is STARTED && Data flow started && has valid MF.
+ * 3. If source module's input port triggers are considered satified by default.
+ * 4. If sink module's output port triggers are considered satified by default.
+ * 5. If STM module's is always considered active.
+ * 6. If a module is disabled and has the bypass ptr set. In that case module is considered bypassed.
+ * 7. If its a fwk module i.e capi_ptr is NULL. in that case module will be considered as bypassed.
  */
 GEN_CNTR_STATIC bool_t thin_topo_is_module_active(gen_topo_module_t *module_ptr, bool_t need_to_ignore_state)
 {
@@ -166,19 +181,14 @@ GEN_CNTR_STATIC bool_t thin_topo_is_module_active(gen_topo_module_t *module_ptr,
          // If the input port is not started or doesn't have a buffer (media-fmt prop didn't happen)
          // then process cannot be called on the module.
          if ((TOPO_PORT_STATE_STARTED != in_port_ptr->common.state) ||
-             (TOPO_DATA_FLOW_STATE_AT_GAP ==
-              in_port_ptr->common.data_flow_state))
-         {
-            continue;
-         }
-         else if (FALSE == in_port_ptr->common.flags.is_mf_valid)
+             (FALSE == in_port_ptr->common.flags.is_mf_valid) ||
+             (TOPO_DATA_FLOW_STATE_AT_GAP == in_port_ptr->common.data_flow_state))
          {
             continue;
          }
          else
          {
             atleast_one_input_trigger_satisfied = TRUE;
-            break;
          }
       }
 
@@ -188,12 +198,7 @@ GEN_CNTR_STATIC bool_t thin_topo_is_module_active(gen_topo_module_t *module_ptr,
          gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
 
          if ((TOPO_PORT_STATE_STARTED != out_port_ptr->common.state) ||
-             (TOPO_DATA_FLOW_STATE_AT_GAP ==
-              out_port_ptr->common.data_flow_state))
-         {
-            continue;
-         }
-         else if (FALSE == out_port_ptr->common.flags.is_mf_valid)
+             (FALSE == out_port_ptr->common.flags.is_mf_valid))
          {
             continue;
          }
@@ -235,9 +240,9 @@ GEN_CNTR_STATIC ar_result_t thin_topo_replace_with_topo_buffer(gen_cntr_t       
 
    // internally mem needed for topo_buf_mgr_element_t is counted.
    // Also ref count is initialized to 1.
-   int8_t     *prev_ptr             = cmn_port_ptr->bufs_ptr[0].data_ptr;
-   uint32_t    prev_buf_origin      = cmn_port_ptr->flags.buf_origin;
-   int8_t     *new_ptr              = NULL;
+   int8_t  *prev_ptr        = cmn_port_ptr->bufs_ptr[0].data_ptr;
+   uint32_t prev_buf_origin = cmn_port_ptr->flags.buf_origin;
+   int8_t  *new_ptr         = NULL;
 
    ar_result_t result = topo_buf_manager_get_buf(&me_ptr->topo, &new_ptr, cmn_port_ptr->max_buf_len);
    if (NULL == new_ptr)
@@ -299,7 +304,8 @@ GEN_CNTR_STATIC ar_result_t thin_topo_replace_with_topo_buffer(gen_cntr_t       
 }
 
 /** Free buffers at the ports without any data */
-GEN_CNTR_STATIC ar_result_t thin_topo_return_assigned_port_buffers(gen_cntr_t *me_ptr, bool_t force_free_buffers_with_data)
+GEN_CNTR_STATIC ar_result_t thin_topo_return_assigned_port_buffers(gen_cntr_t *me_ptr,
+                                                                   bool_t      force_free_buffers_with_data)
 {
    gu_module_list_t *module_list_ptr = me_ptr->topo.started_sorted_module_list_ptr;
 
@@ -537,7 +543,7 @@ ar_result_t gen_cntr_switch_from_thin_topo_to_gen_topo_during_process(gen_cntr_t
    TRY(result, gen_cntr_prepare_remaining_ext_inputs_before_switch(me_ptr));
 
    // if thin topo exited at/before setting up ext inputs, it needs to setup remaining output ports as well.
-   if (topo_ptr->thin_topo_ptr->state <= THIN_TOPO_EXITED_AT_EXT_OUT_BUFFER_SETUP)
+   if (topo_ptr->thin_topo_ptr->state <= THIN_TOPO_EXITED_AT_EXT_IN_BUFFER_SETUP)
    {
       gen_cntr_st_prepare_output_buffers(me_ptr);
    }
@@ -557,7 +563,7 @@ ar_result_t gen_cntr_switch_from_thin_topo_to_gen_topo_during_process(gen_cntr_t
    // necessary for gen topo any more.
    topo_buf_manager_destroy_all_unused_buffers(topo_ptr, TRUE);
 
-   topo_ptr->thin_topo_ptr->rest_of_module_proc_list_ptr = NULL;
+   topo_ptr->thin_topo_ptr->gen_topo_proc_next_module_list_ptr = NULL;
 
    cu_set_handler_for_bit_mask(&me_ptr->cu, GEN_CNTR_TIMER_BIT_MASK, gen_cntr_signal_trigger);
 
@@ -593,6 +599,11 @@ ar_result_t gen_cntr_switch_to_thin_topo_util_(gen_cntr_t *me_ptr)
 
    CATCH(result, GEN_CNTR_MSG_PREFIX, topo_ptr->gu.log_id)
    {
+      GEN_CNTR_MSG(topo_ptr->gu.log_id,
+                   DBG_HIGH_PRIO,
+                   "Failed switching to Thin Topo exit_flags:0x%lX result 0x%lx",
+                   me_ptr->topo.exit_flags.word,
+                   result);
    }
 
    return result;
@@ -676,8 +687,7 @@ ar_result_t thin_topo_update_process_info(gen_cntr_t *me_ptr)
    {
       TOPO_MSG(topo_ptr->gu.log_id,
                DBG_ERROR_PRIO,
-               " Started sorted order is not updated yet, unable to assign topo buffers",
-               topo_ptr->started_sorted_module_list_ptr);
+               "Started sorted order is not updated yet, unable to assign topo buffers");
       return AR_EFAILED;
    }
 
@@ -685,6 +695,8 @@ ar_result_t thin_topo_update_process_info(gen_cntr_t *me_ptr)
    TRY(result, thin_topo_return_assigned_port_buffers(me_ptr, TRUE /* flag: need to drop data*/));
 
    thin_topo_reset_handle(topo_ptr, FALSE);
+
+   topo_buf_manager_reset_static_assignment_list(topo_ptr);
 
    gu_module_list_t *module_list_ptr = topo_ptr->started_sorted_module_list_ptr;
 
@@ -720,13 +732,14 @@ ar_result_t thin_topo_update_process_info(gen_cntr_t *me_ptr)
          gen_cntr_ext_in_port_t  *nblc_start_ext_in_port_ptr = NULL;
          gen_cntr_ext_out_port_t *nblc_end_ext_out_port_ptr  = NULL;
 
+#ifdef VERBOSE_DEBUGGING
          TOPO_MSG(topo_ptr->gu.log_id,
-                  DBG_HIGH_PRIO,
+                  DBG_LOW_PRIO,
                   "Module 0x%lX: Input port id 0x%lx, port_state %lu, check and assign topo buffers",
                   module_ptr->gu.module_instance_id,
                   in_port_ptr->gu.cmn.id,
                   in_port_ptr->common.state);
-
+#endif
          // reset pass_thru_upstream_buffer flag in ext in ports
          if (in_port_ptr->gu.ext_in_port_ptr)
          {
@@ -811,14 +824,16 @@ ar_result_t thin_topo_update_process_info(gen_cntr_t *me_ptr)
       {
          gen_topo_output_port_t  *out_port_ptr     = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
          gen_topo_input_port_t   *next_in_port_ptr = (gen_topo_input_port_t *)out_port_ptr->gu.conn_in_port_ptr;
-         gen_cntr_ext_out_port_t *nblc_end_ext_out_port_ptr  = NULL;
+         gen_cntr_ext_out_port_t *nblc_end_ext_out_port_ptr = NULL;
 
+#ifdef VERBOSE_DEBUGGING
          TOPO_MSG(topo_ptr->gu.log_id,
                   DBG_HIGH_PRIO,
                   "Module 0x%lX: Output port id 0x%lx, port_state %lu, check and assign topo buffers",
                   module_ptr->gu.module_instance_id,
                   out_port_ptr->gu.cmn.id,
                   out_port_ptr->common.state);
+#endif
 
          /* return existing topo buffer*/
          out_port_ptr->common.flags.force_return_buf = TRUE;
@@ -895,6 +910,29 @@ ar_result_t thin_topo_update_process_info(gen_cntr_t *me_ptr)
                                        "buffer assignment cmd");
 #endif
       }
+
+      // ideally after process this particular module will not have any data in inputs, so can be reused for the next
+      // modules output. Note that next module input will use the current modules output always.
+      for (gu_input_port_list_t *in_port_list_ptr = module_ptr->gu.input_port_list_ptr; (NULL != in_port_list_ptr);
+           LIST_ADVANCE(in_port_list_ptr))
+      {
+         gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
+
+         if (GEN_TOPO_BUF_ORIGIN_BUF_MGR == in_port_ptr->common.flags.buf_origin)
+         {
+#ifdef VERBOSE_DEBUGGING
+            GEN_CNTR_MSG(topo_ptr->gu.log_id,
+                         DBG_LOW_PRIO,
+                         "Module 0x%lX: port id 0x%lx, return buf 0x%p statically assigned free list",
+                         module_ptr->gu.module_instance_id,
+                         in_port_ptr->gu.cmn.id,
+                         in_port_ptr->common.bufs_ptr[0].data_ptr);
+#endif
+            // add input buffer to the temp free list for the downstream modules to use.
+            topo_buf_manager_static_buf_assign_add_buf_to_temp_free_list(topo_ptr,
+                                                                         in_port_ptr->common.bufs_ptr[0].data_ptr);
+         }
+      }
    }
 
    for (gu_ext_in_port_list_t *ext_in_port_list_ptr = topo_ptr->gu.ext_in_port_list_ptr; ext_in_port_list_ptr;
@@ -964,6 +1002,8 @@ ar_result_t thin_topo_update_process_info(gen_cntr_t *me_ptr)
    // destory any unused buffers in the topo buf manager list
    topo_buf_manager_destroy_all_unused_buffers(topo_ptr, TRUE);
 
+   topo_buf_manager_reset_static_assignment_list(topo_ptr);
+
    CATCH(result, TOPO_MSG_PREFIX, topo_ptr->gu.log_id)
    {
       thin_topo_reset_handle(topo_ptr, TRUE);
@@ -979,7 +1019,8 @@ ar_result_t thin_topo_handle_fwk_events(gen_cntr_t                 *me_ptr,
                                         cu_event_flags_t           *fwk_event_flag_ptr)
 {
    gen_topo_t *topo_ptr = &me_ptr->topo;
-
+   ar_result_t result   = AR_EOK;
+   INIT_EXCEPTION_HANDLING
    GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
                 DBG_LOW_PRIO,
                 "Handling events, fwk events 0x%lX, capi events 0x%lX state %ld",
@@ -989,8 +1030,9 @@ ar_result_t thin_topo_handle_fwk_events(gen_cntr_t                 *me_ptr,
 
    if (check_if_cntr_is_processing_with_thin_topo(topo_ptr)) // check if currently thin topo
    {
-      // check if thin topo needs to be exited
-      if (check_if_needed_to_exit_thin_topo(topo_ptr))
+      // check if thin topo needs to be exited, if graph is getting stopped started module list will be NULL
+      // hence need to be switched to gen topo as well.
+      if (check_if_needed_to_exit_thin_topo(topo_ptr) || (NULL == topo_ptr->started_sorted_module_list_ptr))
       {
          GEN_CNTR_MSG(topo_ptr->gu.log_id,
                       DBG_HIGH_PRIO,
@@ -999,12 +1041,17 @@ ar_result_t thin_topo_handle_fwk_events(gen_cntr_t                 *me_ptr,
 
          // there could be EOS metadata due to a port stop cmd, hence we cannot drop data. otherwise
          // there wouldn't be any partial data left from thin topo.
-         TRY(result, thin_topo_return_assigned_port_buffers(me_ptr, FALSE /* flag: need to drop data*/));
+         bool_t drop_pending_data = (NULL == topo_ptr->started_sorted_module_list_ptr);
+         TRY(result, thin_topo_return_assigned_port_buffers(me_ptr, drop_pending_data));
 
          cu_set_handler_for_bit_mask(&me_ptr->cu, GEN_CNTR_TIMER_BIT_MASK, gen_cntr_signal_trigger);
          thin_topo_reset_handle(topo_ptr, FALSE);
 
          topo_ptr->thin_topo_ptr->state = THIN_TOPO_SWITCHED_TO_GEN_TOPO;
+
+         // destory any unused buffers in the topo buf manager list, which might have been allocated in thin topo but
+         // not necessary for gen topo any more.
+         topo_buf_manager_destroy_all_unused_buffers(topo_ptr, TRUE);
       }
       // check if thin topo process info needs to be updated because of an event/cmd
       else if (fwk_event_flag_ptr->port_state_change || fwk_event_flag_ptr->sg_state_change ||
@@ -1030,5 +1077,41 @@ ar_result_t thin_topo_handle_fwk_events(gen_cntr_t                 *me_ptr,
 #endif
    }
 
-   return AR_EOK;
+   CATCH(result, GEN_CNTR_MSG_PREFIX, topo_ptr->gu.log_id)
+   {
+   }
+
+   return result;
+}
+
+gu_module_list_t *thin_topo_get_gen_topo_module_list_ptr(gen_topo_t *topo_ptr, gu_module_t *gu_module_ptr)
+{
+   if (NULL == gu_module_ptr)
+   {
+      return NULL;
+   }
+
+   // search and get the list pointer of the module from gen topo list.
+   gu_module_list_t *temp_module_list_ptr = (gu_module_list_t *)topo_ptr->started_sorted_module_list_ptr;
+   while (temp_module_list_ptr)
+   {
+      if (temp_module_list_ptr->module_ptr == gu_module_ptr)
+      {
+         GEN_CNTR_MSG(topo_ptr->gu.log_id,
+                      DBG_LOW_PRIO,
+                      "Found MID:0x%lx list ptr 0x%lx from gen topo list",
+                      gu_module_ptr->module_instance_id,
+                      temp_module_list_ptr);
+         return temp_module_list_ptr;
+      }
+
+      LIST_ADVANCE(temp_module_list_ptr);
+   }
+
+   GEN_CNTR_MSG(topo_ptr->gu.log_id,
+                DBG_ERROR_PRIO,
+                "Could not find MID:0x%lx list ptr from gen topo list",
+                gu_module_ptr->module_instance_id);
+
+   return NULL;
 }

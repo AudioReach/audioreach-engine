@@ -597,6 +597,19 @@ ar_result_t topo_buf_manager_get_buf(gen_topo_t *topo_ptr, int8_t **buf_pptr, ui
 
    *buf_pptr = NULL;
 
+   // check if there is any buffer available in the static assigment helper list.
+   // this list can contain buffer only in the ctrl context where static buffers are being assigned. Currently
+   // valid only in the context of thin topo buffer assignment.
+   if (topo_ptr->buf_mgr.opt_static_buf_assign_temp_list_ptr)
+   {
+      topo_buf_manager_check_static_buf_assign_temp_list(topo_ptr, buf_pptr, buf_size);
+      if (*buf_pptr)
+      {
+         // buffer found
+         return AR_EOK;
+      }
+   }
+
    /* The buffer list is sorted in ascending order, so break on finding the buffer greater than or equal to
       requested size. */
    buf_mgr_list_ptr = topo_ptr->buf_mgr.head_node_ptr;
@@ -608,7 +621,8 @@ ar_result_t topo_buf_manager_get_buf(gen_topo_t *topo_ptr, int8_t **buf_pptr, ui
 #ifdef TOPO_BUF_MGR_DEBUG
          TBF_MSG(topo_ptr->gu.log_id,
                  DBG_HIGH_PRIO,
-                 "topo_buf_manager_get_buf: buffer a found closest to requested size: %lu closest buf size: %lu",
+                 "topo_buf_manager_get_buf: found a buffer 0x%p closest to requested size: %lu closest buf size: %lu",
+                 buf_element_ptr,
                  buf_size,
                  buf_element_ptr->size);
 #endif

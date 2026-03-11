@@ -121,12 +121,12 @@ static inline void thin_topo_count_and_decr_active_md_nodes(gen_topo_t *topo_ptr
    }
 }
 
-static inline void thin_topo_check_get_start_module(gen_topo_t *topo_ptr, gu_module_list_t **start_module_list_pptr)
+static inline void thin_topo_check_get_gen_topo_next_proc_module(gen_topo_t *topo_ptr, gu_module_list_t **start_module_list_pptr)
 {
    // get the rest of module proc list ptr if the gen topo is called from the thin topo's exit context
    if (topo_ptr->thin_topo_ptr && (THIN_TOPO_SWITCHED_TO_GEN_TOPO != topo_ptr->thin_topo_ptr->state))
    {
-      *start_module_list_pptr = topo_ptr->thin_topo_ptr->rest_of_module_proc_list_ptr;
+      *start_module_list_pptr = topo_ptr->thin_topo_ptr->gen_topo_proc_next_module_list_ptr;
    }
 }
 
