@@ -42,7 +42,8 @@ typedef struct apm_offload_utils_vtable
 
    ar_result_t (*apm_offload_master_memorymap_register_fptr)(uint32_t mem_map_client,
                                                              uint32_t master_handle,
-                                                             uint32_t mem_size);
+                                                             uint32_t mem_size,
+                                                             uint32_t heap_mgr_type);
 
    ar_result_t (*apm_offload_master_memorymap_check_deregister_fptr)(uint32_t master_handle);
 

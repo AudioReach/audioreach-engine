@@ -292,16 +292,34 @@ static ar_result_t apm_mem_shared_memory_map_regions_cmd_handler(uint32_t      m
       // register here. is_loaned field will be false on the satellite, that's how we'll avoid heap creation there
       if (is_mem_loaned && is_offset_map)
       {
+
          /** Get the pointer to ext utils vtbl   */
-         apm_ext_utils_t *ext_utils_ptr = apm_get_ext_utils_ptr();
+         apm_ext_utils_t *ext_utils_ptr   = apm_get_ext_utils_ptr();
+         uint32_t         heap_mngr_type  = APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_DEFAULT;
+         posal_heap_t     heap_mgr_type_i = POSAL_HEAP_NON_ISLAND;
+
+         heap_mngr_type = (uint32_t)(
+            (common_mem_map_region_payload.property_flag & APM_MEMORY_MAP_BIT_MASK_LOANED_MEMORY_HEAP_MNGR_TYPE) >>
+            APM_MEMORY_MAP_SHIFT_LOANED_MEMORY_HEAP_MNGR_TYPE);
+
+         if (APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_DEFAULT == heap_mngr_type)
+         {
+            heap_mgr_type_i = POSAL_HEAP_NON_ISLAND;
+         }
+         else if (APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_DEFAULT == heap_mngr_type)
+         {
+            heap_mgr_type_i = POSAL_HEAP_NON_ISLAND_SAFE_HEAP;
+         }
 
          if (ext_utils_ptr->offload_vtbl_ptr &&
              ext_utils_ptr->offload_vtbl_ptr->apm_offload_master_memorymap_register_fptr)
          {
-            if (AR_EOK != (result = ext_utils_ptr->offload_vtbl_ptr
-                                       ->apm_offload_master_memorymap_register_fptr(mem_map_client,
-                                                                                    mem_map_handle,
-                                                                                    phy_regions[0].mem_size)))
+            if (AR_EOK !=
+                (result =
+                    ext_utils_ptr->offload_vtbl_ptr->apm_offload_master_memorymap_register_fptr(mem_map_client,
+                                                                                                mem_map_handle,
+                                                                                                phy_regions[0].mem_size,
+																								heap_mgr_type_i)))
             {
                AR_MSG(DBG_ERROR_PRIO,
                       "MDF: Failed to register Loaned Master memory, Handle 0x%lx of size %lu",
