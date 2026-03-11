@@ -858,6 +858,9 @@ void *apm_offload_memory_malloc(uint32_t sat_domain_id, uint32_t req_size, apm_o
 
    sat_info_t *sat_book_ptr = NULL;
 
+   // update the size to align the size to cache line
+   req_size  =  req_size + (APM_OFFLOAD_MEM_ALIGNMENT_BYTES  - req_size % APM_OFFLOAD_MEM_ALIGNMENT_BYTES);
+
    posal_mutex_lock(g_offload_mem_mgr.map_mutex);
    sat_book_ptr = &(g_offload_mem_mgr.sat_book[sat_domain_remap_list_index][0]);
 
