@@ -394,8 +394,8 @@ ar_result_t cu_register_with_pm(cu_base_t *me_ptr, bool_t is_duty_cycling_allowe
 
    CU_MSG(me_ptr->gu_ptr->log_id,
           DBG_HIGH_PRIO,
-          " Duty cycling enabled is : %d (0-FALSE, 1-TRUE)",
-          (int)is_duty_cycling_allowed);
+          "Duty cycling enabled is : %d (0-FALSE, 1-TRUE), container IID:0x%x", 
+          (int)is_duty_cycling_allowed, me_ptr->gu_ptr->container_instance_id);
 
    /* *
     * pm_already_registered 	is_duty_cycling_allowed		PM_MODE 		Outcome
@@ -432,7 +432,7 @@ ar_result_t cu_register_with_pm(cu_base_t *me_ptr, bool_t is_duty_cycling_allowe
    return posal_power_mgr_register(me_ptr->pm_info.register_info,
                                    &me_ptr->pm_info.pm_handle_ptr,
                                    me_ptr->gp_signal_ptr,
-                                   me_ptr->gu_ptr->log_id);
+                                   me_ptr->gu_ptr->container_instance_id);
 }
 
 ar_result_t cu_deregister_with_pm(cu_base_t *me_ptr)
