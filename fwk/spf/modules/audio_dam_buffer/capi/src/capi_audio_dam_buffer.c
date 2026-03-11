@@ -1401,7 +1401,8 @@ capi_err_t capi_audio_dam_buffer_set_param_non_island(capi_t                 *ca
                         }
 
                         // Fallback to regular mode, since virtual writer client is being stopped/closed
-                        if (audio_dam_driver_is_virtual_writer_mode(
+                        if (is_dam_output_port_initialized(me_ptr, op_arr_idx) &&
+                             audio_dam_driver_is_virtual_writer_mode(
                                me_ptr->out_port_info_arr[op_arr_idx].strm_reader_ptr))
                         {
                            capi_check_and_reinit_output_port(me_ptr,
