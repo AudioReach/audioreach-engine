@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -1599,6 +1599,13 @@ ar_result_t apm_set_cmd_seq_func(apm_t *apm_info_ptr)
       {
          /** Offload memory map handling is not the part of default
           *  sequencer and is handled separately. */
+         break;
+      }
+      case APM_CMD_SHARED_MEM_MAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_UNMAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_REGION_ACCESS_INFO:
+      {
+         /** Shared memory handling V2 is not part of the default sequencer. */
          break;
       }
       default:

@@ -9,7 +9,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -34,7 +34,7 @@ extern "C" {
   ar_result_t to indicate success or failure.
 
 */
-ar_result_t apm_offload_global_mem_mgr_init(POSAL_HEAP_ID heap_id);
+ar_result_t apm_offload_global_mem_mgr_init_v1(POSAL_HEAP_ID heap_id);
 
 /**
   Initializes the global structure and destroys the mutex
@@ -45,7 +45,7 @@ ar_result_t apm_offload_global_mem_mgr_init(POSAL_HEAP_ID heap_id);
   ar_result_t to indicate success or failure.
 
 */
-ar_result_t apm_offload_global_mem_mgr_deinit();
+ar_result_t apm_offload_global_mem_mgr_deinit_v1();
 
 /**
   Records the satellite Memory Map Handle along with the association to
@@ -158,6 +158,30 @@ uint32_t apm_offload_get_va_offset_from_sat_handle(uint32_t sat_domain_id, uint3
   Utility function to reset the memory manager
 ========================================================================== */
 ar_result_t apm_offload_mem_mgr_reset(void);
+
+
+ar_result_t apm_offload_mem_mgr_reset_v1(void);
+
+ar_result_t apm_offload_mem_mgr_reset_v2(void);
+
+void *apm_offload_memory_malloc_v1(uint32_t sat_domain_id, uint32_t req_size, apm_offload_ret_info_t *ret_info_ptr);
+
+void *apm_offload_memory_malloc_v2(uint32_t                peer_proc_domain_id,
+                                   uint32_t                req_size,
+                                   apm_offload_ret_info_t *ret_info_ptr);
+
+void apm_offload_memory_free_v1(apm_offload_ret_info_t *shmem_info_ptr);
+
+void apm_offload_memory_free_v2(apm_offload_ret_info_t *ret_info_ptr);
+
+uint32_t apm_offload_get_persistent_sat_handle_v1(uint32_t sat_domain_id, uint32_t master_handle);
+
+uint32_t apm_offload_get_persistent_sat_handle_v2(uint32_t sat_domain_id, uint32_t master_handle);
+
+ar_result_t apm_offload_global_mem_mgr_init_v2(POSAL_HEAP_ID heap_id);
+
+ar_result_t apm_offload_global_mem_mgr_deinit_v2();
+
 
 #ifdef __cplusplus
 }

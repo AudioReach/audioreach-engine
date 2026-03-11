@@ -10,7 +10,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -34,15 +34,17 @@ extern "C" {
 
 struct apm_offload_ret_info_t
 {
-   uint32_t master_handle;
+   bool_t is_handle_type_v2; // indicates if the memory is allocated from region mapped with v2/v1
 
-   uint32_t sat_handle;
+   uint32_t master_handle; // if allocated from v2 region its unique shm id, other wise mem map handle
+
+   uint32_t sat_handle; // if allocated from v2 region its unique shm id, other wise satellite's mem map handle
 
    uint32_t offset; /*will be the same for both master and slave*/
 
    uint32_t heap_id; /* specifies the heap_id */
 
-   void *ret_ptr;  /* memory pointer allocator */
+   void *ret_ptr; /* memory pointer allocator */
 };
 
 typedef struct apm_offload_ret_info_t apm_offload_ret_info_t;

@@ -31,6 +31,7 @@ include_directories(
                     ../ext/sys_util/inc
                     ../../amdb/ext/inc
                     ../ext/multi_client/inc
+                    ../ext/shared_mem/src
                    )
 
 #Add the sub directories

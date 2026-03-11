@@ -1572,6 +1572,12 @@ static ar_result_t apm_deallocate_cmd_ctrl_obj(apm_t *apm_info_ptr, apm_cmd_ctrl
 
          break;
       }
+      case APM_CMD_SHARED_MEM_MAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_UNMAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_REGION_ACCESS_INFO:
+      {
+         break;
+      }
       default:
       {
          AR_MSG(DBG_ERROR_PRIO, "apm_deallocate_cmd_ctrl_obj(), Unsupported cmd_opcode[0x%lX]", cmd_opcode);
