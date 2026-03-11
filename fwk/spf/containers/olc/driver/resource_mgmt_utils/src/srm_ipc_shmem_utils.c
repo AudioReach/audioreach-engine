@@ -54,9 +54,9 @@ ar_result_t sgm_shmem_free(sgm_shmem_handle_t *shmem)
    }
 
    // check if the mdf shared memory is a valid memory
-   if (NULL != shmem->shm_mem_ptr)
+   if ((NULL != shmem->shm_mem_ptr) && (NULL != shmem->mem_attr.ret_ptr))
    {
-      apm_offload_memory_free(shmem->shm_mem_ptr);
+      apm_offload_memory_free(&shmem->mem_attr);
    }
 
    // reset the shared memory handle

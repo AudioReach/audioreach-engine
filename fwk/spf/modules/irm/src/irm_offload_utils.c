@@ -36,7 +36,7 @@ ar_result_t irm_clean_up_proc_id_cmd_ctrl(irm_t *irm_ptr, uint32_t proc_domain_i
             __gpr_cmd_end_command(cmd_gpr_payload_ptr, AR_EFAILED); // send fail response to master's client
             if (NULL != cur_cmd_ctrl_ptr->loaned_mem_ptr)
             {
-               apm_offload_memory_free(cur_cmd_ctrl_ptr->loaned_mem_ptr);
+               apm_offload_memory_free(&cur_cmd_ctrl_ptr->ret_info);
             }
             LIST_ADVANCE(list_ptr); // advance the list before deleting it
             result |= irm_clear_cmd_ctrl(irm_ptr, cur_cmd_ctrl_ptr);
@@ -279,8 +279,7 @@ ar_result_t irm_route_cmd_to_satellite(irm_t     *irm_ptr,
    if (is_out_of_band)
    {
       irm_payload_size = new_apm_header_ptr->payload_size;
-      apm_offload_ret_info_t ret_info;
-      curr_cmd_ctrl_ptr->loaned_mem_ptr = (void *)apm_offload_memory_malloc(dst_domain_id, irm_payload_size, &ret_info);
+      curr_cmd_ctrl_ptr->loaned_mem_ptr = (void *)apm_offload_memory_malloc(dst_domain_id, irm_payload_size, &curr_cmd_ctrl_ptr->ret_info);
 
       if (NULL == curr_cmd_ctrl_ptr->loaned_mem_ptr)
       {
@@ -297,11 +296,11 @@ ar_result_t irm_route_cmd_to_satellite(irm_t     *irm_ptr,
              "Copied payload of size %lu, into loaned mem for sat ID %lu. Sat mem handle is %lu",
              irm_payload_size,
              dst_domain_id,
-             ret_info.sat_handle);
+			 curr_cmd_ctrl_ptr->ret_info.sat_handle);
 #endif
       // replace the mem handle with the sat handle
-      new_apm_header_ptr->mem_map_handle      = ret_info.sat_handle;
-      new_apm_header_ptr->payload_address_lsw = ret_info.offset; // offset mode mapped
+      new_apm_header_ptr->mem_map_handle      = curr_cmd_ctrl_ptr->ret_info.sat_handle;
+      new_apm_header_ptr->payload_address_lsw = curr_cmd_ctrl_ptr->ret_info.offset; // offset mode mapped
       new_apm_header_ptr->payload_address_msw = 0;
       curr_cmd_ctrl_ptr->is_out_of_band       = TRUE;
    }
@@ -318,7 +317,7 @@ __bailout_route_cmd_2:
    __gpr_cmd_free(new_cmd_gpr_ptr);
    if (NULL != curr_cmd_ctrl_ptr->loaned_mem_ptr)
    {
-      apm_offload_memory_free(curr_cmd_ctrl_ptr->loaned_mem_ptr);
+      apm_offload_memory_free(&curr_cmd_ctrl_ptr->ret_info);
    }
 __bailout_route_cmd_1:
    // Note: caller responds to the client
@@ -410,7 +409,7 @@ __bailout_set_cfg_cmd_2:
    __gpr_cmd_free(new_cmd_gpr_ptr);
    if (NULL != curr_cmd_ctrl_ptr->loaned_mem_ptr)
    {
-      apm_offload_memory_free(curr_cmd_ctrl_ptr->loaned_mem_ptr);
+      apm_offload_memory_free(&curr_cmd_ctrl_ptr->ret_info);
    }
 __bailout_set_cfg_cmd_1:
    // Note: caller responds to the client
@@ -477,7 +476,7 @@ ar_result_t irm_route_basic_rsp_to_client(irm_t *irm_ptr, spf_msg_t *msg_ptr)
       __gpr_cmd_end_command(cmd_gpr_payload_ptr, result); // send response to master's client
       if (NULL != ctrl_obj_ptr->loaned_mem_ptr)
       {
-         apm_offload_memory_free(ctrl_obj_ptr->loaned_mem_ptr);
+         apm_offload_memory_free(&ctrl_obj_ptr->ret_info);
       }
    }
    else
@@ -643,7 +642,7 @@ ar_result_t irm_route_get_cfg_rsp_to_client(irm_t *irm_ptr, spf_msg_t *msg_ptr)
          __gpr_cmd_free(cmd_gpr_payload_ptr); // send response to master's client
          if (NULL != ctrl_obj_ptr->loaned_mem_ptr)
          {
-            apm_offload_memory_free(ctrl_obj_ptr->loaned_mem_ptr);
+            apm_offload_memory_free(&ctrl_obj_ptr->ret_info);
          }
       }
       else

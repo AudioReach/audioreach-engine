@@ -83,7 +83,7 @@ extern "C" {
 #define HEAP_TABLE_INDEX_FROM_HEAP_ID(actual_heap_id) (actual_heap_id - POSAL_HEAP_MGR_HEAP_INDEX_START)
 
 
-//#define ENABLE_SAFE_HEAP  1
+//#define SAFE_HEAP_MGR_SUPPORTED
 
 // Specific memory alignment is not needed, alignment requirement is zero
 #define POSAL_MEM_ALIGN_UNSPECIFIED 0
@@ -191,6 +191,21 @@ void *posal_memory_aligned_malloc(uint32_t unBytes, uint32_t unAlignBits, POSAL_
   @newpage
 */
 void posal_memory_aligned_free(void *ptr);
+
+/**
+  Frees memory that was allocated only with posal_memory_aligned_malloc().
+
+  @param[in] ptr - Pointer to the aligned memory to free.
+  @param[in] heapId ID of the heap from which to allocate memory.
+
+  @return
+  None.
+
+  @dependencies
+  Before calling this function, the object must be created and initialized.
+  @newpage
+*/
+void posal_memory_aligned_free_v2(void *ptr, POSAL_HEAP_ID heapId);
 
 /**
   Determines if memory allocated was from Island heap id (TCM).

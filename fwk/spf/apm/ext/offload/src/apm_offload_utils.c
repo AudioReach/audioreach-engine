@@ -81,41 +81,41 @@ ar_result_t apm_search_in_sat_prv_peer_cfg_for_miid(uint8_t * sat_prv_cfg_ptr,
 apm_offload_utils_vtable_t offload_util_funcs =
    {.apm_offload_shmem_cmd_handler_fptr = apm_offload_shmem_cmd_handler,
 
-    .apm_offload_basic_rsp_handler_fptr = apm_offload_basic_rsp_handler,
+   .apm_offload_basic_rsp_handler_fptr = apm_offload_basic_rsp_handler,
 
-    .apm_offload_master_memorymap_register_fptr = apm_offload_master_memorymap_register,
+   .apm_offload_master_memorymap_register_fptr = apm_offload_master_memorymap_register,
 
-    .apm_offload_master_memorymap_check_deregister_fptr = apm_offload_master_memorymap_check_deregister,
+   .apm_offload_master_memorymap_check_deregister_fptr = apm_offload_master_memorymap_check_deregister,
 
-    .apm_db_get_sat_contaniners_parent_cont_id_fptr = apm_db_get_sat_contaniners_parent_cont_id,
+   .apm_db_get_sat_contaniners_parent_cont_id_fptr = apm_db_get_sat_contaniners_parent_cont_id,
 
-    .apm_check_and_cache_satellite_container_config_fptr = apm_check_and_cache_satellite_container_config,
+   .apm_check_and_cache_satellite_container_config_fptr = apm_check_and_cache_satellite_container_config,
 
-    .apm_clear_cont_satellite_cont_list_fptr = apm_clear_cont_satellite_cont_list,
+   .apm_clear_cont_satellite_cont_list_fptr = apm_clear_cont_satellite_cont_list,
 
-    .apm_check_alloc_add_to_peer_domain_ctrl_list_fptr = apm_check_alloc_add_to_peer_domain_ctrl_list,
+   .apm_check_alloc_add_to_peer_domain_ctrl_list_fptr = apm_check_alloc_add_to_peer_domain_ctrl_list,
 
-    .apm_parse_imcl_peer_domain_info_list_fptr = apm_parse_imcl_peer_domain_info_list,
+   .apm_parse_imcl_peer_domain_info_list_fptr = apm_parse_imcl_peer_domain_info_list,
 
-    .apm_offload_get_ctrl_link_remote_peer_info_fptr = apm_offload_get_ctrl_link_remote_peer_info,
+   .apm_offload_get_ctrl_link_remote_peer_info_fptr = apm_offload_get_ctrl_link_remote_peer_info,
 
-    .apm_search_in_sat_prv_peer_cfg_for_miid_fptr = apm_search_in_sat_prv_peer_cfg_for_miid,
+   .apm_search_in_sat_prv_peer_cfg_for_miid_fptr = apm_search_in_sat_prv_peer_cfg_for_miid,
 
-    .apm_offload_handle_pd_info_fptr = apm_offload_handle_pd_info,
+   .apm_offload_handle_pd_info_fptr = apm_offload_handle_pd_info,
 
-    .apm_offload_send_master_pd_info_fptr = apm_offload_send_master_pd_info,
+   .apm_offload_send_master_pd_info_fptr = apm_offload_send_master_pd_info,
 
-    .apm_send_close_all_to_sat_fptr = apm_send_close_all_to_sat,
+   .apm_send_close_all_to_sat_fptr = apm_send_close_all_to_sat,
 
-    .apm_offload_sat_cleanup_fptr = apm_offload_sat_cleanup,
+   .apm_offload_sat_cleanup_fptr = apm_offload_sat_cleanup,
 
-    .apm_offload_is_master_pid_fptr = apm_offload_is_master_pid,
+   .apm_offload_is_master_pid_fptr = apm_offload_is_master_pid,
 
-    .apm_debug_info_cfg_hdlr_fptr = apm_send_debug_info_to_sat,
+   .apm_debug_info_cfg_hdlr_fptr = apm_send_debug_info_to_sat,
 
-    .apm_offload_mem_mgr_reset_fptr = apm_offload_mem_mgr_reset
+   .apm_offload_mem_mgr_reset_fptr = apm_offload_mem_mgr_reset
 
-   };
+};
 
 static apm_offload_utils_sat_pd_info_t g_apm_sat_pd_info = { 0 };
 
@@ -751,7 +751,7 @@ static ar_result_t apm_offload_handle_sat_pd_info(apm_t *apm_info_ptr, apm_modul
       apm_sys_util_vtable_t *sys_util_vtbl_ptr = apm_info_ptr->ext_utils.sys_util_vtbl_ptr;
       if (sys_util_vtbl_ptr && sys_util_vtbl_ptr->apm_sys_util_is_pd_info_available_fptr)
       {
-         if(FALSE == sys_util_vtbl_ptr->apm_sys_util_is_pd_info_available_fptr())
+         if (FALSE == sys_util_vtbl_ptr->apm_sys_util_is_pd_info_available_fptr())
          {
             goto __bailout_handle_sat_pd_info_1;
          }
@@ -788,8 +788,8 @@ __bailout_handle_sat_pd_info:
    if (apm_sat_pd_info_ptr->proc_domain_list)
    {
       posal_memory_free(apm_sat_pd_info_ptr->proc_domain_list);
-      apm_sat_pd_info_ptr->proc_domain_list     = NULL;
-	  apm_sat_pd_info_ptr->num_proc_domain_ids  = 0;
+      apm_sat_pd_info_ptr->proc_domain_list    = NULL;
+      apm_sat_pd_info_ptr->num_proc_domain_ids = 0;
    }
 __bailout_handle_sat_pd_info_1:
    return result;
@@ -859,15 +859,15 @@ ar_result_t apm_send_debug_info_to_sat(apm_t *apm_info_ptr)
    uint32_t                         size                = 0;
    uint8_t *                        payload             = NULL;
    apm_cmd_header_t *               cmd_header          = NULL;
-   apm_cmd_ctrl_t *  apm_cmd_ctrl_ptr = apm_info_ptr->curr_cmd_ctrl_ptr;
+   apm_cmd_ctrl_t *                 apm_cmd_ctrl_ptr    = apm_info_ptr->curr_cmd_ctrl_ptr;
 
    if (!apm_offload_is_master_pid())
    {
       return result;
    }
 
-   //If message is not pending to sat apm, no need to send the debug info.
-   if(!apm_cmd_ctrl_ptr->set_cfg_cmd_ctrl.debug_info.is_sattelite_debug_info_send_pending)
+   // If message is not pending to sat apm, no need to send the debug info.
+   if (!apm_cmd_ctrl_ptr->set_cfg_cmd_ctrl.debug_info.is_sattelite_debug_info_send_pending)
    {
       return result;
    }
@@ -918,8 +918,8 @@ ar_result_t apm_send_debug_info_to_sat(apm_t *apm_info_ptr)
          /** Fill module param data */
          apm_module_param_data_t *param_data = (apm_module_param_data_t *)(payload + sizeof(apm_cmd_header_t));
          param_data->module_instance_id      = APM_MODULE_INSTANCE_ID;
-         param_data->param_id = APM_PARAM_ID_PORT_MEDIA_FMT_REPORT_CFG;
-         param_data->param_size = sizeof(apm_param_id_port_media_fmt_report_cfg_enable_t);
+         param_data->param_id                = APM_PARAM_ID_PORT_MEDIA_FMT_REPORT_CFG;
+         param_data->param_size              = sizeof(apm_param_id_port_media_fmt_report_cfg_enable_t);
 
          apm_param_id_port_media_fmt_report_cfg_enable_t *master_enable_info_ptr =
             (apm_param_id_port_media_fmt_report_cfg_enable_t *)(param_data + 1);
@@ -943,8 +943,7 @@ ar_result_t apm_send_debug_info_to_sat(apm_t *apm_info_ptr)
          /** If at least 1 command issued to container, set the
           *  command response pending status */
          apm_cmd_ctrl_ptr->rsp_ctrl.cmd_rsp_pending = CMD_RSP_PENDING;
-         AR_MSG(DBG_HIGH_PRIO, "APM: sending debug info to sat successful for %lu", sat_proc_domain );
-
+         AR_MSG(DBG_HIGH_PRIO, "APM: sending debug info to sat successful for %lu", sat_proc_domain);
       }
    }
    return result;
@@ -1048,13 +1047,12 @@ ar_result_t apm_send_close_all_to_sat(apm_t *apm_info_ptr)
          ar_result_t   local_result    = AR_EOK;
          gpr_packet_t *gpr_pkt_ptr     = NULL;
          uint32_t      sat_proc_domain = apm_sat_pd_info_ptr->proc_domain_list[sat_pd_idx];
-		 
-         if (APM_PROC_DOMAIN_ID_CDSP == sat_proc_domain) 
+
+         if (APM_PROC_DOMAIN_ID_CDSP == sat_proc_domain)
          {
-             /* Close all is due to HLOS restart. */
-             AR_MSG(DBG_HIGH_PRIO,
-                    "APM: skipping sending close all to CDSP as dynamic PD restarts when HLOS restarts");
-             continue;
+            /* Close all is due to HLOS restart. */
+            AR_MSG(DBG_HIGH_PRIO, "APM: skipping sending close all to CDSP as dynamic PD restarts when HLOS restarts");
+            continue;
          }
 
          /** allocate the GPR packet to Send to satellite DSP */
@@ -1185,7 +1183,7 @@ ar_result_t apm_offload_basic_rsp_handler(apm_t *         apm_info_ptr,
                    curr_rsp_payload_ptr->opcode,
                    curr_rsp_payload_ptr->status);
          }
-		 __gpr_cmd_free(gpr_pkt_ptr);
+         __gpr_cmd_free(gpr_pkt_ptr);
          break;
       }
       default:

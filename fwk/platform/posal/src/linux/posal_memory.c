@@ -41,7 +41,7 @@ stack only
 ----------------------------------------------------------------------------------------------------------------------*/
 static inline void *posal_memory_malloc_inline(uint32_t unBytes, POSAL_HEAP_ID origheapId, bool_t track_mem_stats)
 {
-   void *        ptr            = NULL;
+   void *ptr = NULL;
 
    POSAL_HEAP_ID heapId         = GET_ACTUAL_HEAP_ID(origheapId);
    uint32_t      appended_bytes = unBytes;
@@ -227,7 +227,6 @@ void posal_memory_aligned_free_internal(void *ptr, bool_t track_mem_stats)
 
    /* Free the memory */
    posal_memory_free_internal(pTemp, track_mem_stats);
-
 }
 
 ar_result_t posal_memory_heapmgr_create(POSAL_HEAP_ID *heap_id_ptr,
@@ -261,4 +260,9 @@ void *posal_memory_aligned_malloc(uint32_t unBytes, uint32_t unAlignSize, POSAL_
 void posal_memory_aligned_free(void *ptr)
 {
    posal_memory_aligned_free_internal(ptr, TRACK_MEM_STATS_TRUE);
+}
+
+void posal_memory_aligned_free_v2(void *ptr, POSAL_HEAP_ID heapId)
+{
+   return posal_memory_aligned_free(ptr);
 }
