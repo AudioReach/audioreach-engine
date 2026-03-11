@@ -1188,6 +1188,7 @@ static ar_result_t olc_process_for_peer_cntr_delivery(olc_t *me_ptr, olc_ext_out
                                              out_actual_media_fmt,
                                              TRUE /*with header*/,
                                              me_ptr->cu.heap_id);
+            out_actual_media_fmt->fmt_id = media_ptr->main.fmt_id;
          }
          else
          {

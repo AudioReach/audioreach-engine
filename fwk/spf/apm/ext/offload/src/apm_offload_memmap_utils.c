@@ -672,7 +672,7 @@ ar_result_t apm_offload_unloaned_mem_deregister(uint32_t sat_domain_id, uint32_t
       return AR_EFAILED;
    }
    /*reset to INVALID VAL*/
-   APM_OFFLOAD_MEMSET(unloaned_book_ptr, sizeof(unloaned_map_t));
+   APM_OFFLOAD_MEMSET(&unloaned_book_ptr[idx], sizeof(unloaned_map_t));
    posal_mutex_unlock(g_offload_mem_mgr.map_mutex);
 
    AR_MSG(DBG_HIGH_PRIO,

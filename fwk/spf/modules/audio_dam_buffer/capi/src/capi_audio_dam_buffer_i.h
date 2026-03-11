@@ -148,8 +148,11 @@ typedef struct
    uint32_t is_peer_heap_id_valid;
    /* indicates if a valid heap ID is sent by a peer to this output, through IMCL */
 
+   uint32_t ftrt_unread_data_len_in_us;
+   uint32_t bytes_before_eos;
    POSAL_HEAP_ID peer_heap_id;
    /* Heap id received from IMCL peer*/
+   audio_dam_gate_ctrl_op_t gate_ctrl_op;
 
    bool_t is_peer_aad;
    /** set to TRUE if IMCL peer is AAD module*/
@@ -166,17 +169,16 @@ typedef struct
    bool_t is_drain_history;
    // gate is opened to drain all the history data. gate will auto close when all history data is sent out.
 
-   uint32_t ftrt_unread_data_len_in_us;
    // amount of KW data buffered at the time of gate open
 
-   bool_t trigger_island_entry;
    /* flag to indicate downstream module is done processing and ready to enter island */
 
-   uint32_t bytes_before_eos;
    /*bytes to drain before sending EOS in case of input port stop e.g., device switch in ASR case*/
 
    bool_t pending_eos;
    /* indicate if the EOS is yet to sent */
+   bool_t is_dcm_duty_cycling_enabled;
+   bool_t ready_for_island_entry;
 } _aud_dam_output_port_info;
 
 typedef struct
@@ -260,7 +262,6 @@ typedef struct capi_audio_dam_t
    bool_t is_tp_enabled;                // TP can be disabled dynamicaly when all gates are closed
    bool_t cannot_toggle_to_default_tgp; // set to TRUE if one of the IMCL peer is Acoustic Activity Detection module
 
-   bool_t is_island_duty_cycle_enabled;  // enable island enrty/exit based on this flag config
    dcm_island_control_payload_t payload; // Payload used for sending entry or exit to dcm
 
 } capi_audio_dam_t;

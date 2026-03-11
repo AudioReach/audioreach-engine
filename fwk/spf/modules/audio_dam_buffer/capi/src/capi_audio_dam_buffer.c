@@ -132,7 +132,6 @@ capi_err_t capi_audio_dam_buffer_init(capi_t *capi_ptr, capi_proplist_t *init_se
 
    // To allow ftrt data drain in STM container
    result = capi_audio_dam_raise_event_data_trigger_in_st_cntr(me_ptr);
-   me_ptr->is_island_duty_cycle_enabled = FALSE;
    return result;
 }
 
@@ -2390,6 +2389,8 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
             else
             {
                me_ptr->out_port_info_arr[arr_index].is_open = FALSE;
+               me_ptr->out_port_info_arr[arr_index].gate_ctrl_op                = AUDIO_DAM_BATCH_INVALID;
+               me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = FALSE;
             }
 
             break;
@@ -2411,6 +2412,10 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
             else
             {
                me_ptr->out_port_info_arr[arr_index].is_started = TRUE;
+               if(AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING == me_ptr->out_port_info_arr[arr_index].gate_ctrl_op)
+               {
+                  me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = TRUE;
+               }
 
                /** for outputs trigger policy is optional present if gate is opened, other wise it is non-trigger
                 * blocked*/
@@ -2476,7 +2481,7 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
                   audio_dam_force_set_pending_bytes(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr);
 
                   // check if the DCM is eneabled and pending bytes is non-zero (capture transition from 0 -> non-zero number)
-                  if (me_ptr->is_island_duty_cycle_enabled)
+                  if (FALSE == me_ptr->out_port_info_arr[arr_idx].is_dcm_duty_cycling_enabled)
                   {
                      posal_island_trigger_island_exit();
                      capi_dam_duty_cycling_buf_send_message_to_dcm(me_ptr, (uint32_t)SPF_MSG_CMD_DCM_REQ_FOR_ISLAND_EXIT);
@@ -2501,6 +2506,8 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
             else
             {
                me_ptr->out_port_info_arr[arr_index].is_started = FALSE;
+               me_ptr->out_port_info_arr[arr_index].gate_ctrl_op                = AUDIO_DAM_BATCH_INVALID;
+               me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = FALSE;
             }
 
             break;
