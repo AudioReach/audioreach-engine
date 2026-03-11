@@ -382,18 +382,58 @@ capi_err_t capi_splitter_set_param(capi_t *                _pif,
             capi_result |= CAPI_ENEEDMORE;
             break;
          }
+		 
+		 /* We perform bookkeeping for input as well as output ports in the splitter, 
+		  * to track port states, which are later referenced during TGP raise handling
+          * This is because there can be multiple ports on either side. In general,
+          * we do bookkeeping for whichever side (or both) has multi-port 
+		  * capability */
          if (data_ptr->is_input_port)
          {
-            if (1 == data_ptr->num_ports && 0 == data_ptr->id_idx[0].port_index &&
-                INTF_EXTN_DATA_PORT_CLOSE == data_ptr->opcode)
-            {
-              me_ptr->flags.is_ds_rt = FALSE;
-              me_ptr->flags.is_us_rt = FALSE;
+              switch (data_ptr->opcode)
+               {
+                  case INTF_EXTN_DATA_PORT_CLOSE:
+                  {
+                        if (1 == data_ptr->num_ports && 0 == data_ptr->id_idx[0].port_index)
+                        {
+                            me_ptr->flags.is_ds_rt = FALSE;
+                            me_ptr->flags.is_us_rt = FALSE;
+                        }
+                        break;
+                  }
+				  case INTF_EXTN_DATA_PORT_OPEN:
+                  { 
+                       #ifdef SPLITTER_DBG_LOW
+                           AR_MSG(DBG_HIGH_PRIO,"capi_splitter: Opening input Port");
+                       #endif // SPLITTER_DBG_LOW
+                       me_ptr->input_port_state =  DATA_PORT_STATE_OPENED;
+                       break;
+                  }
+                  case INTF_EXTN_DATA_PORT_START:
+                  { 
+                       #ifdef SPLITTER_DBG_LOW
+                           AR_MSG(DBG_HIGH_PRIO,"capi_splitter: Starting input Port");
+                       #endif // SPLITTER_DBG_LOW
+                       me_ptr->input_port_state =  DATA_PORT_STATE_STARTED;
+                       break;
+                  }
+                  case INTF_EXTN_DATA_PORT_STOP:
+                  {
+                      #ifdef SPLITTER_DBG_LOW
+                          AR_MSG(DBG_HIGH_PRIO,"capi_splitter: Stopping input Port");
+                      #endif // SPLITTER_DBG_LOW
+                      me_ptr->input_port_state =  DATA_PORT_STATE_STOPPED;
+                      break;
+                  }
+                  default:
+                  {
+                      AR_MSG(DBG_ERROR_PRIO,"capi_splitter: Port operation - Unsupported opcode: %lu",
+                            data_ptr->opcode);
+                     CAPI_SET_ERROR(capi_result, CAPI_EUNSUPPORTED);
+                     break;
+                  }
             }
          }
-         /* we do bookkeeping only for the output ports for splitter since there are multiple ports
-          * on the output side. In general, we do bookkeeping for whichever side (can be both) that has multi-port
-          * capability.*/
          else
          {
             // output port
