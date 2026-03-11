@@ -34,7 +34,7 @@ ar_result_t sgm_get_unique_token(spgm_info_t *spgm_ptr, uint32_t *unique_token_p
       // Set the dynamic token variable with start value
       posal_atomic_set(spgm_ptr->token_instance, 0);
    }
-   unique_token      += (counter_token << 16);
+   unique_token += (counter_token << 16);
    *unique_token_ptr = unique_token;
 
    return AR_EOK;
@@ -254,21 +254,17 @@ ar_result_t sgm_ipc_send_data_pkt(spgm_info_t *spgm_ptr)
       OLC_SGM_MSG(OLC_SGM_ID,
                   DBG_ERROR_PRIO,
                   "gpr_gmc: failed to send the data command with opcode[0x%lX] "
-                  "token[0x%lX] src port [0x%lX] dst [0x%lX]",
+                  "token[0x%lX]",
                   spgm_ptr->process_info.active_data_hndl.opcode,
-                  spgm_ptr->process_info.active_data_hndl.token,
-                  spgm_ptr->process_info.active_data_hndl.src_port,
-                  spgm_ptr->process_info.active_data_hndl.dst_port);
+                  spgm_ptr->process_info.active_data_hndl.token);
    }
 
    OLC_SGM_MSG(OLC_SGM_ID,
                DBG_LOW_PRIO,
-               "gpr_gmc: send the data command with opcode[0x%lX]",
-               "token[0x%lX] src port [0x%lX] dst [0x%lX]",
+               "gpr_gmc: send the data command with opcode[0x%lX]"
+               "token[0x%lX] ",
                spgm_ptr->process_info.active_data_hndl.opcode,
-               spgm_ptr->process_info.active_data_hndl.token,
-               spgm_ptr->process_info.active_data_hndl.src_port,
-               spgm_ptr->process_info.active_data_hndl.dst_port);
+               spgm_ptr->process_info.active_data_hndl.token);
 
    return result;
 }
@@ -297,9 +293,9 @@ uint32_t sdm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
 
    VERIFY(result, (NULL != packet_ptr));
 
-   //#ifdef VERBOSE_DEBUGGING
+   #ifdef VERBOSE_DEBUGGING
    AR_MSG(DBG_LOW_PRIO, "GPR callback for dst port 0x%lx pkt_ptr 0x%lx", packet_ptr->dst_port, packet_ptr);
-   //#endif
+   #endif
 
    spgm_info_t *spgm_ptr = (spgm_info_t *)callback_data;
    VERIFY(result, (spgm_ptr && spgm_ptr->rsp_q_ptr && spgm_ptr->evnt_q_ptr));
@@ -362,7 +358,7 @@ uint32_t sdm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
             {
                OLC_SGM_MSG(OLC_SGM_ID,
                            DBG_ERROR_PRIO,
-                           "gpr: data callback handler, invalid command handling for opcode[0x%lX]",
+                           "data_event_rsp: received from satellite, invalid command handling for opcode[0x%lX]",
                            packet_ptr->opcode);
                THROW(result, AR_EFAILED); // packet would be freed in catch
                break;
@@ -371,7 +367,7 @@ uint32_t sdm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
             {
                OLC_SGM_MSG(OLC_SGM_ID,
                            DBG_ERROR_PRIO,
-                           "gpr: data callback handler, invalid guid[0x%lX]",
+                           "data_event_rsp: received from satellite, invalid opcode[0x%lX]",
                            packet_ptr->opcode);
                THROW(result, AR_EFAILED); // packet would be freed in catch
             }
@@ -384,12 +380,7 @@ uint32_t sdm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
          {
             case DATA_CMD_RSP_WR_SH_MEM_EP_DATA_BUFFER_DONE_V2:
             {
-
-               TRY(result,
-                   sgm_get_data_port_index_given_rw_client_miid(spgm_ptr,
-                                                                IPC_WRITE_DATA,
-                                                                packet_ptr->dst_port,
-                                                                &port_index));
+               TRY(result, sgm_get_data_port_index_given_wr_client_miid(spgm_ptr, packet_ptr->dst_port, &port_index));
                TRY(result,
                    (ar_result_t)
                       posal_queue_push_back(spgm_ptr->process_info.wdp_obj_ptr[port_index]->port_info.this_handle.q_ptr,
@@ -399,11 +390,7 @@ uint32_t sdm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
             case DATA_CMD_RSP_RD_SH_MEM_EP_DATA_BUFFER_DONE_V2:
             {
 
-               TRY(result,
-                   sgm_get_data_port_index_given_rw_client_miid(spgm_ptr,
-                                                                IPC_READ_DATA,
-                                                                packet_ptr->dst_port,
-                                                                &port_index));
+               TRY(result, sgm_get_data_port_index_given_rd_client_miid(spgm_ptr, packet_ptr->dst_port, &port_index));
                TRY(result,
                    (ar_result_t)
                       posal_queue_push_back(spgm_ptr->process_info.rdp_obj_ptr[port_index]->port_info.this_handle.q_ptr,
@@ -413,7 +400,7 @@ uint32_t sdm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
             default:
                OLC_SGM_MSG(OLC_SGM_ID,
                            DBG_ERROR_PRIO,
-                           "gpr: data callback handler, invalid guid[0x%lX]",
+                           "data_rsp: received from satellite, invalid opcode[0x%lX]",
                            packet_ptr->opcode);
                THROW(result, AR_EFAILED);
          }
@@ -446,7 +433,7 @@ uint32_t sdm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
       }
       default:
       {
-         OLC_SGM_MSG(OLC_SGM_ID, DBG_ERROR_PRIO, "gpr: data callback handler, invalid guid 0x%lX", packet_ptr->opcode);
+         OLC_SGM_MSG(OLC_SGM_ID, DBG_ERROR_PRIO, "gpr_data_cb_h, invalid opcode 0x%lX", packet_ptr->opcode);
          THROW(result, AR_EFAILED);
       }
    }
@@ -476,8 +463,8 @@ uint32_t sgm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
 {
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
-   uint32_t                 log_id     = 0;
-   spf_msg_t                msg;
+   uint32_t  log_id = 0;
+   spf_msg_t msg;
 
    spgm_info_t *spgm_ptr = (spgm_info_t *)callback_data;
 
@@ -490,16 +477,14 @@ uint32_t sgm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
 
    //#ifdef VERBOSE_DEBUGGING
    AR_MSG(DBG_LOW_PRIO,
-          "GPR callback for src domain id %lu, dst domain id %lu "
-          "src port 0x%lx dst port 0x%lx pkt_ptr 0x%lx",
+          "olc_cmd_resp : gpr_cb_h src_pd %lu, dst_pd id %lu "
+          "src_port 0x%lx dst_port 0x%lx pkt_ptr 0x%lx",
           packet_ptr->src_domain_id,
           packet_ptr->dst_domain_id,
           packet_ptr->src_port,
           packet_ptr->dst_port,
           packet_ptr);
    //#endif
-
-
 
    /* Validate handles and queue pointers */
    VERIFY(result, (spgm_ptr && spgm_ptr->rsp_q_ptr && spgm_ptr->evnt_q_ptr));
@@ -533,7 +518,9 @@ uint32_t sgm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
             case OFFLOAD_EVENT_ID_DOWNSTREAM_PEER_PORT_PROPERTY:
             case OFFLOAD_EVENT_ID_UPSTREAM_STATE:
             {
-               TRY(result, (ar_result_t)posal_queue_push_back(spgm_ptr->cu_ptr->cmd_handle.cmd_q_ptr, (posal_queue_element_t *)&msg));
+               TRY(result,
+                   (ar_result_t)posal_queue_push_back(spgm_ptr->cu_ptr->cmd_handle.cmd_q_ptr,
+                                                      (posal_queue_element_t *)&msg));
             }
             break;
             case APM_EVENT_MODULE_TO_CLIENT:
@@ -740,7 +727,7 @@ ar_result_t sgm_deregister_olc_module_with_gpr(spgm_info_t *spgm_ptr, uint32_t s
          {
             OLC_SGM_MSG(OLC_SGM_ID,
                         DBG_ERROR_PRIO,
-                        "close: failed to deregister the module iid[0x%08lx] with GPR, result %lu",
+                        "close: failed to deregister the miid 0x%lx with GPR, result %lu",
                         module_node_ptr->instance_id,
                         result);
          }
@@ -801,7 +788,7 @@ ar_result_t sgm_register_olc_module_with_gpr(spgm_info_t *spgm_ptr)
          {
             OLC_SGM_MSG(OLC_SGM_ID,
                         DBG_ERROR_PRIO,
-                        "open: failed to register the module iid[0x%08lx] with GPR, result %lu",
+                        "open: failed to register the miid 0x%lx with GPR, result %lu",
                         module_node_ptr->instance_id,
                         result);
          }

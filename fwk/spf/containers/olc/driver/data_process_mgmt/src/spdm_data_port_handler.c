@@ -33,7 +33,9 @@ static ar_result_t spgm_rd_data_port_msg_handler(spgm_info_t *spgm_ptr, uint32_t
    log_id = spgm_ptr->sgm_id.log_id;
    VERIFY(result, (SPDM_MAX_IO_PORTS > port_index));
 
+#ifdef SGM_ENABLE_DATA_RSP_LEVEL_MSG
    OLC_SDM_MSG(OLC_SDM_ID, DBG_HIGH_PRIO, "rd_port_msg_h : processing read queue element");
+#endif
 
    // Get the pointer to the queue and the msg
 
@@ -383,7 +385,9 @@ static ar_result_t spdm_wr_data_port_msg_handler(spgm_info_t *spgm_ptr, uint32_t
    log_id = spgm_ptr->sgm_id.log_id;
    VERIFY(result, (SPDM_MAX_IO_PORTS > port_index));
 
-   OLC_SDM_MSG(OLC_SDM_ID, DBG_HIGH_PRIO, "wd_port_msg_h : processing write queue element");
+#if SGM_ENABLE_WRITE_DATA_FLOW_LEVEL_MSG
+   OLC_SDM_MSG(OLC_SDM_ID, DBG_LOW_PRIO, "wd_port_msg_h : processing write queue element");
+#endif
 
    // Get the pointer to the queue and the msg
 
@@ -400,7 +404,7 @@ static ar_result_t spdm_wr_data_port_msg_handler(spgm_info_t *spgm_ptr, uint32_t
    VERIFY(result, (NULL != packet_ptr));
 
    OLC_SDM_MSG(OLC_SDM_ID,
-               DBG_HIGH_PRIO,
+               DBG_MED_PRIO,
                "wd_port_msg_h : processing cmd opcode (%lX) token (%lx), pkt_ptr 0x%lx",
                packet_ptr->opcode,
                packet_ptr->token,

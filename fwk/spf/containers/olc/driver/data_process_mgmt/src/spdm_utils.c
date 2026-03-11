@@ -115,7 +115,7 @@ ar_result_t sgm_get_rw_ep_miid_given_rw_client_miid(spgm_info_t *       spgm_ptr
                sat_rw_ep_miid,
                rw_client_miid,
                (uint32_t)data_type,
-			   arr_indx,
+               arr_indx,
                result);
 
    return result;
@@ -141,11 +141,13 @@ ar_result_t sgm_get_data_port_index_given_bit_index(spgm_info_t *       spgm_ptr
    log_id = spgm_ptr->sgm_id.log_id;
    VERIFY(result, (NULL != port_index_ptr));
 
+#ifdef SGM_ENABLE_READ_DATA_FLOW_LEVEL_MSG
    OLC_SGM_MSG(OLC_SGM_ID,
                DBG_MED_PRIO,
-               "sgm_util: get sat_rw_dpi, given cbi (0x%lX) ipc dct (w/r: 0/1) %lu",
+               "sgm_util: get_data_port_index, given bit_index (0x%lX) ipc dct (w/r: 0/1) %lu",
                channel_bit_index,
                (uint32_t)data_type);
+#endif
 
    TRY(result, sgm_is_valid_ipc_data_conn_type(spgm_ptr, data_type));
 
@@ -183,13 +185,15 @@ ar_result_t sgm_get_data_port_index_given_bit_index(spgm_info_t *       spgm_ptr
    {
    }
 
+#ifdef SGM_ENABLE_READ_DATA_FLOW_LEVEL_MSG
    OLC_SGM_MSG(OLC_SGM_ID,
                DBG_HIGH_PRIO,
-               "sgm_util: sat_rw_dpi is %lu, given cbi (0x%lX) ipc_dct (w/r: 0/1) %lu, result %lu",
+               "sgm_util: data_port_index %lu, given cbi (0x%lX) ipc_dct (w/r: 0/1) %lu, result %lu",
                port_index,
                channel_bit_index,
                (uint32_t)data_type,
                result);
+#endif
 
    return AR_EOK;
 }
@@ -260,7 +264,7 @@ ar_result_t sgm_get_data_port_index_given_rw_ep_miid(spgm_info_t *       spgm_pt
                DBG_HIGH_PRIO,
                "sgm_util: sat_rw_dpi is %lu, given rw_ep_miid (0x%lX) ipc_dct (w/r: 0/1) %lu result %lu",
                port_index,
-			   sat_rw_ep_miid,
+               sat_rw_ep_miid,
                (uint32_t)data_type,
                result);
 
@@ -287,7 +291,7 @@ ar_result_t sgm_get_data_port_index_given_rw_client_miid(spgm_info_t *       spg
    VERIFY(result, (NULL != port_index_ptr));
 
    OLC_SGM_MSG(OLC_SGM_ID,
-               DBG_MED_PRIO,
+               DBG_LOW_PRIO,
                "sgm_util: get dpi, given rw_client_miid (0x%lX) ipc dct (w/r: 0/1) %lu",
                rw_client_miid,
                (uint32_t)data_type);
@@ -335,6 +339,116 @@ ar_result_t sgm_get_data_port_index_given_rw_client_miid(spgm_info_t *       spg
                rw_client_miid,
                (uint32_t)data_type,
                result);
+
+   return result;
+}
+
+/* utility function to get the associated data port index in the SGM driver,
+ * given the satellite Write client module instance ID in the OLC core
+ */
+ar_result_t sgm_get_data_port_index_given_wr_client_miid(spgm_info_t *spgm_ptr,
+                                                         uint32_t     write_client_miid,
+                                                         uint32_t *   port_index_ptr)
+{
+   ar_result_t result = AR_EOK;
+   INIT_EXCEPTION_HANDLING
+   uint32_t log_id     = 0;
+   uint32_t port_index = 0;
+
+   write_data_port_obj_t *wd_port_obj_ptr = NULL;
+
+   log_id = spgm_ptr->sgm_id.log_id;
+   VERIFY(result, (NULL != port_index_ptr));
+
+#ifdef SGM_ENABLE_WRITE_DATA_FLOW_LEVEL_MSG
+   OLC_SGM_MSG(OLC_SGM_ID, DBG_LOW_PRIO, "data_rsp : get_data_port_index  wr_client_miid (0x%lX)", write_client_miid);
+#endif
+
+   /** go through the list of port data objects  to find the object corresponding
+    * to specified RW_CLIENT_MIID and derived the data port index
+    **/
+   for (port_index = 0; port_index < SPDM_MAX_IO_PORTS; port_index++)
+   {
+      wd_port_obj_ptr = spgm_ptr->process_info.wdp_obj_ptr[port_index];
+      if ((NULL != wd_port_obj_ptr) && (write_client_miid == wd_port_obj_ptr->port_info.ctrl_cfg.rw_client_miid))
+      {
+         *port_index_ptr = port_index;
+         break;
+      }
+   }
+
+   if (SPDM_MAX_IO_PORTS == port_index)
+   {
+      THROW(result, AR_EFAILED);
+   }
+
+   CATCH(result, OLC_MSG_PREFIX, log_id)
+   {
+   }
+
+#ifdef SGM_ENABLE_WRITE_DATA_FLOW_LEVEL_MSG
+   OLC_SGM_MSG(OLC_SGM_ID,
+               DBG_LOW_PRIO,
+               "data_rsp :data_port_index is %lu, given rw_client_miid (0x%lX)  result %lu",
+               port_index,
+               write_client_miid,
+               result);
+#endif
+
+   return result;
+}
+
+/* utility function to get the associated data port index in the SGM driver,
+ * given the satellite RW client module instance ID in the OLC core
+ */
+ar_result_t sgm_get_data_port_index_given_rd_client_miid(spgm_info_t *spgm_ptr,
+                                                         uint32_t     rd_client_miid,
+                                                         uint32_t *   port_index_ptr)
+{
+   ar_result_t result = AR_EOK;
+   INIT_EXCEPTION_HANDLING
+   uint32_t log_id     = 0;
+   uint32_t port_index = 0;
+
+   read_data_port_obj_t *rd_port_obj_ptr = NULL;
+
+   log_id = spgm_ptr->sgm_id.log_id;
+   VERIFY(result, (NULL != port_index_ptr));
+
+#ifdef SGM_ENABLE_READ_DATA_FLOW_LEVEL_MSG
+   OLC_SGM_MSG(OLC_SGM_ID, DBG_LOW_PRIO, "data_rsp : get_data_port_index, rd_client_miid (0x%lX)", rd_client_miid);
+#endif
+
+   /** go through the list of port data objects  to find the object corresponding
+    * to specified RW_CLIENT_MIID and derived the data port index
+    **/
+   for (port_index = 0; port_index < SPDM_MAX_IO_PORTS; port_index++)
+   {
+      rd_port_obj_ptr = spgm_ptr->process_info.rdp_obj_ptr[port_index];
+      if ((NULL != rd_port_obj_ptr) && (rd_client_miid == rd_port_obj_ptr->port_info.ctrl_cfg.rw_client_miid))
+      {
+         *port_index_ptr = port_index;
+         break;
+      }
+   }
+
+   if (SPDM_MAX_IO_PORTS == port_index)
+   {
+      THROW(result, AR_EFAILED);
+   }
+
+   CATCH(result, OLC_MSG_PREFIX, log_id)
+   {
+   }
+
+#ifdef SGM_ENABLE_READ_DATA_FLOW_LEVEL_MSG
+   OLC_SGM_MSG(OLC_SGM_ID,
+               DBG_LOW_PRIO,
+               "data_rsp :data_port_index is %lu, given rd_client_miid (0x%lX)  result %lu",
+               port_index,
+               rd_client_miid,
+               result);
+#endif
 
    return result;
 }

@@ -60,7 +60,7 @@ static ar_result_t spgm_cmd_rsp_handler(cu_base_t *cu_ptr, spgm_info_t *spgm_ptr
          OLC_SGM_MSG(OLC_SGM_ID,
                      DBG_HIGH_PRIO,
                      "cmd_rsp: processing ibasic response with cmd_opcode(0x%lX) "
-                     "token(0x%lX) ptime %llu",
+                     "token(0x%lX) ptime %lu",
                      rsp_ptr->opcode,
                      packet_ptr->token,
                      spgm_ptr->p_cmd_exec_ts);
@@ -230,7 +230,8 @@ static ar_result_t spgm_cmd_rsp_handler(cu_base_t *cu_ptr, spgm_info_t *spgm_ptr
 
          OLC_SGM_MSG(OLC_SGM_ID,
                      DBG_HIGH_PRIO,
-                     "cmd_rsp: processing GET CFG response with cmd_opcode(0x%lX) token(0x%lX) ptime %llu",
+                     "cmd_rsp: processing GET CFG response with "
+                     "cmd_opcode(0x%lX) token(0x%lX) ptime %lu",
                      rsp_info->opcode,
                      packet_ptr->token,
 					 spgm_ptr->p_cmd_exec_ts);

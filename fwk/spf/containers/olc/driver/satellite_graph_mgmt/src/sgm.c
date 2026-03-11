@@ -229,7 +229,7 @@ ar_result_t sgm_init(spgm_info_t *spgm_ptr, cu_base_t *cu_ptr, void *rsp_vtbl_pt
       return result;
    }
 
-
+   g_olc_cnt++;
    // set the base_token
    spgm_ptr->base_token = (uint32_t)(g_olc_cnt << 24);
    // set the dynamic token variable with start value
