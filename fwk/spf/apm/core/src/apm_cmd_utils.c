@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -349,6 +349,13 @@ ar_result_t apm_clear_pspc_cont_mod_list(apm_t *              apm_info_ptr,
                                       sub_graph_node_ptr,
                                       &apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_proc_info.num_processed_sg);
 
+         if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+             apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_clear_graph_mgmt_context_fptr)
+         {
+            apm_info_ptr->ext_utils.multi_client_vtbl_ptr
+               ->apm_multi_client_clear_graph_mgmt_context_fptr(apm_info_ptr, sub_graph_node_ptr);
+         }
+
          AR_MSG(DBG_HIGH_PRIO, SPF_LOG_PREFIX "GRAPH_CLOSE: Destroyed SG_ID[0x%lX]", sub_graph_node_ptr->sub_graph_id);
 
          /** Free up the memory of this sub-graph node object */
@@ -376,6 +383,12 @@ static ar_result_t apm_clear_graph_open_cmd_info(apm_t *apm_info_ptr)
    {
       spf_list_delete_list(&graph_open_cmd_ctrl_ptr->sg_id_list_ptr, TRUE /* pool_used */);
       graph_open_cmd_ctrl_ptr->num_sub_graphs = 0;
+   }
+
+   if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+       apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_clear_graph_open_cmd_info_fptr)
+   {
+      apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_clear_graph_open_cmd_info_fptr(apm_info_ptr);
    }
 
    for (uint32_t list_idx = 0; list_idx < LINK_TYPE_MAX; list_idx++)
@@ -1325,6 +1338,8 @@ ar_result_t apm_gm_cmd_validate_sg_list(apm_t *             apm_info_ptr,
    ar_result_t      result = AR_EOK;
    apm_sub_graph_t *sub_graph_node_ptr;
    apm_cmd_ctrl_t * apm_cmd_ctrl_ptr;
+   bool_t           seq_entry_reqd = TRUE;
+   bool_t           found_sg_node  = FALSE;
 
    if (!num_sub_graphs || !sg_id_list_ptr)
    {
@@ -1370,14 +1385,36 @@ ar_result_t apm_gm_cmd_validate_sg_list(apm_t *             apm_info_ptr,
          return AR_EFAILED;
       }
 
+      /**
+       * Below checks and aggregates the sub graph management states from each client and decides to put it to
+       * reg_sg_list_ptr or not. reg_sg_list_ptr is used by APM cmn sequencer to process further.(Default handling).
+       * allow_sequencer is TRUE when it's decided to allowed to be further processing by APM cmn sequencer, else FALSE.
+       */
+      if (apm_info_ptr->ext_utils.multi_client_vtbl_ptr &&
+          apm_info_ptr->ext_utils.multi_client_vtbl_ptr->apm_multi_client_check_sg_state_and_update_send_to_seqncr_fptr)
+      {
+         if (AR_EOK != apm_info_ptr->ext_utils.multi_client_vtbl_ptr
+                          ->apm_multi_client_check_sg_state_and_update_send_to_seqncr_fptr(apm_info_ptr,
+                                                                                           sub_graph_node_ptr,
+                                                                                           cmd_opcode,
+                                                                                           &seq_entry_reqd))
+         {
+            AR_MSG(DBG_ERROR_PRIO, "[multi-client]: Failure checking apm_check_sg_state_and_update_send_to_seqncr");
+            return AR_EFAILED;
+         }
+      }
+
       /** Add this sub-graph node to the selected list */
       if (sub_graph_node_ptr)
       {
+         if (seq_entry_reqd)
+         {
          if (AR_EOK !=
              (result =
                  apm_db_search_and_add_node_to_list(&apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_list.reg_sg_list_ptr,
                                                     sub_graph_node_ptr,
-                                                    &apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_list.num_reg_sub_graphs)))
+                                                       &apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_list
+                                                           .num_reg_sub_graphs)))
 
          {
             AR_MSG(DBG_ERROR_PRIO,
@@ -1388,11 +1425,17 @@ ar_result_t apm_gm_cmd_validate_sg_list(apm_t *             apm_info_ptr,
             return result;
          }
       }
+         else
+         {
+            found_sg_node = TRUE; // This is false by default, so single client case should work as current behaviour
+         }
+      }
 
    } /** End of for loop() */
 
    /* if none of the sub-graphs listed in the close command are found, then return failure to the client.*/
-   if ((!apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_list.num_reg_sub_graphs) && (APM_CMD_GRAPH_CLOSE == cmd_opcode))
+   if ((!apm_cmd_ctrl_ptr->graph_mgmt_cmd_ctrl.sg_list.num_reg_sub_graphs) && (APM_CMD_GRAPH_CLOSE == cmd_opcode) &&
+       (!found_sg_node))
    {
       AR_MSG(DBG_ERROR_PRIO,
              "apm_gm_cmd_validate_sg_list(): num_reg_sub_graphs = %d, cmd_opcode: 0x%lx",

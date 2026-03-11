@@ -8,7 +8,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -28,6 +28,7 @@
 #include "apm_db_query.h"
 #include "apm_parallel_cmd_utils.h"
 #include "apm_debug_info_cfg.h"
+#include "apm_multi_client.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,6 +73,9 @@ struct apm_ext_utils_t
    apm_parallel_cmd_utils_vtable_t      *parallel_cmd_utils_vtbl_ptr;
    /** Parallel cmd handler utils vtble ptr */
    
+   apm_multi_client_vtable_t            *multi_client_vtbl_ptr;
+   /** multi client vtble ptr */
+
    apm_db_query_utils_vtable_t          *db_query_vtbl_ptr;
    /** apm db query vtble  ptr */
 

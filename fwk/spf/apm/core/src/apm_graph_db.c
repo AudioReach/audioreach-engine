@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -15,8 +15,8 @@
 ==============================================================================*/
 
 #include "apm_graph_db.h"
-#include "apm_i.h"
 #include "apm_ext_cmn.h"
+#include "apm_i.h"
 
 static const uint32_t apm_obj_hash_tbl_size[] =
 {
