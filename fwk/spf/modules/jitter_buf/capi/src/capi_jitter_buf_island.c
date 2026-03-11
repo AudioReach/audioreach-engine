@@ -54,19 +54,20 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
    capi_jitter_buf_t *me_ptr = (capi_jitter_buf_t *)capi_ptr;
 
    /* If debug value is present that takes precedence */
-   if(!me_ptr->jitter_allowance_in_ms && me_ptr->debug_size_ms)
+   if (!me_ptr->jitter_allowance_in_ms && me_ptr->debug_size_ms)
    {
       me_ptr->jitter_allowance_in_ms = me_ptr->debug_size_ms;
    }
 
-   if(!me_ptr->is_input_mf_received || !me_ptr->jitter_allowance_in_ms || me_ptr->is_disabled_by_failure)
+   if (!me_ptr->is_input_mf_received || !me_ptr->jitter_allowance_in_ms || me_ptr->is_disabled_by_failure)
    {
-      AR_MSG(DBG_ERROR_PRIO, "jitter_buf: buf size %d, mf received %d, is_module_disabled_by_fatal_failure %d",
-                                    me_ptr->jitter_allowance_in_ms,
-                                    me_ptr->is_input_mf_received,
-                                    me_ptr->is_disabled_by_failure);
+      AR_MSG(DBG_ERROR_PRIO,
+             "jitter_buf: buf size %d, mf received %d, is_module_disabled_by_fatal_failure %d",
+             me_ptr->jitter_allowance_in_ms,
+             me_ptr->is_input_mf_received,
+             me_ptr->is_disabled_by_failure);
 
-      if(me_ptr->is_input_mf_received && input[0]->buf_ptr)
+      if (me_ptr->is_input_mf_received && input[0]->buf_ptr)
       {
          for (int i = 0; i < input[0]->bufs_num; i++)
          {
@@ -101,19 +102,19 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
 #ifdef DEBUG_JITTER_BUF_DRIVER
       AR_MSG(DBG_LOW_PRIO, "jitter_buf: frame duration set to %lu", me_ptr->frame_duration_in_us);
 #endif
-       posal_island_trigger_island_exit();
-       if (CAPI_EOK != (result = capi_jitter_buf_set_size(me_ptr)))
-       {
-          AR_MSG(DBG_ERROR_PRIO, "jitter_buf: Failed init the driver with error = %lx", result);
+      posal_island_trigger_island_exit();
+      if (CAPI_EOK != (result = capi_jitter_buf_set_size(me_ptr)))
+      {
+         AR_MSG(DBG_ERROR_PRIO, "jitter_buf: Failed init the driver with error = %lx", result);
 
-          for (int i = 0; i < input[0]->bufs_num; i++)
-          {
-             // marking as input not consumed
-             input[0]->buf_ptr[i].actual_data_len = 0;
-          }
+         for (int i = 0; i < input[0]->bufs_num; i++)
+         {
+            // marking as input not consumed
+            input[0]->buf_ptr[i].actual_data_len = 0;
+         }
 
-          return result;
-       }
+         return result;
+      }
    }
 
    bool_t is_output_written = FALSE, update_drift_thresh = FALSE, is_input_trig = FALSE;
@@ -238,7 +239,7 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
       }
    }
 
-   //drift detection is disabled if module is configured at input buffering mode.
+   // drift detection is disabled if module is configured at input buffering mode.
    if (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER != me_ptr->configured_buffer_mode)
    {
       /* Apply drift correction if buffer size crosses upper/lower thresholds. Depending on
@@ -254,10 +255,54 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
 
       if (prev_buffer_mode != me_ptr->buffer_mode)
       {
-         posal_island_trigger_island_exit();
          capi_jitter_buf_change_trigger_policy(me_ptr);
       }
    }
 
+   return result;
+}
+
+/* Jitter buffer is by default driven based on output availability. Only if output is read
+ * input is written if it is available at that time. If not, the input gets buffered
+ * up in congestion buffering module.
+ * If input buffering mode is enabled (ICMD) then input is written if it is available.*/
+capi_err_t capi_jitter_buf_change_trigger_policy(capi_jitter_buf_t *me_ptr)
+{
+   capi_err_t result = AR_EOK;
+
+   if (NULL == me_ptr->policy_chg_cb.change_data_trigger_policy_cb_fn)
+   {
+      return result;
+   }
+
+   fwk_extn_port_trigger_affinity_t input_group1  = { FWK_EXTN_PORT_TRIGGER_AFFINITY_NONE };
+   fwk_extn_port_trigger_affinity_t output_group1 = { FWK_EXTN_PORT_TRIGGER_AFFINITY_PRESENT };
+
+   fwk_extn_port_trigger_group_t triggerable_groups[1];
+   triggerable_groups[0].in_port_grp_affinity_ptr  = &input_group1;
+   triggerable_groups[0].out_port_grp_affinity_ptr = &output_group1;
+
+   fwk_extn_port_nontrigger_policy_t input_group2  = { FWK_EXTN_PORT_NON_TRIGGER_OPTIONAL };
+   fwk_extn_port_nontrigger_policy_t output_group2 = { FWK_EXTN_PORT_NON_TRIGGER_INVALID };
+
+   fwk_extn_port_nontrigger_group_t nontriggerable_group[1];
+   nontriggerable_group[0].in_port_grp_policy_ptr  = &input_group2;
+   nontriggerable_group[0].out_port_grp_policy_ptr = &output_group2;
+
+   /* If input buffering is to be done at input trigger then need to mark optional triggerable.*/
+   if (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == me_ptr->buffer_mode)
+   {
+      input_group1 = FWK_EXTN_PORT_TRIGGER_AFFINITY_PRESENT;
+      input_group2 = FWK_EXTN_PORT_NON_TRIGGER_INVALID;
+   }
+
+   // By default set the mode to RT, when the write arrives then make it FTRT.
+   result = me_ptr->policy_chg_cb.change_data_trigger_policy_cb_fn(me_ptr->policy_chg_cb.context_ptr,
+                                                                   nontriggerable_group,
+                                                                   FWK_EXTN_PORT_TRIGGER_POLICY_OPTIONAL,
+                                                                   1,
+                                                                   triggerable_groups);
+
+   AR_MSG(DBG_HIGH_PRIO, "jitter_buf: Raised TP with mode : %d", me_ptr->buffer_mode);
    return result;
 }
