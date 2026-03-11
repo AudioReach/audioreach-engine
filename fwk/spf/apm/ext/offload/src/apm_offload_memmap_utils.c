@@ -26,7 +26,7 @@
  ****************************************************************************/
 
 
-#define APM_OFFLOAD_MEM_ALIGNMENT_BYTES 64 // varies per product
+#define APM_OFFLOAD_MEM_ALIGNMENT_BYTES 128 // varies per product
 
 #define MAX_MASTER_MAPS 5 // Can be tuned. Don't expect more than 1 or 2
 // as per today's requirement
@@ -114,6 +114,8 @@ static uint32_t apm_offload_get_first_open_sat_slot(sat_info_t *sat_book_ptr);
 static uint32_t apm_offload_get_first_open_unloaned_slot(unloaned_map_t *unloaned_book_ptr);
 
 static uint32_t apm_offload_find_unloaned_sat_handle_idx(unloaned_map_t *unloaned_book_ptr, uint32_t sat_handle);
+
+static uint32_t apm_offload_find_unloaned_master_handle_idx(unloaned_map_t *unloaned_book_ptr, uint32_t master_handle);
 
 static void apm_offload_unloaned_book_cleanup(uint32_t sat_domain_id);
 
@@ -350,6 +352,49 @@ ar_result_t apm_offload_satellite_memorymap_check_deregister(uint32_t unmap_mast
       }
    } // endloop
    posal_mutex_unlock(g_offload_mem_mgr.map_mutex);
+
+   // check if the master_handle belongs to unloaned_book and dereg the same
+	if (!sat_unmapped)
+   {
+      AR_MSG(DBG_ERROR_PRIO, "Offload: Unloaned Book Entry DEREG, Satellite domain ID %lu master_handle 0x%x",
+                              sat_domain_id,
+                              unmap_master_handle);
+
+      uint32_t    sat_domain_remap_list_index = APM_OFFLOAD_INVALID_VAL;
+      sat_domain_remap_list_index = apm_offload_get_sat_domain_list_index(sat_domain_id);
+      if (APM_OFFLOAD_INVALID_VAL == sat_domain_remap_list_index)
+      {
+         AR_MSG(DBG_ERROR_PRIO, "Offload: Unloaned Book Entry DEREG, Unsupported Satellite domain ID %lu", sat_domain_id);
+         return AR_EFAILED;
+      }
+
+      posal_mutex_lock(g_offload_mem_mgr.map_mutex);
+
+      unloaned_map_t *unloaned_book_ptr = &(g_offload_mem_mgr.unloaned_book[sat_domain_remap_list_index][0]);
+      uint32_t        idx               = apm_offload_find_unloaned_master_handle_idx(unloaned_book_ptr, unmap_master_handle);
+      if (APM_OFFLOAD_INVALID_VAL == idx)
+      {
+         AR_MSG(DBG_ERROR_PRIO,
+               "Offload: unmap_master_handle 0x%lx not found in sat domain %lu unloaned map",
+               unmap_master_handle,
+               sat_domain_id);
+         posal_mutex_unlock(g_offload_mem_mgr.map_mutex);
+         return AR_EFAILED;
+      }
+      else
+      {
+
+         AR_MSG(DBG_ERROR_PRIO, "Offload: Unloaned Book Entry DEREG, sat_handle 0x%x master_handle 0x%x",
+                              unloaned_book_ptr[idx].sat_handle,
+                              unmap_master_handle);
+
+         apm_offload_unloaned_mem_deregister(sat_domain_id, unloaned_book_ptr[idx].sat_handle);
+
+         posal_mutex_unlock(g_offload_mem_mgr.map_mutex);
+         return result;
+      }
+   }
+
    if (!sat_unmapped)
    {
       AR_MSG(DBG_ERROR_PRIO,
@@ -518,6 +563,36 @@ uint32_t apm_offload_get_sat_handle_from_master_handle(uint32_t master_handle, u
          break;
       }
    }
+
+	if (sat_handle == APM_OFFLOAD_INVALID_VAL)
+   {
+      uint32_t sat_domain_remap_list_index = APM_OFFLOAD_INVALID_VAL;
+      sat_domain_remap_list_index = apm_offload_get_sat_domain_list_index(sat_domain_id);
+      if (APM_OFFLOAD_INVALID_VAL == sat_domain_remap_list_index)
+      {
+         AR_MSG(DBG_ERROR_PRIO, "Offload: Unloaned Book Entry DEREG, Unsupported Satellite domain ID %lu", sat_domain_id);
+         return AR_EFAILED;
+      }
+
+      unloaned_map_t *unloaned_book_ptr = &(g_offload_mem_mgr.unloaned_book[sat_domain_remap_list_index][0]);
+      uint32_t        idx               = apm_offload_find_unloaned_master_handle_idx(unloaned_book_ptr, master_handle);
+
+      if (APM_OFFLOAD_INVALID_VAL == idx)
+      {
+         AR_MSG(DBG_ERROR_PRIO,
+               "Offload: Master handle 0x%lx not found in sat domain %lu unloaned map",
+               master_handle,
+               sat_domain_id);
+   posal_mutex_unlock(g_offload_mem_mgr.map_mutex);
+   return sat_handle;
+}
+
+
+      AR_MSG(DBG_ERROR_PRIO, "Offload: SAT HANDLE found master_handle: 0x%x 0x%x",
+                              master_handle,
+                              g_offload_mem_mgr.unloaned_book[sat_domain_remap_list_index][idx].sat_handle);
+      sat_handle = g_offload_mem_mgr.unloaned_book[sat_domain_remap_list_index][idx].sat_handle;
+   }
    posal_mutex_unlock(g_offload_mem_mgr.map_mutex);
    return sat_handle;
 }
@@ -608,7 +683,6 @@ uint32_t apm_offload_get_persistent_sat_handle(uint32_t sat_domain_id, uint32_t 
              sat_domain_id);
       return AR_EFAILED;
    }
-
    posal_mutex_lock(g_offload_mem_mgr.map_mutex);
    unloaned_map_t *unloaned_book_ptr = &(g_offload_mem_mgr.unloaned_book[sat_domain_remap_list_index][0]);
 
@@ -616,9 +690,11 @@ uint32_t apm_offload_get_persistent_sat_handle(uint32_t sat_domain_id, uint32_t 
    {
       if (master_handle == unloaned_book_ptr[i].master_handle)
       {
+   	   posal_mutex_unlock(g_offload_mem_mgr.map_mutex);
          return unloaned_book_ptr[i].sat_handle;
       }
    }
+   posal_mutex_unlock(g_offload_mem_mgr.map_mutex);
    AR_MSG(DBG_ERROR_PRIO,
           "Offload: Could not find master handle 0x%lx in unloaned book for sat_domain_id %lu",
           master_handle,
@@ -721,6 +797,21 @@ static uint32_t apm_offload_find_unloaned_sat_handle_idx(unloaned_map_t *unloane
    }
    return not_found;
 }
+
+static uint32_t apm_offload_find_unloaned_master_handle_idx(unloaned_map_t *unloaned_book_ptr, uint32_t master_handle)
+{
+   uint32_t not_found = APM_OFFLOAD_INVALID_VAL;
+
+   for (uint32_t i = 0; i < MAX_NUM_UNLOANED_MAPS; i++)
+   {
+      if (master_handle == unloaned_book_ptr[i].master_handle)
+      {
+         return i;
+      }
+   }
+   return not_found;
+}
+
 /* =======================================================================
    Memory Function Implementations
 ========================================================================== */
