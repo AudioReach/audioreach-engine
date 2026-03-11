@@ -143,18 +143,21 @@ capi_err_t check_alloc_log_buf(capi_data_logging_t *me_ptr)
 
    DATA_LOGGING_MSG(me_ptr->nlpi_me_ptr->iid,
                     DBG_HIGH_PRIO,
-                    "Entering check_alloc_log_buf, num chs %d, media_fmt_ptr->format.num_channels %d "
-                    "media_fmt_ptr->format.bits_per_sample %d media_fmt_ptr->format.sampling_rate %d",
-                    num_chs_to_log,
-                    me_ptr->media_format.format.num_channels,
-                    me_ptr->media_format.format.bits_per_sample,
-                    me_ptr->media_format.format.sampling_rate);
+                    "Entering check_alloc_log_buf, number of buffers to log %lu",num_chs_to_log);
 
    if (num_chs_to_log)
    {
       // for PCM media format try to allocate log buffer for 10ms.
       if (capi_data_logging_media_fmt_is_valid(&me_ptr->media_format))
       {
+         DATA_LOGGING_MSG(me_ptr->nlpi_me_ptr->iid,
+                    DBG_HIGH_PRIO,
+                    "check_alloc_log_buf, media_fmt_ptr->format.num_channels %lu "
+                    "media_fmt_ptr->format.bits_per_sample %lu media_fmt_ptr->format.sampling_rate %lu",
+                    me_ptr->media_format.format.num_channels,
+                    me_ptr->media_format.format.bits_per_sample,
+                    me_ptr->media_format.format.sampling_rate);
+
          const uint32_t NUM_10MS_IN_ONE_SEC = 100;
          uint32_t       bytes_per_sample    = (me_ptr->media_format.format.bits_per_sample / 8) * num_chs_to_log;
          uint32_t       frame_size_10ms =
@@ -1895,8 +1898,9 @@ static capi_err_t capi_data_logging_log_data(capi_data_logging_t *me_ptr,
 
    uint32_t capi_buf_bytes_per_channel = 0;
 
-   if ((CAPI_MAX_CHANNELS_V2 < num_channels) ||
-       (CAPI_MAX_CHANNELS_V2 < num_ch_to_log)) // added this to resolve kw issues
+   if((CAPI_RAW_COMPRESSED != me_ptr->media_format.header.format_header.data_format) &&
+         ((CAPI_MAX_CHANNELS_V2 < num_channels) || (CAPI_MAX_CHANNELS_V2 < num_ch_to_log))) //added this to resolve kw issues
+
    {
       DATA_LOGGING_MSG(me_ptr->nlpi_me_ptr->iid, DBG_ERROR_PRIO, "Unsupported number of channels");
       return CAPI_EFAILED;
