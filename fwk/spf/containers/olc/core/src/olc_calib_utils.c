@@ -515,6 +515,12 @@ ar_result_t olc_process_container_set_get_cfg(cu_base_t *                       
                   param_data_ptr->error_code = result;
                   break;
                }
+               case CNTR_PARAM_ID_CONTAINER_PROC_PARAMS_INFO:
+               {
+                  result = cu_cntr_proc_params_query(base_ptr, param_payload_ptr, &param_data_ptr->param_size);
+                  param_data_ptr->error_code = result;
+                  break;
+               }
                default:
                {
                   CU_MSG(base_ptr->gu_ptr->log_id,
@@ -814,21 +820,53 @@ ar_result_t olc_process_satellite_set_get_cfg(cu_base_t *                       
 
       case SPF_CFG_DATA_PERSISTENT:
       {
-         void **param_data_pptr = cfg_cmd_ptr->param_data_pptr;
-         void * param_data_ptr  = param_data_pptr[0];
-// tbd: add continuity check
+         void **                  param_data_pptr           = cfg_cmd_ptr->param_data_pptr;
+         int8_t *                 param_data_ptr            = param_data_pptr[0];
+         apm_module_param_data_t *module_param_data_ptr     = NULL;
+         uint32_t                 payload_size              = 0;
+         bool_t                   is_payload_mem_contiguous = TRUE;
+
+         for (uint32_t pid_cnt = 0; pid_cnt < cfg_cmd_ptr->num_param_id_cfg; pid_cnt++)
+         {
+            param_data_ptr        = param_data_pptr[pid_cnt];
+            module_param_data_ptr = (apm_module_param_data_t *)param_data_ptr;
+            payload_size          = sizeof(apm_module_param_data_t) + ALIGN_8_BYTES(module_param_data_ptr->param_size);
+            if ((pid_cnt + 1) < cfg_cmd_ptr->num_param_id_cfg)
+            {
+               int8_t *next_param_data_ptr = param_data_pptr[pid_cnt + 1];
+               if ((param_data_ptr + payload_size) != next_param_data_ptr)
+               {
+                  is_payload_mem_contiguous = FALSE;
+               }
+            }
+         }
 
 #ifdef OLC_VERBOSE_DEBUGGING
          OLC_MSG(me_ptr->topo.gu.log_id, DBG_HIGH_PRIO, "is_deregister = %u", is_deregister);
 #endif
-         TRY(result,
-             sgm_handle_persistent_cfg(&me_ptr->spgm_info,
-                                       param_data_ptr,
-                                       payload_size,
-                                       FALSE /*is_inband*/,
-                                       is_deregister,
-                                       cmd_extn_ptr));
-         wait_for_response = sgm_get_cmd_rsp_status(&me_ptr->spgm_info, opcode);
+         if ((1 == cfg_cmd_ptr->num_param_id_cfg) || (is_payload_mem_contiguous))
+         {
+            TRY(result,
+                sgm_handle_persistent_cfg(&me_ptr->spgm_info,
+                                          (void *)param_data_ptr,
+                                          payload_size,
+                                          FALSE /*is_inband*/,
+                                          is_deregister,
+                                          cmd_extn_ptr));
+            wait_for_response = sgm_get_cmd_rsp_status(&me_ptr->spgm_info, opcode);
+         }
+         else
+         {
+            TRY(result,
+                sgm_handle_persistent_cfg_v2(&me_ptr->spgm_info,
+                                             param_data_pptr,
+                                             cfg_cmd_ptr->num_param_id_cfg,
+                                             payload_size,
+                                             FALSE /*is_inband*/,
+                                             is_deregister,
+                                             cmd_extn_ptr));
+            wait_for_response = sgm_get_cmd_rsp_status(&me_ptr->spgm_info, opcode);
+         }
 
          break;
       }

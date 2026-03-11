@@ -143,6 +143,8 @@ typedef struct spgm_cmd_hndl_node_t
    uint32_t             sec_opcode;
    uint32_t             token;
    uint32_t             wait_for_rsp;
+   uint16_t             multi_max_resp_cnt;
+   uint16_t             multi_rsp_cnt;
    uint32_t             cmd_payload_size;
    uint32_t             rsp_payload_size;
    uint8_t *            rsp_payload_ptr;
