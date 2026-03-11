@@ -16,7 +16,8 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/ext/prof/inc \
     $(LOCAL_PATH)/ext/pure_st_topo/inc \
     $(LOCAL_PATH)/ext/sync_fwk_ext/inc \
-    $(LOCAL_PATH)/../topo_interface/inc
+    $(LOCAL_PATH)/../topo_interface/inc \
+    $(LOCAL_PATH)/ext/thin_topo/inc
 
 LOCAL_PROPRIETARY_MODULE := true
 include $(BUILD_HEADER_LIBRARY)
@@ -42,7 +43,9 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/ext/pure_st_topo/inc \
     $(LOCAL_PATH)/ext/pure_st_topo/src \
     $(LOCAL_PATH)/ext/sync_fwk_ext/inc \
-    $(LOCAL_PATH)/../topo_interface/inc
+    $(LOCAL_PATH)/../topo_interface/inc \
+    $(LOCAL_PATH)/ext/thin_topo/inc \
+    $(LOCAL_PATH)/ext/thin_topo/src
 
 LOCAL_SRC_FILES := \
     core/src/gen_topo.c \
@@ -82,7 +85,8 @@ LOCAL_SRC_FILES := \
     ext/prof/src/gen_topo_prof.c \
     ext/pure_st_topo/src/gen_topo_pure_st_process.c \
     ext/pure_st_topo/src/gen_topo_pure_st_process_island.c \
-    ext/sync_fwk_ext/src/gen_topo_sync_fwk_ext.c
+    ext/sync_fwk_ext/src/gen_topo_sync_fwk_ext.c \
+    ext/thin_topo/src/thin_topo.c
 
 
 LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17

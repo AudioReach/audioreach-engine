@@ -19,6 +19,7 @@ include_directories(
                     ../ext/err_hdlr/inc
                     ../ext/gpr_cmd_rsp_hdlr/inc
                     ../ext/graph_utils/inc
+                    ../ext/offload/inc
                     ../ext/offload/src
                     ../ext/parallel_cmd_utils/inc
                     ../ext/proxy/proxy_cmn/inc
