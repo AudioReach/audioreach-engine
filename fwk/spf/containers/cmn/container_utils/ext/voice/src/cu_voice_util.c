@@ -174,7 +174,7 @@ ar_result_t cu_offload_voice_session_cfg(cu_base_t *base_ptr, int8_t *param_payl
 
    CU_MSG(base_ptr->gu_ptr->log_id,
           DBG_HIGH_PRIO,
-          "CMD:OFFLOAD_VOICE_SESSION_CFG: sg_id = %d, kpps_sf = %d, bw_sf = %d",
+          "CMD:OFFLOAD_VOICE_SESSION_CFG: sg_id = 0x%lX, kpps_sf = %d, bw_sf = %d",
           voice_session_info_ptr->sg_id,
           voice_session_info_ptr->kpps_sf,
           voice_session_info_ptr->bw_sf);
