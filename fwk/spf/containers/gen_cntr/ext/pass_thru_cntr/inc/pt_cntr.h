@@ -43,11 +43,11 @@ typedef union pt_cntr_flags_t
 {
    struct
    {
-      uint64_t num_subgraphs_not_satisfied : 1; /**< set if no SGs are not as expected*/
-      uint64_t supports_md_propagation     : 1;
-      uint64_t processing_data_path_mf : 1;
+      uint32_t num_subgraphs_not_satisfied : 1; /**< set if no SGs are not as expected*/
+      uint32_t supports_md_propagation     : 1;
+      uint32_t processing_data_path_mf : 1;
    };
-   uint64_t word;
+   uint32_t word;
 } pt_cntr_flags_t;
 
 
@@ -68,10 +68,10 @@ typedef union pt_cntr_module_flags_t
 {
    struct
    {
-      uint64_t has_attached_module : 1;
-      uint64_t has_stopped_port : 1;
+      uint32_t has_attached_module : 1;
+      uint32_t has_stopped_port : 1;
    };
-   uint64_t word;
+   uint32_t word;
 } pt_cntr_module_flags_t;
 
 typedef struct pt_cntr_module_t
