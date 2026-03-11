@@ -1033,6 +1033,18 @@ void gen_topo_set_med_fmt_to_attached_module(gen_topo_t *topo_ptr, gen_topo_outp
          ? (gen_topo_input_port_t *)attached_module_ptr->gu.output_port_list_ptr->op_port_ptr
          : NULL;
 
+   topo_media_fmt_t *dst_mf = attached_input_port_ptr ? attached_input_port_ptr-> common.media_fmt_ptr : NULL;
+   topo_media_fmt_t *src_mf = out_port_ptr->common.media_fmt_ptr;
+
+   if(!dst_mf || !src_mf || !tu_has_media_format_changed(dst_mf, src_mf))
+   {
+      TOPO_MSG(topo_ptr->gu.log_id, DBG_HIGH_PRIO,
+               "Skipping MF propagation, no change (MIID 0x%lx)",
+               attached_module_ptr->gu.module_instance_id);
+
+      return;
+   }          
+
    TOPO_PRINT_MEDIA_FMT(topo_ptr->gu.log_id,
                         attached_module_ptr,
                         attached_input_port_ptr,
@@ -1296,6 +1308,12 @@ static ar_result_t gen_topo_prop_med_fmt_from_prev_out_to_next_in(gen_topo_t *  
                                     prev_out_ptr->common.media_fmt_ptr);
       }
 
+      // Check and set media format on attached modules if needed. 
+      if (prev_out_ptr && prev_out_ptr->gu.attached_module_ptr)
+      {
+         gen_topo_set_med_fmt_to_attached_module(topo_ptr, prev_out_ptr);
+      }
+      
       prev_out_ptr->common.flags.media_fmt_event = FALSE;
       in_port_ptr->common.flags.media_fmt_event  = TRUE;
       in_port_ptr->flags.media_fmt_received      = TRUE;
