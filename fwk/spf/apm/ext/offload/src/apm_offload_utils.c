@@ -25,6 +25,8 @@
 #include "apm_memmap_api.h"
 #include "apm_cmd_utils.h"
 #include "apm_debug_info.h"
+#include "proxy_cntr_if.h"
+#include "apm_private_api.h"
 
 /**==============================================================================
    Function Declarations
@@ -113,8 +115,9 @@ apm_offload_utils_vtable_t offload_util_funcs =
 
    .apm_debug_info_cfg_hdlr_fptr = apm_send_debug_info_to_sat,
 
-   .apm_offload_mem_mgr_reset_fptr = apm_offload_mem_mgr_reset
-
+   .apm_offload_mem_mgr_reset_fptr = apm_offload_mem_mgr_reset,
+   
+   .apm_offload_handle_scale_factor_info_fptr = apm_offload_handle_scale_factor_info
 };
 
 static apm_offload_utils_sat_pd_info_t g_apm_sat_pd_info = { 0 };
@@ -851,6 +854,173 @@ ar_result_t apm_offload_handle_pd_info(apm_t *apm_info_ptr, apm_module_param_dat
    }
    return result;
 }
+
+static ar_result_t apm_offload_parse_voice_session_info(apm_t *apm_info_ptr, uint8_t *mod_pid_payload_ptr, uint32_t payload_size)
+{
+   ar_result_t                   result                      = AR_EOK;
+   apm_sub_graph_t *             sub_graph_node_ptr          = NULL;
+   apm_container_t *             contr_node_ptr              = NULL;
+   uint32_t                      local_domain_id             = 0;
+   uint32_t                      num_cfgs;
+   uint8_t *                     curr_payload_ptr;
+   apm_param_id_offload_voice_session_info_t *pid_data_ptr;
+   apm_param_id_offload_voice_session_info_payload_t *curr_sg_cfg_ptr;
+   uint32_t                      expected_payload_size;
+   spf_list_node_t         *container_list_ptr;
+   apm_cont_cached_cfg_t *cont_cached_cfg_ptr;
+   apm_cont_cmd_ctrl_t *  cont_cmd_ctrl_ptr;
+   apm_offload_voice_session_info_t *voice_info_ptr;
+
+   /** Validate the payload pointer */
+   if (!mod_pid_payload_ptr || !payload_size)
+   {
+      AR_MSG(DBG_ERROR_PRIO,
+             "SG_PARSE: PID payload pointer[0x%lX] and/or size[%lu] is NULL",
+             mod_pid_payload_ptr,
+             payload_size);
+
+      return AR_EFAILED;
+   }
+
+   __gpr_cmd_get_host_domain_id(&local_domain_id);
+
+   /** Get the pointer to sub-graph config payload start */
+   pid_data_ptr = (apm_param_id_offload_voice_session_info_t *)mod_pid_payload_ptr;
+
+   /** Validate the number of sub-graphs being configured */
+   if (!pid_data_ptr->num_configs)
+   {
+      AR_MSG(DBG_ERROR_PRIO, "SG_PARSE: Num configs is 0");
+
+      return AR_EBADPARAM;
+   }
+
+   num_cfgs = pid_data_ptr->num_configs;
+  
+  /** Compute min payload size */
+  expected_payload_size = sizeof(apm_param_id_offload_voice_session_info_t) + (num_cfgs * sizeof(apm_param_id_offload_voice_session_info_payload_t));
+  
+  /** Validate provided payload size */
+  if (payload_size < expected_payload_size)
+  {
+     AR_MSG(DBG_ERROR_PRIO,
+            "SG_PARSE: Insufficient payload size[%lu bytes], min size[%lu bytes], num_cfgs sg[%lu]",
+            payload_size,
+            expected_payload_size,
+            num_cfgs);
+  
+     return AR_EBADPARAM;
+  }
+  
+  AR_MSG(DBG_MED_PRIO,
+         "SG_PARSE: Processing num_cfgs[%lu], payload_size[%lu bytes]",
+         num_cfgs,
+         payload_size);
+  
+  /** Get the pointer to start of sub-graph object list */
+  curr_payload_ptr = mod_pid_payload_ptr + sizeof(apm_param_id_offload_voice_session_info_t);
+  
+  /** Iterate over the list of sub-graph config objects */
+  for (uint32_t idx = num_cfgs; idx > 0; idx--)
+  {
+     /** Get the pointer to current sub-graph object */
+     curr_sg_cfg_ptr = (apm_param_id_offload_voice_session_info_payload_t *)curr_payload_ptr;
+  
+     if ((AR_INVALID_INSTANCE_ID == curr_sg_cfg_ptr->sg_id) ||
+         (curr_sg_cfg_ptr->sg_id < AR_DYNAMIC_INSTANCE_ID_RANGE_BEGIN))
+     {
+  
+        AR_MSG(DBG_ERROR_PRIO, "SG_PARSE: Invalid SG_ID: [0x%lX]", curr_sg_cfg_ptr->sg_id);
+  
+        return AR_EBADPARAM;
+     }
+  
+     /** Check if the sub-graph ID already exists in the graph data base. */
+     result = apm_db_get_sub_graph_node(&apm_info_ptr->graph_info,
+                                        curr_sg_cfg_ptr->sg_id,
+                                        &sub_graph_node_ptr,
+                                        APM_DB_OBJ_QUERY);
+                                        
+     if ( ( AR_EOK != result ) || ( NULL == sub_graph_node_ptr) )
+     {
+        AR_MSG(DBG_ERROR_PRIO, "SG_PARSE: Invalid SG_node or SG_ID: [0x%lX]", curr_sg_cfg_ptr->sg_id);
+        return AR_EBADPARAM;
+     }
+     container_list_ptr = sub_graph_node_ptr->container_list_ptr;
+
+     while (container_list_ptr )
+     {
+       contr_node_ptr = container_list_ptr->obj_ptr;
+       /** Get the pointer to host container's command control
+        *  pointer */
+       apm_get_cont_cmd_ctrl_obj(contr_node_ptr, apm_info_ptr->curr_cmd_ctrl_ptr, &cont_cmd_ctrl_ptr);
+     
+       /** Get the pointer to container cached configuration params
+        *  corresponding to current APM command */
+       cont_cached_cfg_ptr = &cont_cmd_ctrl_ptr->cached_cfg_params;
+
+       if (NULL == (voice_info_ptr = (apm_offload_voice_session_info_t *)
+                       posal_memory_malloc(sizeof(apm_offload_voice_session_info_t), POSAL_HEAP_DEFAULT)))
+       {
+          AR_MSG(DBG_ERROR_PRIO,
+                 "apm_aggregate_cntr_payload(): Failed to allocate memory for caching cont info, "
+                 "CONT_ID[0x%lX]",
+                 contr_node_ptr->container_id);
+
+          return AR_ENOMEMORY;
+       }
+
+       /** Populate the allocated cached object */
+       voice_info_ptr->header.param_id = CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO;
+       voice_info_ptr->sg_id = curr_sg_cfg_ptr->sg_id;
+       voice_info_ptr->kpps_sf = curr_sg_cfg_ptr->kpps_sf;
+       voice_info_ptr->bw_sf = curr_sg_cfg_ptr->bw_sf;
+
+       /** Add this param ID to the cached configuration list of this contr */
+       if (AR_EOK != (result = apm_db_add_node_to_list(&cont_cached_cfg_ptr->cont_cfg_params.param_data_list_ptr,
+                                                       voice_info_ptr,
+                                                       &cont_cached_cfg_ptr->cont_cfg_params.num_cfg_params)))
+       {
+          return result;
+       }
+       
+       /** Add this container node to the list of container pending
+           *  send message */
+       if (AR_EOK != (result = apm_add_cont_to_pending_msg_send_list(apm_info_ptr->curr_cmd_ctrl_ptr,
+                                                                     contr_node_ptr,
+                                                                     cont_cmd_ctrl_ptr)))
+       {
+          return result;
+       }
+       container_list_ptr = container_list_ptr->next_ptr;
+     }
+     
+                                        
+  }
+  return result;
+}
+ar_result_t apm_offload_handle_scale_factor_info(apm_t *apm_info_ptr, apm_module_param_data_t *mod_data_ptr)
+{
+   ar_result_t result = AR_EOK;
+
+   switch (mod_data_ptr->param_id)
+   {
+      case APM_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO:
+      {
+        uint8_t* mod_pid_payload_ptr = ((uint8_t *)mod_data_ptr) + sizeof(apm_module_param_data_t);
+        result = apm_offload_parse_voice_session_info( apm_info_ptr, mod_pid_payload_ptr, mod_data_ptr->param_size );
+        break;
+      }
+      default:
+      {
+         AR_MSG(DBG_ERROR_PRIO, "APM: apm_offload_handle_scale_factor_info: Unsupported pid 0x%X", mod_data_ptr->param_id);
+         result = AR_EUNSUPPORTED;
+         break;
+      }
+   }
+   return result;
+}
+
 ar_result_t apm_send_debug_info_to_sat(apm_t *apm_info_ptr)
 {
    ar_result_t                      result              = AR_EOK;

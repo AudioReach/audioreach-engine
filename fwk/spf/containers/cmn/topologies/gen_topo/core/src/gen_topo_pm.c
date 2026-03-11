@@ -53,6 +53,10 @@ static uint32_t gen_topo_aggregate_bandwidth(gen_topo_t *topo_ptr, bool_t only_a
          aggregated_bw += bw;
       }
       sg_scaled_bw_agg = sg_scaled_bw_agg * sg_list_ptr->sg_ptr->bus_scale_factor_q4;
+      if (sg_list_ptr->sg_ptr->bw_scale_factor > 0 )
+      {
+         sg_scaled_bw_agg = ( sg_list_ptr->sg_ptr->bw_scale_factor * sg_scaled_bw_agg )/10;
+      }
 
       *scaled_bw_agg_ptr += (sg_scaled_bw_agg >> 4);
    }
@@ -64,6 +68,7 @@ static uint32_t gen_topo_aggregate_bandwidth(gen_topo_t *topo_ptr, bool_t only_a
 static uint32_t gen_topo_aggregate_kpps(gen_topo_t *topo_ptr, bool_t only_aggregate, uint32_t *scaled_kpps_agg_q4_ptr)
 {
    uint32_t aggregate_kpps       = 0;
+   uint32_t sg_kpps       = 0;
    bool_t   need_to_ignore_state = only_aggregate;
 
    *scaled_kpps_agg_q4_ptr = 0;
@@ -84,7 +89,7 @@ static uint32_t gen_topo_aggregate_kpps(gen_topo_t *topo_ptr, bool_t only_aggreg
             scaled_kpps_q4 = (module_ptr->kpps_scale_factor_q4 * kpps);
 
             sg_scaled_kpps_agg_q12_ptr += scaled_kpps_q4;
-            aggregate_kpps += kpps;
+            sg_kpps += kpps;
          }
       }
       if (sg_list_ptr->sg_ptr->duty_cycling_mode_enabled)
@@ -98,6 +103,15 @@ static uint32_t gen_topo_aggregate_kpps(gen_topo_t *topo_ptr, bool_t only_aggreg
          sg_scaled_kpps_agg_q12_ptr =
             sg_scaled_kpps_agg_q12_ptr * UNITY_Q4 * sg_list_ptr->sg_ptr->clock_scale_factor_q4;
       }
+      if (sg_list_ptr->sg_ptr->kpps_scale_factor > 0 )
+      {
+         aggregate_kpps += ( sg_list_ptr->sg_ptr->kpps_scale_factor * sg_kpps )/10;
+      }
+      else
+      {
+         aggregate_kpps += sg_kpps;
+      }
+      sg_kpps = 0;
       *scaled_kpps_agg_q4_ptr += (sg_scaled_kpps_agg_q12_ptr >> 8);
    }
 

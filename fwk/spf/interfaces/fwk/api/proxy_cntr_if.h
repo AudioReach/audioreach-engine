@@ -152,6 +152,45 @@ struct cntr_event_id_container_perf_params_update_t
 
 #define CNTR_EVENT_ID_CONTAINER_FRAME_DELIVERY_DONE 0x0800116F
 
+/**
+ * This param ID is used as part of #SPF_MSG_CMD_SET_CFG.
+ *
+ * This parameter is used by container clients (E.g., APM/VCPM) to
+ * set the offload voice session parameters needed by the container.
+ * Payload: cntr_param_id_offload_voice_session_info_t
+ */
+#define CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO 0x08001B35
+
+struct cntr_param_id_offload_voice_session_info_t
+{
+   uint32_t sg_id;
+   /**< Subgraph ID.*/
+
+   uint32_t kpps_sf;
+   /**< kpps scale factor to be applied on offload path.*/
+
+   uint32_t bw_sf;
+   /**< bw scale factor to be applied on offload path.*/
+};
+typedef struct cntr_param_id_offload_voice_session_info_t cntr_param_id_offload_voice_session_info_t;
+
+/**
+ * This param ID is used as part of #SPF_MSG_CMD_GET_CFG.
+ *
+ * This parameter is used by container clients (E.g., VCPM) to
+ * Get the satellite domain info mapped to the OLC.
+ *
+ * Payload: cntr_param_id_satellite_domain_info_t
+ */
+#define CNTR_PARAM_ID_SATELLITE_DOMAIN_INFO 0x08001B63
+
+struct cntr_param_id_satellite_domain_info_t
+{
+   uint32_t proc_id;
+   /**< The proc ID of satellite domain. Its an ouput field */
+};
+typedef struct cntr_param_id_satellite_domain_info_t cntr_param_id_satellite_domain_info_t;
+
 /********************************************************************************************************/
 /*                                          Messages                                                    */
 /********************************************************************************************************/

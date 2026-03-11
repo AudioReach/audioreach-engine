@@ -37,6 +37,8 @@ void cu_destroy_voice_info(cu_base_t *base_ptr);
 ar_result_t cu_voice_session_cfg(cu_base_t *base_ptr, int8_t *param_payload_ptr, uint32_t *param_size_ptr);
 ar_result_t cu_set_calibration_ops_done(cu_base_t *base_ptr, int8_t *param_payload_ptr, uint32_t *param_size_ptr);
 
+ar_result_t cu_offload_voice_session_cfg(cu_base_t *base_ptr, int8_t *param_payload_ptr, uint32_t *param_size_ptr);
+
 ar_result_t cu_cntr_proc_params_query(cu_base_t *base_ptr, int8_t *param_payload_ptr, uint32_t *param_size_ptr);
 
 ar_result_t cu_check_and_raise_voice_proc_param_update_event(cu_base_t *base_ptr, uint32_t log_id, uint32_t hw_acc_proc_delay, bool_t hw_acc_proc_delay_event);

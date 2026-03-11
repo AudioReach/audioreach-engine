@@ -89,6 +89,8 @@ typedef struct apm_offload_utils_vtable
 
    ar_result_t (*apm_offload_mem_mgr_reset_fptr)(void);
 
+  ar_result_t (*apm_offload_handle_scale_factor_info_fptr)(apm_t *apm_info_ptr, apm_module_param_data_t *mod_data_ptr);
+
 } apm_offload_utils_vtable_t;
 
 /*----------------------------------------------------------------------------
@@ -103,6 +105,9 @@ ar_result_t apm_offload_utils_init(apm_t *apm_info_ptr);
 ar_result_t apm_offload_utils_deinit();
 
 ar_result_t apm_offload_utils_handle_svc_status(apm_t *apm_info_ptr, void *status_ptr);
+
+ar_result_t apm_offload_handle_scale_factor_info(apm_t *apm_info_ptr, apm_module_param_data_t *mod_data_ptr);
+
 #ifdef __cplusplus
 }
 #endif //__cplusplus
