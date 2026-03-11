@@ -125,9 +125,12 @@ THIN_TOPO_STATIC ar_result_t thin_topo_copy_data_from_prev_to_next(gen_topo_t   
 #endif
 
    // since buffer ptrs are same just copy the actual len, to complete the data copy
+   uint32_t bytes_to_move_per_ch = prev_bufs_ptr[0].actual_data_len;
    for (uint32_t b = 0; b < next_in_port_ptr->common.sdata.bufs_num; b++)
    {
-      next_bufs_ptr[b].actual_data_len = prev_bufs_ptr[b].actual_data_len;
+      // note that previous port might be operating with unpacked V2 so only first ch will have valid actual len
+      // hence using only first ch's length to move data for all the channels.
+      next_bufs_ptr[b].actual_data_len = bytes_to_move_per_ch;
       prev_bufs_ptr[b].actual_data_len = 0;
    }
 
@@ -197,6 +200,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_copy_data_from_prev_to_next(gen_topo_t   
 
 /* Poll for the input buffers for PCM only and only if,
  *  1. Internal input buffer is not filled and data buffers are present on the queue.
+ *  2. If the media format is not yet received, because it may be received in process context due to started state.
  */
 THIN_TOPO_STATIC inline bool_t thin_topo_need_to_poll_for_input_data(gen_cntr_ext_in_port_t *ext_in_port_ptr)
 {
@@ -206,7 +210,8 @@ THIN_TOPO_STATIC inline bool_t thin_topo_need_to_poll_for_input_data(gen_cntr_ex
    uint32_t max_len = in_port_ptr->common.bufs_ptr[0].data_ptr ? in_port_ptr->common.bufs_ptr[0].max_data_len
                                                                : in_port_ptr->common.max_buf_len_per_buf;
 
-   if ((max_len > in_port_ptr->common.bufs_ptr[0].actual_data_len) && (0 == ext_in_port_ptr->buf.actual_data_len))
+   if (((max_len > in_port_ptr->common.bufs_ptr[0].actual_data_len) && (0 == ext_in_port_ptr->buf.actual_data_len)) ||
+       (SPF_UNKNOWN_DATA_FORMAT == ext_in_port_ptr->cu.media_fmt.data_format))
    {
       return TRUE;
    }
@@ -611,11 +616,12 @@ THIN_TOPO_STATIC ar_result_t thin_topo_setup_internal_input_port_and_preprocess(
    return result;
 }
 
-THIN_TOPO_STATIC ar_result_t thin_topo_poll_and_setup_ext_inputs(gen_cntr_t *me_ptr, gen_topo_input_port_t *in_port_ptr)
+THIN_TOPO_STATIC ar_result_t thin_topo_poll_and_setup_ext_inputs(gen_cntr_t             *me_ptr,
+                                                                 gen_cntr_ext_in_port_t *ext_in_port_ptr,
+                                                                 gen_topo_input_port_t  *in_port_ptr)
 {
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
-   gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)in_port_ptr->gu.ext_in_port_ptr;
 
 #ifdef VERBOSE_DEBUGGING
    uint32_t num_polled_buffers = 0;
@@ -991,9 +997,18 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
       gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
       gen_topo_input_port_t  *in_port_ptr     = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
 
-      {
-         TRY(result, thin_topo_poll_and_setup_ext_inputs(me_ptr, in_port_ptr));
-      }
+#ifdef VERBOSE_DEBUGGING
+      GEN_CNTR_MSG_ISLAND(topo_ptr->gu.log_id,
+                          DBG_HIGH_PRIO,
+                          "Module 0x%lX external Input 0x%lx int buf: (%p %lu %lu) ",
+                          module_ptr->gu.module_instance_id,
+                          in_port_ptr->gu.cmn.id,
+                          in_port_ptr->common.bufs_ptr[0].data_ptr,
+                          in_port_ptr->common.bufs_ptr[0].actual_data_len,
+                          in_port_ptr->common.bufs_ptr[0].max_data_len);
+#endif
+
+      TRY(result, thin_topo_poll_and_setup_ext_inputs(me_ptr, ext_in_port_ptr, in_port_ptr));
    }
 
    /** -------- PRE-PROCESS EXTERNAL OUTPUTS ---------------
@@ -1238,13 +1253,13 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
          // if there is any post process required for the outputs cannot be handled in thin topo.
          // currently only external outputs require post process hence differing it to handle in gen topo.
          //
-         bool_t has_metadata = out_port_ptr->common.sdata.metadata_list_ptr ? TRUE : FALSE;
+         bool_t has_metadata       = out_port_ptr->common.sdata.metadata_list_ptr ? TRUE : FALSE;
+         bool_t has_erasure_or_EOF = thin_topo_is_sdata_flag_erasure_or_EOF_set(out_port_ptr->common.sdata.flags);
          bool_t is_data_flow_starting =
             ((TOPO_DATA_FLOW_STATE_AT_GAP == out_port_ptr->common.data_flow_state) &&
-             (thin_topo_is_sdata_flag_erasure_or_EOF_set(out_port_ptr->common.sdata.flags) || has_metadata ||
-              out_port_ptr->common.bufs_ptr[0].actual_data_len));
+             (has_erasure_or_EOF || has_metadata || out_port_ptr->common.bufs_ptr[0].actual_data_len));
 
-         if (has_metadata || is_data_flow_starting)
+         if (has_metadata || has_erasure_or_EOF || is_data_flow_starting)
          {
             topo_ptr->thin_topo_ptr->state = THIN_TOPO_EXITED_AT_OUTPUT_POST_PROCESS;
 
@@ -1254,7 +1269,10 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
             // order which doesn't include the attached modules. Hence there is another check after output post process
             // loop which triggers exit from thin topo.
             gen_topo_exit_island_temporarily(topo_ptr);
-            gen_topo_handle_data_flow_begin(topo_ptr, &out_port_ptr->common, &out_port_ptr->gu.cmn);
+            if (is_data_flow_starting)
+            {
+               gen_topo_handle_data_flow_begin(topo_ptr, &out_port_ptr->common, &out_port_ptr->gu.cmn);
+            }
 
             // process data flow start for attached module and call attached module process
             if (out_port_ptr->gu.attached_module_ptr)
@@ -1282,7 +1300,8 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
 
             // if the current output has metadata, it will be processed from gen topo context. nothing to do here.
          }
-         else // steady state handling
+         // this particular output can be at gap (can happen for MIMO rat if input MF is not available)
+         else if (out_port_ptr->common.bufs_ptr[0].actual_data_len)
          {
             if (out_port_ptr->gu.attached_module_ptr)
             {
@@ -1475,6 +1494,10 @@ skip_thin_topo_process__:
 
    me_ptr->topo.flags.need_to_ignore_signal_miss = FALSE;
    me_ptr->prev_err_print_time_ms                = me_ptr->topo.proc_context.err_print_time_in_this_process_ms;
+   if (me_ptr->st_module.st_module_ts_ptr)
+   {
+      me_ptr->st_module.st_module_ts_ptr->is_valid = FALSE;
+   }
 
    return result;
 }

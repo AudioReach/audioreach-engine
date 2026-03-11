@@ -264,12 +264,11 @@ GEN_CNTR_STATIC ar_result_t thin_topo_replace_with_topo_buffer(gen_cntr_t       
                 MIN(cmn_port_ptr->bufs_ptr[0].actual_data_len, cmn_port_ptr->max_buf_len_per_buf),
                 cmn_port_ptr->max_buf_len_per_buf);
 #endif
+   uint32_t bytes_per_ch = cmn_port_ptr->bufs_ptr[0].actual_data_len;
    for (uint32_t b = 0; b < cmn_port_ptr->sdata.bufs_num; b++)
    {
-      cmn_port_ptr->bufs_ptr[b].actual_data_len = memscpy(new_ptr,
-                                                          cmn_port_ptr->max_buf_len_per_buf,
-                                                          cmn_port_ptr->bufs_ptr[b].data_ptr,
-                                                          cmn_port_ptr->bufs_ptr[b].actual_data_len);
+      cmn_port_ptr->bufs_ptr[b].actual_data_len =
+         memscpy(new_ptr, cmn_port_ptr->max_buf_len_per_buf, cmn_port_ptr->bufs_ptr[b].data_ptr, bytes_per_ch);
 
       cmn_port_ptr->bufs_ptr[b].data_ptr     = new_ptr;
       cmn_port_ptr->bufs_ptr[b].max_data_len = cmn_port_ptr->max_buf_len_per_buf;
@@ -325,15 +324,29 @@ GEN_CNTR_STATIC ar_result_t thin_topo_return_assigned_port_buffers(gen_cntr_t *m
             data_dropped                                    = in_port_ptr->common.bufs_ptr[0].actual_data_len;
             in_port_ptr->common.bufs_ptr[0].actual_data_len = 0;
 
-            GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
-                         DBG_ERROR_PRIO,
-                         "Module 0x%lX: Input port id 0x%lx, dropping data data_dropped=%lu, unexpected",
-                         module_ptr->gu.module_instance_id,
-                         in_port_ptr->gu.cmn.id,
-                         data_dropped);
+            // if the module is active ideally there is no partial data expected at the input.
+            if (module_ptr->flags.active)
+            {
+               GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                            DBG_ERROR_PRIO,
+                            "Module 0x%lX: Input port id 0x%lx, dropping data=%lu is not expected since module is "
+                            "active",
+                            module_ptr->gu.module_instance_id,
+                            in_port_ptr->gu.cmn.id,
+                            data_dropped);
 
-            // crashes only for sim
-            spf_svc_crash();
+               // crashes only for sim
+               spf_svc_crash();
+            }
+            else
+            {
+               GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                            DBG_ERROR_PRIO,
+                            "Module 0x%lX: Input port id 0x%lx, dropping data data_dropped=%lu, unexpected",
+                            module_ptr->gu.module_instance_id,
+                            in_port_ptr->gu.cmn.id,
+                            data_dropped);
+            }
          }
 
 #ifdef VERBOSE_DEBUGGING
@@ -375,6 +388,17 @@ GEN_CNTR_STATIC ar_result_t thin_topo_return_assigned_port_buffers(gen_cntr_t *m
                // replace with a topo buffer
                thin_topo_replace_with_topo_buffer(me_ptr, module_ptr, &in_port_ptr->common, in_port_ptr->gu.cmn.id);
             }
+            // for pcm unpacked need to make sure that all the ch lengths are updated, because gen topo may only
+            // update first ch for unpacked as an optimization.
+            else if (in_port_ptr->common.flags.is_pcm_unpacked)
+            {
+               gen_topo_common_port_t *cmn_port_ptr = &in_port_ptr->common;
+               for (uint32_t b = 0; b < cmn_port_ptr->sdata.bufs_num; b++)
+               {
+                  cmn_port_ptr->bufs_ptr[b].actual_data_len = cmn_port_ptr->bufs_ptr[0].actual_data_len;
+                  cmn_port_ptr->bufs_ptr[b].max_data_len    = cmn_port_ptr->bufs_ptr[0].max_data_len;
+               }
+            }
          }
 
          // free external input if it was held for pass thru
@@ -407,15 +431,31 @@ GEN_CNTR_STATIC ar_result_t thin_topo_return_assigned_port_buffers(gen_cntr_t *m
             data_dropped                                     = out_port_ptr->common.bufs_ptr[0].actual_data_len;
             out_port_ptr->common.bufs_ptr[0].actual_data_len = 0;
 
-            GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
-                         DBG_ERROR_PRIO,
-                         "Module 0x%lX: Output port id 0x%lx, dropping data data_dropped=%lu, unexpected",
-                         module_ptr->gu.module_instance_id,
-                         out_port_ptr->gu.cmn.id,
-                         data_dropped);
+            // If next module is active, we should not have pending data to drop, thats an error
+            if (out_port_ptr->gu.conn_in_port_ptr && out_port_ptr->gu.conn_in_port_ptr->cmn.module_ptr &&
+                ((gen_topo_module_t *)out_port_ptr->gu.conn_in_port_ptr->cmn.module_ptr)->flags.active)
+            {
+               GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                            DBG_ERROR_PRIO,
+                            "Module 0x%lX: Output port id 0x%lx, dropping data=%lu is not expected since next module "
+                            "0x%lx is active",
+                            module_ptr->gu.module_instance_id,
+                            out_port_ptr->gu.cmn.id,
+                            data_dropped,
+                            out_port_ptr->gu.conn_in_port_ptr->cmn.module_ptr->module_instance_id);
 
-            // crashes only for sim
-            spf_svc_crash();
+               // crashes only for sim
+               spf_svc_crash();
+            }
+            else
+            {
+               GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                            DBG_ERROR_PRIO,
+                            "Module 0x%lX: Output port id 0x%lx, dropping data=%lu",
+                            module_ptr->gu.module_instance_id,
+                            out_port_ptr->gu.cmn.id,
+                            data_dropped);
+            }
          }
 #ifdef VERBOSE_DEBUGGING
          GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
@@ -451,6 +491,17 @@ GEN_CNTR_STATIC ar_result_t thin_topo_return_assigned_port_buffers(gen_cntr_t *m
                // replace with a topo buffer
                thin_topo_replace_with_topo_buffer(me_ptr, module_ptr, &out_port_ptr->common, out_port_ptr->gu.cmn.id);
             }
+            // for pcm unpacked need to make sure that all the ch lengths are updated, because gen topo may only
+            // update first ch for unpacked as an optimization.
+            else if (out_port_ptr->common.flags.is_pcm_unpacked)
+            {
+               gen_topo_common_port_t *cmn_port_ptr = &out_port_ptr->common;
+               for (uint32_t b = 0; b < cmn_port_ptr->sdata.bufs_num; b++)
+               {
+                  cmn_port_ptr->bufs_ptr[b].actual_data_len = cmn_port_ptr->bufs_ptr[0].actual_data_len;
+                  cmn_port_ptr->bufs_ptr[b].max_data_len    = cmn_port_ptr->bufs_ptr[0].max_data_len;
+               }
+            }
          }
       }
    }
@@ -470,30 +521,34 @@ GEN_CNTR_STATIC ar_result_t gen_cntr_prepare_remaining_ext_inputs_before_switch(
       gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
       gen_topo_input_port_t  *in_port_ptr     = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
 
-      // check if there data in the external input, it means port is already setup else its needs to be setup by gen
-      // topo.
-      if (in_port_ptr->common.bufs_ptr[0].actual_data_len)
-      {
-#ifdef VERBOSE_DEBUGGING
-         GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
-                      DBG_LOW_PRIO,
-                      "Module 0x%lX: External Input port id 0x%lx buffer 0x%lx lens (%lu of %lu) setup is done, skip "
-                      "setup now.",
-                      in_port_ptr->gu.cmn.module_ptr->module_instance_id,
-                      in_port_ptr->gu.cmn.id,
-                      ext_in_port_ptr->buf.data_ptr,
-                      ext_in_port_ptr->buf.actual_data_len,
-                      ext_in_port_ptr->buf.max_data_len);
-#endif
-
-         // required for gen topo to indicate port is ready to process.
-         ext_in_port_ptr->flags.ready_to_go = TRUE;
-         continue;
-      }
-
       // if thin topo exited at/before setting up ext inputs, it needs to setup remaining ports.
       if (me_ptr->topo.thin_topo_ptr->state <= THIN_TOPO_EXITED_AT_EXT_IN_BUFFER_SETUP)
       {
+         // check if there data in the external input, it means port is already setup else its needs to be setup by gen
+         // topo.
+         // If the internal topo buffer is filled continue to setup the next input port.
+         // here, in_port_ptr->common.buf.data_ptr must be present
+         // and hence using max_data_len is ok compared to max_buf_len
+         if (in_port_ptr->common.bufs_ptr[0].actual_data_len == in_port_ptr->common.max_buf_len_per_buf)
+         {
+            // required for gen topo to indicate port is ready to process.
+            ext_in_port_ptr->flags.ready_to_go      = TRUE;
+            in_port_ptr->common.sdata.flags.erasure = FALSE;
+#ifdef VERBOSE_DEBUGGING
+            GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                         DBG_LOW_PRIO,
+                         "Module 0x%lX: External Input port id 0x%lx buffer 0x%lx lens (%lu of %lu) setup is done, "
+                         "skip "
+                         "setup now.",
+                         in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                         in_port_ptr->gu.cmn.id,
+                         ext_in_port_ptr->buf.data_ptr,
+                         ext_in_port_ptr->buf.actual_data_len,
+                         ext_in_port_ptr->buf.max_data_len);
+#endif
+            continue;
+         }
+
 #ifdef VERBOSE_DEBUGGING
          GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
                       DBG_LOW_PRIO,
@@ -504,6 +559,13 @@ GEN_CNTR_STATIC ar_result_t gen_cntr_prepare_remaining_ext_inputs_before_switch(
 
          // poll and repare external input buffer for this port
          gen_cntr_st_prepare_input_buffers_per_port(me_ptr, ext_in_port_ptr);
+      }
+      else // if thin topo exited after setting up external inputs, mark all the ports as "ready_to_go"=TRUE to prevent
+           // calling gen_cntr_setup_internal_input_port_and_preprocess() in gen_cntr_data_process_one_frame()
+      {
+         // required for gen topo to indicate port is ready to process.
+         ext_in_port_ptr->flags.ready_to_go = TRUE;
+         continue;
       }
    }
 
@@ -527,31 +589,40 @@ ar_result_t gen_cntr_switch_from_thin_topo_to_gen_topo_during_process(gen_cntr_t
 
    topo_ptr->proc_context.curr_trigger = GEN_TOPO_SIGNAL_TRIGGER;
 
-   // continues processing from this module in
-
    // free any port buffers without data, and replace with topo buffers if it has data
    // if there is a port buffer with data, it will be retained if its a topo buffer.
    // If its external buffer propagated in thin topo, it must be replaced with topo buffer.
    // Note that for that one interrupt cycle it might result in an extra copy from topo -> ext buffer,
    TRY(result, thin_topo_return_assigned_port_buffers(me_ptr, FALSE /* flag: need to drop data*/));
 
+   // we might have exited after partially setting up external inputs, need to continue here.
    // Handle ext port setup,
    // 1. check if external ports/buffers need to setup as per gen topo requirements
    // 2. some scratch variables and proc info variables required for gen topo are updated here
-
-   // we might have exited after partially setting up external inputs, need to continue here.
    TRY(result, gen_cntr_prepare_remaining_ext_inputs_before_switch(me_ptr));
 
-   // if thin topo exited at/before setting up ext inputs, it needs to setup remaining output ports as well.
+   // if thin topo exited at/before setting up ext inputs/output, it needs to setup remaining output ports as well.
    if (topo_ptr->thin_topo_ptr->state <= THIN_TOPO_EXITED_AT_EXT_IN_BUFFER_SETUP)
    {
+      // note that currently there is no exit during output buffer setup, if it has exited at the ext input setup,
+      // it means even ext outputs are not setup yet, hence need to setup here.
       gen_cntr_st_prepare_output_buffers(me_ptr);
    }
+   else
+   {
+      /** thin topo always assumes only one frame per buffer for peer container buffers.
+       * Its never sets, so no need reset whenever there is a switch to gen topo
+       * Note that ext
+       */
+      for (gu_ext_out_port_list_t *out_port_list_ptr = me_ptr->topo.gu.ext_out_port_list_ptr;
+           (NULL != out_port_list_ptr);
+           LIST_ADVANCE(out_port_list_ptr))
+      {
+         gen_cntr_ext_out_port_t *ext_out_port_ptr = (gen_cntr_ext_out_port_t *)out_port_list_ptr->ext_out_port_ptr;
 
-   // todo: i think data can be stalled only at inputs ? if module raised any events input wil not be consumed and
-   // output is not generated. hence we wont have a case where data is stalled at output seems like.
-   // i think if module generated any ext output data, it would have been sent downstream during its post process, and
-   // in gen topo post process container will not see any data remaning to be post processed, and skips the port.
+         ext_out_port_ptr->num_frames_in_buf = 0;
+      }
+   }
 
    result = gen_cntr_data_process_frames(me_ptr);
 
@@ -807,6 +878,19 @@ ar_result_t thin_topo_update_process_info(gen_cntr_t *me_ptr)
                         module_ptr->gu.module_instance_id,
                         in_port_ptr->gu.cmn.id);
             }
+
+            // update lengths for rest of the channels, for unpacked V1
+            gen_topo_common_port_t *cmn_port_ptr = &in_port_ptr->common;
+            if (gen_topo_is_pcm_any_unpacked(cmn_port_ptr))
+            {
+               for (uint32_t b = 1; b < cmn_port_ptr->sdata.bufs_num; b++)
+               {
+                  cmn_port_ptr->bufs_ptr[b].data_ptr =
+                     cmn_port_ptr->bufs_ptr[0].data_ptr + b * cmn_port_ptr->max_buf_len_per_buf;
+                  // cmn_port_ptr->bufs_ptr[b].actual_data_len = 0;
+                  cmn_port_ptr->bufs_ptr[b].max_data_len = cmn_port_ptr->max_buf_len_per_buf;
+               }
+            }
          }
 
 #ifdef THIN_TOPO_BUF_ASSIGNMENT_DEBUG
@@ -898,6 +982,19 @@ ar_result_t thin_topo_update_process_info(gen_cntr_t *me_ptr)
                         " Module 0x%lX: Output port id 0x%lx, error getting buffer",
                         module_ptr->gu.module_instance_id,
                         out_port_ptr->gu.cmn.id);
+            }
+
+            // update lengths for rest of the channels, for unpacked V1
+            gen_topo_common_port_t *cmn_port_ptr = &out_port_ptr->common;
+            if (gen_topo_is_pcm_any_unpacked(cmn_port_ptr))
+            {
+               for (uint32_t b = 1; b < cmn_port_ptr->sdata.bufs_num; b++)
+               {
+                  cmn_port_ptr->bufs_ptr[b].data_ptr =
+                     cmn_port_ptr->bufs_ptr[0].data_ptr + b * cmn_port_ptr->max_buf_len_per_buf;
+                  // cmn_port_ptr->bufs_ptr[b].actual_data_len = 0;
+                  cmn_port_ptr->bufs_ptr[b].max_data_len = cmn_port_ptr->max_buf_len_per_buf;
+               }
             }
          }
 

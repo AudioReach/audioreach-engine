@@ -145,6 +145,8 @@ static inline ar_result_t gen_topo_buf_mgr_wrapper_get_buf(gen_topo_t *topo_ptr,
       cmn_port_ptr->bufs_ptr[0].data_ptr       = ptr;
       cmn_port_ptr->flags.buf_origin           = GEN_TOPO_BUF_ORIGIN_BUF_MGR;
 
+      // for pcm unpacked v1/v2 we populate len only for first ch here. If port is operating with unpacked v1
+      // fwk updates rest of the ch lens before calling module process.
       if (cmn_port_ptr->flags.is_pcm_unpacked)
       {
          for (uint32_t b = 0; b < cmn_port_ptr->sdata.bufs_num; b++)
@@ -157,7 +159,6 @@ static inline ar_result_t gen_topo_buf_mgr_wrapper_get_buf(gen_topo_t *topo_ptr,
       }
       else
       {
-
          for (uint32_t b = 0; b < cmn_port_ptr->sdata.bufs_num; b++)
          {
             cmn_port_ptr->bufs_ptr[b].data_ptr =

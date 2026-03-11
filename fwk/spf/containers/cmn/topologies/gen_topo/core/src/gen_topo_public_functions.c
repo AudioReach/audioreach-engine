@@ -862,12 +862,12 @@ void gen_topo_reset_top_level_flags(gen_topo_t *topo_ptr)
 
    TOPO_MSG(topo_ptr->gu.log_id, DBG_LOW_PRIO, "Resetting top level flags.");
 
-   bool_t has_voice_sg            = FALSE;
-   bool_t need_soft_timer_extn    = FALSE;
-   bool_t has_duty_cycling_module = FALSE;
-   bool_t has_signal_tgp_module   = FALSE;
-   bool_t requires_module_looping = FALSE;
-   bool_t has_sh_mem_ep_module    = FALSE;
+   bool_t has_voice_sg                   = FALSE;
+   bool_t need_soft_timer_extn            = FALSE;
+   bool_t has_duty_cycling_module        = FALSE;
+   bool_t has_signal_tgp_module          = FALSE;
+   bool_t requires_module_looping        = FALSE;
+   bool_t mod_type_unsupported_thin_topo = FALSE;
    for (gu_sg_list_t *sg_list_ptr = topo_ptr->gu.sg_list_ptr; (NULL != sg_list_ptr); LIST_ADVANCE(sg_list_ptr))
    {
       if (APM_SUB_GRAPH_SID_VOICE_CALL == topo_ptr->gu.sg_list_ptr->sg_ptr->sid)
@@ -879,12 +879,6 @@ void gen_topo_reset_top_level_flags(gen_topo_t *topo_ptr)
            LIST_ADVANCE(module_list_ptr))
       {
          gen_topo_module_t *module_ptr = (gen_topo_module_t *)module_list_ptr->module_ptr;
-
-         if ((MODULE_ID_WR_SHARED_MEM_EP == module_ptr->gu.module_id) ||
-             (MODULE_ID_RD_SHARED_MEM_EP == module_ptr->gu.module_id))
-         {
-            has_sh_mem_ep_module = TRUE;
-         }
 
          // reset the flags for all modules that didn't raise an event for data trigger in ST,
          // The need_data_trigger_in_st will be updated properly by propagation.
@@ -947,6 +941,17 @@ void gen_topo_reset_top_level_flags(gen_topo_t *topo_ptr)
          {
             requires_module_looping = TRUE;
          }
+
+         if ((AMDB_MODULE_TYPE_DECODER == module_ptr->gu.module_type) ||
+             (AMDB_MODULE_TYPE_ENCODER == module_ptr->gu.module_type) ||
+             (AMDB_MODULE_TYPE_PACKETIZER == module_ptr->gu.module_type) ||
+             (AMDB_MODULE_TYPE_DEPACKETIZER == module_ptr->gu.module_type) ||
+             (AMDB_MODULE_TYPE_CONVERTER == module_ptr->gu.module_type) ||
+             (MODULE_ID_WR_SHARED_MEM_EP == module_ptr->gu.module_id) ||
+             (MODULE_ID_RD_SHARED_MEM_EP == module_ptr->gu.module_id))
+         {
+            mod_type_unsupported_thin_topo = TRUE;
+         }
       }
    }
 
@@ -1005,7 +1010,7 @@ void gen_topo_reset_top_level_flags(gen_topo_t *topo_ptr)
                                   has_duty_cycling_module,
                                   has_signal_tgp_module,
                                   requires_module_looping,
-                                  has_sh_mem_ep_module);
+                                  mod_type_unsupported_thin_topo);
    }
    else
    {
