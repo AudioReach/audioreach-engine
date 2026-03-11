@@ -21,6 +21,43 @@ static capi_err_t capi_audio_dam_imcl_set_hdlr_drain_history_data(capi_audio_dam
                                                                   uint32_t                             op_arr_index,
                                                                   param_id_audio_dam_data_flow_ctrl_t *cfg_ptr);
 
+static capi_err_t capi_audio_dam_raise_allow_duty_cycling(capi_audio_dam_t *me_ptr, bool_t allow_duty_cycling)
+{
+   capi_err_t result         = CAPI_EOK;
+
+   intf_extn_event_id_allow_duty_cycling_v2_t event_payload;
+   AR_MSG(DBG_HIGH_PRIO, "CAPI_DAM: Raise allow_duty_cycling: %d", allow_duty_cycling);
+
+   event_payload.allow_duty_cycling = allow_duty_cycling;
+
+   /* Create event */
+   capi_event_data_to_dsp_service_t to_send;
+   to_send.param_id                = INTF_EXTN_EVENT_ID_ALLOW_DUTY_CYCLING;
+   to_send.payload.actual_data_len = sizeof(intf_extn_event_id_allow_duty_cycling_v2_t);
+   to_send.payload.max_data_len    = sizeof(intf_extn_event_id_allow_duty_cycling_v2_t);
+   to_send.payload.data_ptr        = (int8_t *)&event_payload;
+
+   /* Create event info */
+   capi_event_info_t event_info;
+   event_info.port_info.is_input_port = FALSE;
+   event_info.port_info.is_valid      = FALSE;
+   event_info.payload.actual_data_len = sizeof(to_send);
+   event_info.payload.max_data_len    = sizeof(to_send);
+   event_info.payload.data_ptr        = (int8_t *)&to_send;
+
+   result = me_ptr->event_cb_info.event_cb(me_ptr->event_cb_info.event_context, CAPI_EVENT_DATA_TO_DSP_SERVICE, &event_info);
+
+   if (CAPI_EOK != result)
+   {
+      AR_MSG(DBG_ERROR_PRIO, "CAPI_DAM: Failed to raise INTF_EXTN_EVENT_ID_ALLOW_DUTY_CYCLING event");
+   }
+   else
+   {
+      AR_MSG(DBG_HIGH_PRIO,"CAPI_DAM: Raised INTF_EXTN_EVENT_ID_ALLOW_DUTY_CYCLING event allow_duty_cycling:%d", event_payload.allow_duty_cycling);
+   }
+   return result;
+}
+
 /*==============================================================================
    Public Function Implementation
 ==============================================================================*/
@@ -121,6 +158,7 @@ capi_err_t capi_audio_dam_imcl_set_hdlr_flow_ctrl_v2(capi_audio_dam_t *me_ptr,
          break;
       }
       case AUDIO_DAM_BATCH_STREAM:
+      case AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING:
       {
          DAM_MSG(me_ptr->miid,
                  DBG_HIGH_PRIO,
@@ -133,6 +171,13 @@ capi_err_t capi_audio_dam_imcl_set_hdlr_flow_ctrl_v2(capi_audio_dam_t *me_ptr,
 
          result =
             capi_audio_dam_imcl_handle_gate_open(me_ptr, op_arr_index, (param_id_audio_dam_data_flow_ctrl_t *)cfg_ptr);
+
+         if (AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING == cfg_ptr->gate_ctrl)
+         {
+            me_ptr->is_island_duty_cycle_enabled = TRUE;
+
+            capi_audio_dam_raise_allow_duty_cycling(me_ptr, TRUE);
+         }
          break;
       }
       case AUDIO_DAM_DRAIN_HISTORY:
@@ -183,6 +228,60 @@ static capi_err_t capi_audio_dam_imcl_set_hdlr_drain_history_data(capi_audio_dam
    {
       me_ptr->out_port_info_arr[op_arr_index].is_pending_gate_close = TRUE;
       AR_MSG(DBG_HIGH_PRIO, "DAM: Port index  %lu gate close. FLUSH complete", op_arr_index);
+   }
+   return result;
+}
+
+capi_err_t capi_audio_dam_imcl_trigger_island_entry(capi_audio_dam_t *me_ptr,
+                                                   uint32_t          op_arr_index,
+                                                   vw_imcl_header_t *header_ptr)
+{
+   DAM_MSG(me_ptr->miid, DBG_ERROR_PRIO, "capi_audio_dam: capi_audio_dam_imcl_trigger_island_entry");
+   capi_err_t result = CAPI_EOK;
+   if (header_ptr->actual_data_len < sizeof(param_id_audio_dam_allow_dcm_island_entry_t))
+   {
+      DAM_MSG(me_ptr->miid,
+              DBG_ERROR_PRIO,
+              "CAPI V2 DAM: IMC Param id 0x%lx Invalid payload size for incoming data %d",
+              header_ptr->opcode,
+              header_ptr->actual_data_len);
+      return CAPI_ENEEDMORE;
+   }
+
+   param_id_audio_dam_allow_dcm_island_entry_t *cfg_ptr = (param_id_audio_dam_allow_dcm_island_entry_t *)(header_ptr + 1);
+
+   // Store the flag
+   me_ptr->out_port_info_arr[op_arr_index].trigger_island_entry = cfg_ptr->process_done;
+
+   uint32_t pending_bytes_to_read = 0;
+   if (!me_ptr->is_island_duty_cycle_enabled)
+   {
+      // return error
+      DAM_MSG(me_ptr->miid, DBG_ERROR_PRIO, "DAM is not DCM enabled");
+      return CAPI_EUNSUPPORTED;
+   }
+
+   audio_dam_get_stream_reader_pending_bytes(me_ptr->out_port_info_arr[op_arr_index].strm_reader_ptr, &pending_bytes_to_read);
+
+   if (!is_dam_output_port_initialized(me_ptr, op_arr_index))
+   {
+      DAM_MSG(me_ptr->miid,
+                     DBG_ERROR_PRIO,
+                     "Output port not initialized [%lu]",
+                     pending_bytes_to_read);
+      return CAPI_ENOTREADY;
+   }
+
+
+   // island entry conditions, pending_bytes -> 0, DCM mode enabled and port is intialized
+   if (pending_bytes_to_read == 0)
+   {
+      result |= capi_dam_duty_cycling_buf_send_message_to_dcm(me_ptr, (uint32_t)SPF_MSG_CMD_DCM_REQ_FOR_UNBLOCK_ISLAND_ENTRY);
+   }
+   else
+   {
+      DAM_MSG(me_ptr->miid,
+            DBG_MED_PRIO, "Batching stream data buffering started. Triggering Island Entry pending pending bytes [%lu]", pending_bytes_to_read);
    }
    return result;
 }
