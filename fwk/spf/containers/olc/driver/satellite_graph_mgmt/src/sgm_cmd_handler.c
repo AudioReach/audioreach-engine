@@ -511,6 +511,7 @@ ar_result_t sgm_handle_persistent_cfg_v2(spgm_info_t *                     spgm_
    cmd_header_ptr = (apm_cmd_header_t *)spgm_ptr->active_cmd_hndl_ptr->cmd_payload_ptr;
    uint32_t token = posal_atomic_increment(spgm_ptr->token_instance);
    spgm_ptr->active_cmd_hndl_ptr->multi_max_resp_cnt = num_config;
+   spgm_ptr->active_cmd_hndl_ptr->multi_rsp_cnt = 0;
 
    uint32_t cmd_cnt = 0;
    for (cmd_cnt = 0; cmd_cnt < num_config; cmd_cnt++)
