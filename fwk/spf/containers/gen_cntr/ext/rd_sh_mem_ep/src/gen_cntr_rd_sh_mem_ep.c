@@ -2023,15 +2023,15 @@ ar_result_t gen_cntr_rd_sh_mem_setup_topo_buffer(gen_cntr_t *me_ptr, gen_cntr_ex
 
    if (empty_space_available && (empty_space_available >= out_port_ptr->common.max_buf_len_per_buf))
    {
-      uint32_t buf_addr = (uint32_t)(ext_out_port_ptr->buf.data_ptr + ext_out_port_ptr->buf.actual_data_len);
+      int8_t * buf_addr = (int8_t *)(ext_out_port_ptr->buf.data_ptr + ext_out_port_ptr->buf.actual_data_len);
 
       // if buffer is not 8 byte aligned, skip reusing client buffer.
-      if(buf_addr & 0x7)
+      if((uint32_t)buf_addr & 0x7)
       {
          return result;
       }
 
-      out_port_ptr->common.bufs_ptr[0].data_ptr        = (int8_t *)buf_addr;
+      out_port_ptr->common.bufs_ptr[0].data_ptr        = buf_addr;
       out_port_ptr->common.bufs_ptr[0].actual_data_len = 0;
       out_port_ptr->common.bufs_ptr[0].max_data_len    = out_port_ptr->common.max_buf_len_per_buf;
 
@@ -2069,7 +2069,7 @@ ar_result_t gen_cntr_rd_sh_mem_setup_topo_buffer(gen_cntr_t *me_ptr, gen_cntr_ex
 
          if (NULL == in_port_ptr->common.bufs_ptr[0].data_ptr)
          {
-            in_port_ptr->common.bufs_ptr[0].data_ptr     = (int8_t *)buf_addr;
+            in_port_ptr->common.bufs_ptr[0].data_ptr     = buf_addr;
             in_port_ptr->common.bufs_ptr[0].max_data_len = out_port_ptr->common.bufs_ptr[0].max_data_len;
             in_port_ptr->common.flags.buf_origin         = GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED;
 #ifdef VERBOSE_DEBUGGING

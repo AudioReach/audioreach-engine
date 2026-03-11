@@ -1751,15 +1751,15 @@ ar_result_t gen_cntr_wr_shm_setup_int_port_buf(gen_cntr_t *me_ptr, gen_cntr_ext_
    {
       if ((ext_in_port_ptr->buf.actual_data_len >= in_port_ptr->common.max_buf_len_per_buf))
       {
-         uint32_t buf_addr = (uint32_t)(ext_in_port_ptr->buf.data_ptr +
+         int8_t * buf_addr = (int8_t *)(ext_in_port_ptr->buf.data_ptr +
                                         (ext_in_port_ptr->buf.max_data_len - ext_in_port_ptr->buf.actual_data_len));
 
          // if buffer is not 8 byte aligned, skip reusing client buffer.
-         if (0 == (buf_addr & 0x7))
+         if (0 == ((uint32_t)buf_addr & 0x7))
          {
             // nblc end might have some data. point after that data
             // in interleaved cases there should be only one buffer
-            in_port_ptr->common.bufs_ptr[0].data_ptr     = (int8_t *)buf_addr;
+            in_port_ptr->common.bufs_ptr[0].data_ptr     = buf_addr;
             in_port_ptr->common.bufs_ptr[0].max_data_len = in_port_ptr->common.max_buf_len_per_buf;
             // actual data len will be updated later in this fucntion
             in_port_ptr->common.flags.buf_origin = GEN_TOPO_BUF_ORIGIN_EXT_BUF;
