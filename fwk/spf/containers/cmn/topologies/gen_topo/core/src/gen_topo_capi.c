@@ -1428,9 +1428,15 @@ ar_result_t gen_topo_capi_set_param(uint32_t log_id,
 
    VERIFY(result, NULL != capi_ptr);
 
-   // Assume the Set param value would be a 32-bit integer, as is specified in CAPI document.
-   result = capi_ptr->vtbl_ptr->set_param(capi_ptr, param_id, &port_info, &buf);
-
+   if (capi_ptr == NULL)
+   {
+      return result = AR_EUNSUPPORTED;
+   }
+   else
+   {
+      // Assume the Set param value would be a 32-bit integer, as is specified in CAPI document.
+      result = capi_ptr->vtbl_ptr->set_param(capi_ptr, param_id, &port_info, &buf);
+   }
    if (CAPI_FAILED(result))
    {
       TOPO_MSG(log_id, DBG_ERROR_PRIO, "set param for (param id 0x%lx, size %lu) result %d", param_id, size, result);
