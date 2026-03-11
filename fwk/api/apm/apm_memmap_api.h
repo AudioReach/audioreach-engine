@@ -120,6 +120,37 @@ extern "C" {
 /** Definition of the is_client_loaned_memory flag bitmask. */
 #define APM_MEMORY_MAP_BIT_MASK_IS_MEM_LOANED (0x00000008UL)
 
+/** Definition of the loaned_memory_heap_manager_type flag shift value. */
+#define APM_MEMORY_MAP_SHIFT_LOANED_MEMORY_HEAP_MNGR_TYPE 4
+
+/** Definition of the loaned_memory_heap_manager_type flag bitmask. */
+#define APM_MEMORY_MAP_BIT_MASK_LOANED_MEMORY_HEAP_MNGR_TYPE (0x00000030UL)
+
+/** Definition of the Loaned memory Default Heap Manager. */
+#define APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_DEFAULT 0
+
+/** Definition of the Loaned memory Safe Heap Manager. */
+#define APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_SAFE_HEAP 1
+
+/** Definition of the Loaned memory Heap Manager type value reserved. */
+#define APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_RESERVED1  2
+#define APM_MEMORY_MAP_LOANED_MEMORY_HEAP_MNGR_TYPE_RESERVED2  3
+
+/** Definition of the memory address type flag shift value. */
+#define APM_MEMORY_MAP_SHIFT_MEMORY_ADDRESS_TYPE 6
+
+/** Definition of the memory address type flag bitmask. */
+#define APM_MEMORY_MAP_BIT_MASK_MEMORY_ADDRESS_TYPE (0x000001C0UL)
+
+/** Definition of the memory address type default - physical address (PA) */
+#define APM_MEMORY_MAP_MEMORY_ADDRESS_TYPE_PA 0
+
+/** Definition of the memory address type  - file descriptor(FD) . */
+#define APM_MEMORY_MAP_MEMORY_ADDRESS_TYPE_FD 1
+
+/** Definition of the memory address type - max value. */
+#define APM_MEMORY_MAP_MEMORY_ADDRESS_TYPE_MAX 7
+
 /** @} */ /* end_weakgroup weakb_property_flag_values */
 
 /** @weakgroup weak_apm_cmd_global_shared_mem_map_regions_t
