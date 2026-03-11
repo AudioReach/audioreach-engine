@@ -53,6 +53,12 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
 
    capi_jitter_buf_t *me_ptr = (capi_jitter_buf_t *)capi_ptr;
 
+   /* If debug value is present that takes precedence */
+   if(!me_ptr->jitter_allowance_in_ms && me_ptr->debug_size_ms)
+   {
+      me_ptr->jitter_allowance_in_ms = me_ptr->debug_size_ms;
+   }
+
    if(!me_ptr->is_input_mf_received || !me_ptr->jitter_allowance_in_ms || me_ptr->is_disabled_by_failure)
    {
       AR_MSG(DBG_ERROR_PRIO, "jitter_buf: buf size %d, mf received %d, is_module_disabled_by_fatal_failure %d",
