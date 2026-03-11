@@ -372,9 +372,9 @@ struct apm_cmd_shared_mem_map_regions_t
         @subhead{Bit 6-8 -- memory\_address\_type}
 
          Specifies the memory address type. In the Default configuration (0), would ensure backward compatibility.
-           -  0     – Physical/Virtual Address
-           -  1     – File descriptor
-           -  2-7   – Values reserved for Future
+           -  0     ï¿½ Physical/Virtual Address
+           -  1     ï¿½ File descriptor
+           -  2-7   ï¿½ Values reserved for Future
 
 		 It is important to note, the Signal Processing Framework (a.k.a AudioReach SPF)  would not have any
 		 mechanism to convert the memory address type or validate the same.
@@ -419,7 +419,9 @@ struct apm_cmd_shared_satellite_mem_map_regions_t
         - #APM_PROC_DOMAIN_ID_CDSP
         - #APM_PROC_DOMAIN_ID_GDSP_0
         - #APM_PROC_DOMAIN_ID_GDSP_1
-        - #APM_PROC_DOMAIN_ID_APPS_2   @tablebulletend */
+        - #APM_PROC_DOMAIN_ID_APPS_2
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2   @tablebulletend */
 
    uint16_t mem_pool_id;
    /**< Type of memory on which this memory region is mapped.
@@ -529,9 +531,9 @@ struct apm_cmd_shared_satellite_mem_map_regions_t
         @subhead{Bit 6-8 -- memory\_address\_type}
 
          Specifies the memory address type. In the Default configuration (0), would ensure backward compatibility.
-           -  0     – Physical/virtual Address
-           -  1     – File descriptor
-           -  2-7   – Values reserved for Future
+           -  0     ï¿½ Physical/virtual Address
+           -  1     ï¿½ File descriptor
+           -  2-7   ï¿½ Values reserved for Future
 
 		 It is important to note, the Signal Processing Framework (a.k.a AudioReach SPF)  would not have any
 		 mechanism to convert the memory address type or validate the same.
@@ -769,7 +771,9 @@ struct apm_cmd_shared_satellite_mem_unmap_regions_t
         - #APM_PROC_DOMAIN_ID_CDSP
         - #APM_PROC_DOMAIN_ID_GDSP_0
         - #APM_PROC_DOMAIN_ID_GDSP_1
-        - #APM_PROC_DOMAIN_ID_APPS_2     @tablebulletend */
+        - #APM_PROC_DOMAIN_ID_APPS_2
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2   @tablebulletend */
 
    uint32_t master_mem_handle;
    /**< Unique identifier for the shared memory address.

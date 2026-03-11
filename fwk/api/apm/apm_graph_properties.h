@@ -66,24 +66,24 @@ extern "C" {
 
 /** @ingroup spf_apm_graph_props
     Processor domain identifier for the modem DSP. */
-#define APM_PROC_DOMAIN_ID_MDSP 0x1
+#define APM_PROC_DOMAIN_ID_MDSP   0x1
 
 /** @ingroup spf_apm_graph_props
     Processor domain identifier for the audio DSP. */
-#define APM_PROC_DOMAIN_ID_ADSP 0x2
+#define APM_PROC_DOMAIN_ID_ADSP   0x2
 
 /** @ingroup spf_apm_graph_props
     Processor domain identifier for the SPF-on-ARM process running on APPS. */
-#define APM_PROC_DOMAIN_ID_APPS                   0x3
+#define APM_PROC_DOMAIN_ID_APPS   0x3
 
 /** @ingroup spf_apm_graph_props
     Processor domain identifier for the sensors DSP. */
-#define APM_PROC_DOMAIN_ID_SDSP 0x4
+#define APM_PROC_DOMAIN_ID_SDSP   0x4
 
 /** @ingroup spf_apm_graph_props
     Processor domain identifier for the Hexagon Tensor Processor (previously
     called the compute DSP). */
-#define APM_PROC_DOMAIN_ID_CDSP 0x5
+#define APM_PROC_DOMAIN_ID_CDSP   0x5
 
 /** @ingroup spf_apm_graph_props
     Processor domain identifier for the Companion Chip DSP. */
@@ -100,6 +100,18 @@ extern "C" {
 /** @ingroup spf_apm_graph_props
     Processor domain identifier for the SPF-on-ARM process running on HLOS. */
 #define APM_PROC_DOMAIN_ID_APPS_2 0xC
+
+/** @ingroup spf_apm_graph_props
+    Processor domain identifier for the audio DSP 1st core i.e Execution environment 0 (EE0) . */
+#define APM_PROC_DOMAIN_ID_ADSP_0 APM_PROC_DOMAIN_ID_ADSP
+
+/** @ingroup spf_apm_graph_props
+    Processor domain identifier for the audio DSP 2nd core i.e Execution environment 1 (EE1) . */
+#define APM_PROC_DOMAIN_ID_ADSP_1 0xE
+
+/** @ingroup spf_apm_graph_props
+    Processor domain identifier for the audio DSP 3rd core i.e Execution environment 2 (EE2) . */
+#define APM_PROC_DOMAIN_ID_ADSP_2 0xF
 
 /////////////////Heap IDs//////////////////////////
 
@@ -132,6 +144,12 @@ enum processors
 {
    PROC_DOMAIN_ADSP = APM_PROC_DOMAIN_ID_ADSP,
    /*#< @h2xmle_name {aDSP} */
+
+   PROC_DOMAIN_ADSP_1 = APM_PROC_DOMAIN_ID_ADSP_1,
+   /*#< @h2xmle_name {aDSP_1} */
+
+   PROC_DOMAIN_ADSP_2 = APM_PROC_DOMAIN_ID_ADSP_2,
+   /*#< @h2xmle_name {aDSP_2} */
 
    PROC_DOMAIN_MDSP = APM_PROC_DOMAIN_ID_MDSP,
    /*#< @h2xmle_name {mDSP} */
@@ -195,7 +213,7 @@ enum containerCap
 
    APM_CONTAINER_TYPE_WC = APM_CONTAINER_TYPE_ID_WC,
    /*#< @h2xmle_name {Wear} */
-   
+
    APM_CONTAINER_TYPE_PTC = APM_CONTAINER_TYPE_ID_PTC,
    /*#< @h2xmle_name {PassThru} */
 };
@@ -208,6 +226,12 @@ enum processors
 {
    PROC_DOMAIN_ADSP = APM_PROC_DOMAIN_ID_ADSP,
    /**< Audio DSP. */
+
+   PROC_DOMAIN_ADSP_1 = APM_PROC_DOMAIN_ID_ADSP_1,
+   /**< Audio DSP 2nd Core */
+
+   PROC_DOMAIN_ADSP_2 = APM_PROC_DOMAIN_ID_ADSP_2,
+   /**< Audio DSP 3rd Core */
 
    PROC_DOMAIN_MDSP = APM_PROC_DOMAIN_ID_MDSP,
    /**< Modem DSP. */
@@ -274,7 +298,7 @@ enum containerCap
 
    APM_CONTAINER_TYPE_WC = APM_CONTAINER_TYPE_ID_WC,
    /**< Wear container. */
-   
+
    APM_CONTAINER_TYPE_PTC = APM_CONTAINER_TYPE_ID_PTC,
    /*#< Pass Thru container. */
 };

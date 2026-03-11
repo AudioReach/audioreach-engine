@@ -578,7 +578,7 @@ typedef struct apm_module_event_t apm_module_event_t;
 #define APM_CMD_CLOSE_ALL                       0x01001013
 
 /** @ingroup spf_apm_commands
-    Flushes one or more sub-graph IDs that were configured 
+    Flushes one or more sub-graph IDs that were configured
 
   @gpr_hdr_fields
     Opcode -- APM_CMD_GRAPH_FLUSH
@@ -1175,6 +1175,8 @@ struct apm_param_id_satellite_pd_info_t
         @values
         - APM_PROC_DOMAIN_ID_MDSP
         - APM_PROC_DOMAIN_ID_ADSP
+        - APM_PROC_DOMAIN_ID_ADSP_1
+        - APM_PROC_DOMAIN_ID_ADSP_2
         - APM_PROC_DOMAIN_ID_APPS
         - APM_PROC_DOMAIN_ID_SDSP
         - APM_PROC_DOMAIN_ID_CDSP
