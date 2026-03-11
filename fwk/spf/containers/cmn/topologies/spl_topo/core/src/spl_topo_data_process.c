@@ -453,6 +453,15 @@ static ar_result_t spl_topo_process_attached_modules(spl_topo_t *topo_ptr, spl_t
 #endif
          simp_topo_set_process_end(topo_ptr);
 
+#if SPL_TOPO_DEBUG_LEVEL >= SPL_TOPO_DEBUG_LEVEL_4
+
+        TOPO_MSG(topo_ptr->t_base.gu.log_id,DBG_LOW_PRIO,"M_iid 0x%lX output ts_valid - %d , TS[MSW, LSW] - [%d, %d]",
+                out_attached_module_ptr->t_base.gu.module_instance_id,
+                topo_ptr->t_base.proc_context.out_port_sdata_pptr[out_port_idx].flags.is_timestamp_valid,
+                (uint32_t )(topo_ptr->t_base.proc_context.out_port_sdata_pptr[out_port_idx].timestamp >>32),
+                (uint32_t )topo_ptr->t_base.proc_context.out_port_sdata_pptr[out_port_idx].timestamp);
+#endif
+
 #if SPL_TOPO_DEBUG_LEVEL >= SPL_TOPO_DEBUG_LEVEL_2
          TOPO_MSG(topo_ptr->t_base.gu.log_id,
                   DBG_MED_PRIO,
@@ -2999,12 +3008,12 @@ ar_result_t spl_topo_module_drop_all_data(spl_topo_t *       topo_ptr,
 
          if ((ext_buf_ptr) && (ext_buf_ptr->buf_ptr) && (ext_buf_ptr->buf_ptr[0].actual_data_len))
          {
-        	 TOPO_MSG(topo_ptr->t_base.gu.log_id,
-        	                  DBG_HIGH_PRIO,
-        	                  "Warning: Dropping data on ext input port index %d, miid 0x%lx len %d",
-							  ext_in_port_ptr->t_base.gu.cmn.index,
-        	                  ext_in_port_ptr->t_base.gu.cmn.module_ptr->module_instance_id,
-							  ext_buf_ptr->buf_ptr[0].actual_data_len);
+             TOPO_MSG(topo_ptr->t_base.gu.log_id,
+                          DBG_HIGH_PRIO,
+                              "Warning: Dropping data on ext input port index %d, miid 0x%lx len %d",
+                              ext_in_port_ptr->t_base.gu.cmn.index,
+                              ext_in_port_ptr->t_base.gu.cmn.module_ptr->module_instance_id,
+                              ext_buf_ptr->buf_ptr[0].actual_data_len);
             // Drop data by letting input consumed = prev_actual_data_len. Increment bytes_consumed_per_ch by this
             // amount.
             ext_buf_ptr->bytes_consumed_per_ch = ext_buf_ptr->buf_ptr[0].actual_data_len;
