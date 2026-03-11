@@ -226,6 +226,20 @@ capi_err_t capi_mux_demux_set_param(capi_t *                _pif,
          }
          break;
       }
+      case PARAM_ID_MUX_DEMUX_TS_PROPAGATION:
+      {
+         if (params_ptr->actual_data_len < sizeof(param_id_mux_demux_ts_propagation_t))
+         {
+            AR_MSG(DBG_ERROR_PRIO, "Insufficient size for mux demux TS Prop param.");
+            return CAPI_ENEEDMORE;
+         }
+         param_id_mux_demux_ts_propagation_t *config_ptr =
+            (param_id_mux_demux_ts_propagation_t *)(params_ptr->data_ptr);
+         me_ptr->enable_ts_propagation = config_ptr->enable_ts_propagation;
+         AR_MSG(DBG_HIGH_PRIO, "Set param for TS Prop - %u", me_ptr->enable_ts_propagation);
+         break;
+      }
+
 #ifdef SIM
       case FWK_EXTN_PARAM_ID_TRIGGER_POLICY_CB_FN:
       {
@@ -403,6 +417,19 @@ capi_err_t capi_mux_demux_get_param(capi_t *                _pif,
 
          break;
       }
+      case PARAM_ID_MUX_DEMUX_TS_PROPAGATION:
+      {
+         if (params_ptr->max_data_len < sizeof(param_id_mux_demux_ts_propagation_t))
+         {
+            AR_MSG(DBG_ERROR_PRIO, "Insufficient size for mux demux TS Prop param.");
+            return CAPI_ENEEDMORE;
+         }
+         param_id_mux_demux_ts_propagation_t *config_ptr =
+            (param_id_mux_demux_ts_propagation_t *)(params_ptr->data_ptr);
+         config_ptr->enable_ts_propagation = me_ptr->enable_ts_propagation;
+         params_ptr->actual_data_len = sizeof(param_id_mux_demux_ts_propagation_t);
+         break;
+      }
       default:
          AR_MSG(DBG_ERROR_PRIO, "Invalid getparam received 0x%lx", param_id);
          result = CAPI_EUNSUPPORTED;
@@ -555,7 +582,7 @@ capi_err_t capi_mux_demux_set_properties(capi_t *_pif, capi_proplist_t *props_pt
                       fmt_ptr->format.sampling_rate,
                       fmt_ptr->format.num_channels,
                       fmt_ptr->format.q_factor,
-					  CAPI_MAX_CHANNELS_V2);
+                      CAPI_MAX_CHANNELS_V2);
 #endif
             }
             capi_mux_demux_update_operating_fmt(me_ptr);
