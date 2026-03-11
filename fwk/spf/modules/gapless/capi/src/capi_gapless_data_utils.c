@@ -607,7 +607,10 @@ module_cmn_md_t *gapless_find_eos(capi_stream_data_v2_t *sdata_ptr)
 
       if (MODULE_CMN_MD_ID_EOS == md_ptr->metadata_id)
       {
-         // TODO(claguna): Only return EOS if it's external
+         /*
+		 1.Only external EOS are expected at Gapless module because it is part of first stream subgraph.
+         2.Ideally, we should return the last EOS from the list, if there are multiples non-flushing EOSes at different offsets.
+		 */
          eos_md_ptr = md_ptr;
          break;
       }
