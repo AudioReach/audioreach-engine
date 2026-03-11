@@ -142,8 +142,9 @@ extern "C" {
 /** Definition of the memory address type flag bitmask. */
 #define APM_MEMORY_MAP_BIT_MASK_MEMORY_ADDRESS_TYPE (0x000001C0UL)
 
-/** Definition of the memory address type default - physical address (PA) */
-#define APM_MEMORY_MAP_MEMORY_ADDRESS_TYPE_PA 0
+/** Definition of the memory address type default
+ *  physical/virtual address (PA/VA ) represented by BIT_0 */
+#define APM_MEMORY_MAP_MEMORY_ADDRESS_TYPE_PA_OR_VA 0
 
 /** Definition of the memory address type  - file descriptor(FD) . */
 #define APM_MEMORY_MAP_MEMORY_ADDRESS_TYPE_FD 1
@@ -348,7 +349,42 @@ struct apm_cmd_shared_mem_map_regions_t
         For loaned memory, the client must relinquish the memory access
         permissions for multi-DSP framework (MDF) use cases.
 
-        @subhead{Bits 31 to 4}
+        @contcell
+        @subhead{Bit 4-5 -- loaned\_memory\_heap\_configuration}
+
+        Specifies the heap configuration for the memory loaned by client and
+        managed by APM ( .i.e., this configuration is valid only when Bit_3 is SET)
+          - 0 -- Default Heap ( Regular heap, functionally backward compatible )
+          - 1 -- Safe Heap    ( When the satellite is considered as un-secure
+                                Process Domain, configuring as Safe Heap is
+                                recommended )
+          - 2/3 -- Values reserved for future use
+
+         -It is recommended to use the same heap configuration for all the MDF memory maps
+         for a pair for the master-satellite combination.
+         -If multiple Satellite Process Domains (PD's) are present in a product
+         with same loaned shared memory mapped to all the satellite PD's,
+         and one of the satellite PD is termed as un-secure PD,
+         configuring as Safe Heap is recommended.
+         -In general, configuration as Default Heap is recommended.
+
+        @contcell
+        @subhead{Bit 6-8 -- memory\_address\_type}
+
+         Specifies the memory address type. In the Default configuration (0), would ensure backward compatibility.
+           -  0     – Physical/Virtual Address
+           -  1     – File descriptor
+           -  2-7   – Values reserved for Future
+
+		 It is important to note, the Signal Processing Framework (a.k.a AudioReach SPF)  would not have any
+		 mechanism to convert the memory address type or validate the same.
+         This configuration would enable the HLOS system, specifically GSL in userspace and the audio packet
+         driver with kernel space access, to determine if FD (file descriptor) to PA (physical address)
+         conversion is required in the audio packet driver. This determination is based on the actual needs
+         of the underlying process domain, which requires memory addresses accordingly.
+
+
+        @subhead{Bits 31 to 9}
 
         Reserved and must be set to 0. */
 }
@@ -470,7 +506,42 @@ struct apm_cmd_shared_satellite_mem_map_regions_t
         For loaned memory, the client must relinquish the memory access
         permissions for MDF use cases.
 
-        @subhead{Bits 31 to 4}
+        @contcell
+        @subhead{Bit 4-5 -- loaned\_memory\_heap\_configuration}
+
+        Specifies the heap configuration for the memory loaned by client and
+        managed by APM ( .i.e., this configuration is valid only when Bit_3 is SET)
+          - 0 -- Default Heap ( Regular heap, functionally backward compatible )
+          - 1 -- Safe Heap    ( When the satellite is considered as un-secure
+                                Process Domain, configuring as Safe Heap is
+                                recommended )
+          - 2/3 -- Values reserved for future use
+
+         -It is recommended to use the same heap configuration for all the MDF memory maps
+         for a pair for the master-satellite combination.
+         -If multiple Satellite Process Domains (PD's) are present in a product
+         with same loaned shared memory mapped to all the satellite PD's,
+         and one of the satellite PD is termed as un-secure PD,
+         configuring as Safe Heap is recommended.
+         -In general, configuration as Default Heap is recommended.
+
+        @contcell
+        @subhead{Bit 6-8 -- memory\_address\_type}
+
+         Specifies the memory address type. In the Default configuration (0), would ensure backward compatibility.
+           -  0     – Physical/virtual Address
+           -  1     – File descriptor
+           -  2-7   – Values reserved for Future
+
+		 It is important to note, the Signal Processing Framework (a.k.a AudioReach SPF)  would not have any
+		 mechanism to convert the memory address type or validate the same.
+         This configuration would enable the HLOS system, specifically GSL in userspace and the audio packet
+         driver with kernel space access, to determine if FD (file descriptor) to PA (physical address)
+         conversion is required in the audio packet driver. This determination is based on the actual needs
+         of the underlying process domain, which requires memory addresses accordingly.
+
+
+        @subhead{Bits 31 to 9}
         Reserved and must be set to 0. */
 }
 #include "spf_end_pack.h"
