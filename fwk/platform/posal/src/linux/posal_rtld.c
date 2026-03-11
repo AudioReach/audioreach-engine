@@ -55,7 +55,9 @@ char* posal_dlerror(void)
     return dlerror();
 }
 
+#ifndef _ANDROID_
 int posal_dlinfo(void* handle, int request, void* p)
 {
     return dlinfo(handle, request, p);
 }
+#endif

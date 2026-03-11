@@ -545,18 +545,31 @@ PT_CNTR_STATIC ar_result_t pt_cntr_reset_proc_module_info(pt_cntr_t *me_ptr, pt_
       module_ptr->process = module_ptr->gc.topo.capi_ptr->vtbl_ptr->process;
    }
 
-   module_ptr->flags.has_attached_module = FALSE;
-   module_ptr->flags.has_stopped_port    = FALSE;
+   // update the flags related to attached module, port states. These flags are used to skip output post process
+   // in the module process context.
+   bool_t has_attached_module            = FALSE;
+   bool_t has_stopped_port               = FALSE;
    for (gu_output_port_list_t *op_list_ptr = module_ptr->gc.topo.gu.output_port_list_ptr; NULL != op_list_ptr;
         LIST_ADVANCE(op_list_ptr))
    {
       pt_cntr_output_port_t *out_port_ptr = (pt_cntr_output_port_t *)op_list_ptr->op_port_ptr;
-      /** Reset output port related flags */
-      module_ptr->flags.has_attached_module =
-         out_port_ptr->gc.gu.attached_module_ptr ? TRUE : module_ptr->flags.has_attached_module;
-      module_ptr->flags.has_stopped_port =
-         (TOPO_PORT_STATE_STOPPED == out_port_ptr->gc.common.state) ? TRUE : module_ptr->flags.has_stopped_port;
+
+      has_attached_module = out_port_ptr->gc.gu.attached_module_ptr ? TRUE : has_attached_module;
+      has_stopped_port    = (TOPO_PORT_STATE_STOPPED == out_port_ptr->gc.common.state) ? TRUE : has_stopped_port;
    }
+
+   /** Reset output port related flags */
+   module_ptr->flags.has_attached_module = has_attached_module;
+   module_ptr->flags.has_stopped_port    = has_stopped_port;
+
+#ifdef VERBOSE_DEBUGGING
+   GEN_CNTR_MSG(me_ptr->gc.topo.gu.log_id,
+                DBG_HIGH_PRIO,
+                "Module 0x%lX has_attached_module:%lu has_stopped_port:%lu ",
+                module_ptr->gc.topo.gu.module_instance_id,
+                (TRUE == module_ptr->flags.has_attached_module),
+                (TRUE == module_ptr->flags.has_stopped_port));
+#endif
    return AR_EOK;
 }
 
@@ -756,7 +769,7 @@ ar_result_t pt_cntr_handle_module_buffer_access_event(gen_topo_t        *topo_pt
       input_port_ptr->common.flags.supports_buffer_resuse_extn =
          is_enable ? GEN_TOPO_MODULE_INPUT_BUF_ACCESS : GEN_TOPO_MODULE_BUF_ACCESS_INVALID;
 
-      module_ptr->buffer_mgr_cb_handle = (TRUE == is_enable) ? ip_cb_info_ptr->buffer_mgr_cb_handle : NULL;
+      module_ptr->buffer_mgr_cb_handle = (TRUE == is_enable) ? ip_cb_info_ptr->buffer_mgr_cb_handle : (uint32_t)NULL;
       module_ptr->get_input_buf_fn     = (TRUE == is_enable) ? ip_cb_info_ptr->get_input_buf_fn : NULL;
    }
    else
@@ -782,7 +795,7 @@ ar_result_t pt_cntr_handle_module_buffer_access_event(gen_topo_t        *topo_pt
       output_port_ptr->common.flags.supports_buffer_resuse_extn =
          (TRUE == is_enable) ? GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS : GEN_TOPO_MODULE_BUF_ACCESS_INVALID;
 
-      module_ptr->buffer_mgr_cb_handle = (TRUE == is_enable) ? op_cb_info_ptr->buffer_mgr_cb_handle : NULL;
+      module_ptr->buffer_mgr_cb_handle = (TRUE == is_enable) ? op_cb_info_ptr->buffer_mgr_cb_handle : (uint32_t)NULL;
       module_ptr->return_output_buf_fn = (TRUE == is_enable) ? op_cb_info_ptr->return_output_buf_fn : NULL;
    }
 

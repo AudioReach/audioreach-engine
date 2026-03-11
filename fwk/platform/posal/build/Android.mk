@@ -21,7 +21,8 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/inc/private \
     $(LOCAL_PATH)/inc/generic \
     $(LOCAL_PATH)/src/generic \
-    $(LOCAL_PATH)/src/linux
+    $(LOCAL_PATH)/src/linux \
+    $(LOCAL_PATH)/../../spf/dls/api
 
 LOCAL_SRC_FILES := \
     src/generic/posal_bufpool.c \

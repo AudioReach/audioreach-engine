@@ -21,6 +21,15 @@ extern "C" {
 #define PROF_BEFORE_PROCESS(prof_info_ptr)
 #define PROF_AFTER_PROCESS(prof_info_ptr, prof_mutex)
 
+#define IRM_PROFILE_MOD_PROCESS_SECTION(prof_info_ptr, prof_mutex, XX_CODE_SECTION_XX)        \
+   do                                                                                         \
+   {                                                                                          \
+      XX_CODE_SECTION_XX                                                                      \
+   } while (0)
+
+#define IRM_PROFILE_MODULE_PROCESS_BEGIN(prof_info_ptr)
+#define IRM_PROFILE_MODULE_PROCESS_END(prof_info_ptr, prof_mutex)
+
 #ifdef __cplusplus
 }
 #endif /*__cplusplus*/
