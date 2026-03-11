@@ -431,6 +431,8 @@ ar_result_t sgm_handle_persistent_cfg(spgm_info_t *                     spgm_ptr
       return result;
    }
    cmd_header_ptr = (apm_cmd_header_t *)spgm_ptr->active_cmd_hndl_ptr->cmd_payload_ptr;
+   spgm_ptr->active_cmd_hndl_ptr->multi_max_resp_cnt = 1;
+   spgm_ptr->active_cmd_hndl_ptr->multi_rsp_cnt = 0;
 
    result = posal_memorymap_get_shmm_handle_and_offset_from_va_offset_map(apm_get_mem_map_client(),
                                                                           (uint32_t)param_data_ptr,
