@@ -27,11 +27,11 @@
 /* Get the size of the jitter buffer in microseconds */
 ar_result_t jitter_buf_driver_get_required_circbuf_size_in_us(capi_jitter_buf_t *me_ptr, uint32_t *size_us_ptr)
 {
-   uint32_t buf_size_in_ms = 0;
+   uint32_t buf_size_in_us = 0;
 
-   buf_size_in_ms = me_ptr->jitter_allowance_in_ms;
+   buf_size_in_us = (me_ptr->jitter_allowance_in_ms * 1000) + (JITTER_BUF_TOLERANCE_FRAMES * me_ptr->frame_duration_in_us);
 
-   *size_us_ptr = (buf_size_in_ms * 1000);
+   *size_us_ptr = buf_size_in_us;
 
 #ifdef DEBUG_JITTER_BUF_DRIVER
    AR_MSG(DBG_ERROR_PRIO, "JITTER_BUF_DRIVER: Required circular_buf_size_in_us = %lu", *size_us_ptr);
@@ -159,7 +159,7 @@ ar_result_t jitter_buf_calibrate_driver(capi_jitter_buf_t *me_ptr)
 {
    ar_result_t result = AR_EOK;
 
-   if (!me_ptr->is_input_mf_received)
+   if (!me_ptr->is_input_mf_received || !me_ptr->driver_hdl.writer_handle)
    {
       return result;
    }
@@ -171,14 +171,6 @@ ar_result_t jitter_buf_calibrate_driver(capi_jitter_buf_t *me_ptr)
                                                         me_ptr->operating_mf.format.bits_per_sample);
    }
 
-   if (me_ptr->frame_duration_in_bytes)
-   {
-      me_ptr->frame_duration_in_us = capi_cmn_bytes_to_us(me_ptr->frame_duration_in_bytes,
-                                                          me_ptr->operating_mf.format.sampling_rate,
-                                                          me_ptr->operating_mf.format.bits_per_sample,
-                                                          1,
-                                                          NULL);
-   }
 
    spf_circ_buf_result_t circ_buf_result = spf_circ_buf_set_media_format(me_ptr->driver_hdl.writer_handle,
                                                                         &me_ptr->operating_mf,
