@@ -859,12 +859,16 @@ ar_result_t olc_process_satellite_set_get_cfg(cu_base_t *                       
          apm_module_param_data_t *module_param_data_ptr     = NULL;
          uint32_t                 payload_size              = 0;
          bool_t                   is_payload_mem_contiguous = TRUE;
+		 int8_t *                 start_param_data_ptr      = (int8_t *)param_data_pptr[0];
+		 uint32_t                 total_payload_size        = 0;
 
          for (uint32_t pid_cnt = 0; pid_cnt < cfg_cmd_ptr->num_param_id_cfg; pid_cnt++)
          {
             param_data_ptr        = param_data_pptr[pid_cnt];
             module_param_data_ptr = (apm_module_param_data_t *)param_data_ptr;
             payload_size          = sizeof(apm_module_param_data_t) + ALIGN_8_BYTES(module_param_data_ptr->param_size);
+			total_payload_size    += payload_size;
+			
             if ((pid_cnt + 1) < cfg_cmd_ptr->num_param_id_cfg)
             {
                int8_t *next_param_data_ptr = param_data_pptr[pid_cnt + 1];
@@ -882,8 +886,8 @@ ar_result_t olc_process_satellite_set_get_cfg(cu_base_t *                       
          {
             TRY(result,
                 sgm_handle_persistent_cfg(&me_ptr->spgm_info,
-                                          (void *)param_data_ptr,
-                                          payload_size,
+                                          (void *)start_param_data_ptr,
+                                          total_payload_size,
                                           FALSE /*is_inband*/,
                                           is_deregister,
                                           cmd_extn_ptr));
