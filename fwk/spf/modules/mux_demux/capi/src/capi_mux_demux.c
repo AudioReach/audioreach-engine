@@ -197,19 +197,25 @@ capi_err_t capi_mux_demux_set_param(capi_t *                _pif,
             }
 
             result |=
-               ((CAPI_MAX_CHANNELS_V2 < out_format_ptr->num_channels) ||
-                (BIT_WIDTH_16 != out_format_ptr->bits_per_sample && BIT_WIDTH_32 != out_format_ptr->bits_per_sample) ||
-                (PCM_Q_FACTOR_15 != out_format_ptr->q_factor && PCM_Q_FACTOR_27 != out_format_ptr->q_factor &&
-                 PCM_Q_FACTOR_31 != out_format_ptr->q_factor))
-                  ? CAPI_EBADPARAM
-                  : CAPI_EOK;
+                ((CAPI_MAX_CHANNELS_V2 < out_format_ptr->num_channels) ||
+                 !((out_format_ptr->bits_per_sample == BIT_WIDTH_16 &&
+                    out_format_ptr->q_factor == PCM_Q_FACTOR_15) ||
+                   (out_format_ptr->bits_per_sample == BIT_WIDTH_32 &&
+                    (out_format_ptr->q_factor == PCM_Q_FACTOR_27 ||
+                     out_format_ptr->q_factor == PCM_Q_FACTOR_31))))
+                    ? CAPI_EBADPARAM
+                    : CAPI_EOK;
 
             if (CAPI_FAILED(result))
             {
                AR_MSG(DBG_ERROR_PRIO,
-                      "Invalid media format received for output port array index 0x%x port id 0x%x.",
+                      "Invalid media format received for output port array index 0x%x port id 0x%x. "
+                      "bps=%u, q_factor=%u, num_channels=%u",
                       out_port_arr_index,
-                      out_format_ptr->output_port_id);
+                      out_format_ptr->output_port_id,
+                      out_format_ptr->bits_per_sample,
+                      out_format_ptr->q_factor,
+                      out_format_ptr->num_channels);
                continue;
             }
 
