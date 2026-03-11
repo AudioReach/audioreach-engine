@@ -21,7 +21,7 @@ ar_result_t spdm_get_databuf_from_rd_datapool(spgm_info_t *spgm_ptr, read_data_p
 {
    ar_result_t            result            = AR_EALREADY;
    bool_t                 found_node        = FALSE;
-   data_buf_pool_node_t  *data_buf_node_ptr = NULL;
+   data_buf_pool_node_t * data_buf_node_ptr = NULL;
    shmem_data_buf_pool_t *data_pool_ptr     = &rd_ptr->db_obj.buf_pool;
 
    if (NULL == rd_ptr->db_obj.active_buf_node_ptr)
@@ -45,7 +45,7 @@ ar_result_t spdm_get_databuf_from_rd_datapool(spgm_info_t *spgm_ptr, read_data_p
 }
 
 static ar_result_t validate_read_buf_state(data_buf_pool_node_t *data_buf_node_ptr,
-                                           spgm_info_t          *spgm_ptr,
+                                           spgm_info_t *         spgm_ptr,
                                            uint32_t              port_index)
 {
    ar_result_t result       = AR_EOK;
@@ -56,7 +56,7 @@ static ar_result_t validate_read_buf_state(data_buf_pool_node_t *data_buf_node_p
 
    if (buffer_state == 0)
    {
-      return result;
+      return AR_EOK;
    }
    else
    {
@@ -67,7 +67,7 @@ static ar_result_t validate_read_buf_state(data_buf_pool_node_t *data_buf_node_p
    return result;
 }
 
-static ar_result_t spdm_recreate_rd_data_buffer(spgm_info_t          *spgm_ptr,
+static ar_result_t spdm_recreate_rd_data_buffer(spgm_info_t *         spgm_ptr,
                                                 data_buf_pool_node_t *data_buf_node_ptr,
                                                 read_data_port_obj_t *rd_ptr,
                                                 uint32_t              port_index)
@@ -89,7 +89,7 @@ static ar_result_t spdm_recreate_rd_data_buffer(spgm_info_t          *spgm_ptr,
 
    new_data_buf_size = ALIGN_128_BYTES(data_buf_node_ptr->meta_data_buf_size); // md_size
    new_data_buf_size += ALIGN_128_BYTES(rd_ptr->db_obj.buf_pool.buf_size);     // data buf size
-   new_data_buf_size += 3 * GAURD_PROTECTION_BYTES;                           // start, end, mid
+   new_data_buf_size += 3 * GAURD_PROTECTION_BYTES;                            // start, end, mid
 
    result = sgm_shmem_alloc(new_data_buf_size, spgm_ptr->sgm_id.sat_pd, &data_buf_node_ptr->ipc_data_buf);
    if (AR_EOK != result)
@@ -103,7 +103,7 @@ static ar_result_t spdm_recreate_rd_data_buffer(spgm_info_t          *spgm_ptr,
    return result;
 }
 
-ar_result_t spdm_send_read_data_buffer(spgm_info_t          *spgm_ptr,
+ar_result_t spdm_send_read_data_buffer(spgm_info_t *         spgm_ptr,
                                        data_buf_pool_node_t *data_buf_node_ptr,
                                        read_data_port_obj_t *rd_ptr)
 {
@@ -111,6 +111,7 @@ ar_result_t spdm_send_read_data_buffer(spgm_info_t          *spgm_ptr,
    uint32_t    rd_ep_port_id      = rd_ptr->port_info.ctrl_cfg.rw_ep_miid;
    uint32_t    rd_client_port_id  = rd_ptr->port_info.ctrl_cfg.rw_client_miid;
    uint32_t    port_index         = rd_ptr->port_info.ctrl_cfg.sdm_port_index;
+   uint32_t    buff_cnt           = 0;
    uint32_t    shmem_offset       = 0;
    bool_t      create_rd_pool_buf = FALSE;
 
@@ -158,12 +159,16 @@ ar_result_t spdm_send_read_data_buffer(spgm_info_t          *spgm_ptr,
    rd_cmd_ptr->read_data.md_mem_map_handle = data_buf_node_ptr->ipc_data_buf.mem_attr.sat_handle;
    rd_cmd_ptr->read_data.md_buf_size       = data_buf_node_ptr->meta_data_buf_size;
 
+   // add a buff counter to the token
+   buff_cnt = rd_ptr->port_info.ctrl_cfg.buf_cnt++;
+   buff_cnt = buff_cnt & (0xFFFF);
+
    spgm_ptr->process_info.active_data_hndl.payload_size = sizeof(rd_ep_data_header_t);
    spgm_ptr->process_info.active_data_hndl.payload_ptr  = (uint8_t *)rd_cmd_ptr;
    spgm_ptr->process_info.active_data_hndl.src_port     = rd_client_port_id;
    spgm_ptr->process_info.active_data_hndl.dst_port     = rd_ep_port_id;
    spgm_ptr->process_info.active_data_hndl.opcode       = DATA_CMD_RD_SH_MEM_EP_DATA_BUFFER_V2;
-   spgm_ptr->process_info.active_data_hndl.token        = data_buf_node_ptr->token;
+   spgm_ptr->process_info.active_data_hndl.token        = data_buf_node_ptr->token + buff_cnt;
 
 #ifdef SGM_ENABLE_READ_DATA_FLOW_LEVEL_MSG
    OLC_SDM_MSG(OLC_SDM_ID,
@@ -236,7 +241,7 @@ ar_result_t spdm_process_data_release_read_buffer(spgm_info_t *spgm_ptr, uint32_
    return result;
 }
 
-ar_result_t spdm_process_render_read_done_data(spgm_info_t            *spgm_ptr,
+ar_result_t spdm_process_render_read_done_data(spgm_info_t *           spgm_ptr,
                                                uint32_t                port_index,
                                                sdm_cnt_ext_data_buf_t *output_data_ptr)
 {
@@ -247,7 +252,7 @@ ar_result_t spdm_process_render_read_done_data(spgm_info_t            *spgm_ptr,
    uint32_t src_data_to_fill = 0;
    uint32_t copy_size        = 0;
 
-   uint8_t              *src_data_ptr    = NULL;
+   uint8_t *             src_data_ptr    = NULL;
    data_buf_pool_node_t *rd_buf_node_ptr = NULL;
    read_data_port_obj_t *rd_ptr          = NULL;
 
@@ -349,11 +354,11 @@ ar_result_t spdm_process_data_read_done(spgm_info_t *spgm_ptr, gpr_packet_t *pac
    uint32_t token                          = 0;
    uint32_t ext_out_port_channel_bit_index = 0;
 
-   read_data_port_obj_t                            *rd_ptr             = NULL;
-   shmem_data_buf_pool_t                           *read_data_pool_ptr = NULL;
-   data_buf_pool_node_t                            *data_buf_node_ptr  = NULL;
+   read_data_port_obj_t *                           rd_ptr             = NULL;
+   shmem_data_buf_pool_t *                          read_data_pool_ptr = NULL;
+   data_buf_pool_node_t *                           data_buf_node_ptr  = NULL;
    data_cmd_rsp_rd_sh_mem_ep_data_buffer_done_v2_t *read_done_ptr      = NULL;
-   gen_topo_module_t                               *module_ptr         = NULL;
+   gen_topo_module_t *                              module_ptr         = NULL;
 
    VERIFY(result, (NULL != spgm_ptr));
    log_id = spgm_ptr->sgm_id.log_id;
@@ -364,7 +369,7 @@ ar_result_t spdm_process_data_read_done(spgm_info_t *spgm_ptr, gpr_packet_t *pac
 
    VERIFY(result, (NULL != packet_ptr));
    VERIFY(result, (DATA_CMD_RSP_RD_SH_MEM_EP_DATA_BUFFER_DONE_V2 == packet_ptr->opcode));
-   token = packet_ptr->token;
+   token = packet_ptr->token & 0xFFFF0000;
 
    read_done_ptr = (data_cmd_rsp_rd_sh_mem_ep_data_buffer_done_v2_t *)GPR_PKT_GET_PAYLOAD(void, packet_ptr);
    VERIFY(result,
@@ -404,10 +409,8 @@ ar_result_t spdm_process_data_read_done(spgm_info_t *spgm_ptr, gpr_packet_t *pac
 
    if (NULL == module_ptr)
    {
-	   OLC_SDM_MSG(OLC_SDM_ID,
-		   DBG_ERROR_PRIO,
-		   "read_data_done: module_ptr is NULL");
-	   return AR_EFAILED;
+      OLC_SDM_MSG(OLC_SDM_ID, DBG_ERROR_PRIO, "read_data_done: module_ptr is NULL");
+      return AR_EFAILED;
    }
 
    IRM_PROFILE_MODULE_PROCESS_BEGIN(module_ptr->prof_info_ptr);
@@ -466,7 +469,7 @@ ar_result_t spdm_read_dl_pcd(spgm_info_t *spgm_ptr, uint32_t port_index)
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
    uint32_t                           log_id = 0;
-   read_data_port_obj_t              *rd_ptr = NULL;
+   read_data_port_obj_t *             rd_ptr = NULL;
    read_ipc_data_link_process_state_t rdl_state;
 
    rd_ptr = spgm_ptr->process_info.rdp_obj_ptr[port_index];
@@ -524,7 +527,7 @@ ar_result_t spdm_get_databuf_from_wr_datapool(spgm_info_t *spgm_ptr, write_data_
 {
    ar_result_t            result            = AR_EALREADY;
    bool_t                 found_node        = FALSE;
-   data_buf_pool_node_t  *data_buf_node_ptr = NULL;
+   data_buf_pool_node_t * data_buf_node_ptr = NULL;
    shmem_data_buf_pool_t *data_pool_ptr     = &wr_ptr->db_obj.buf_pool;
    // caller to ensure the input arguments are valid
 
@@ -555,7 +558,7 @@ ar_result_t spdm_get_databuf_from_wr_datapool(spgm_info_t *spgm_ptr, write_data_
 
 /* function to send the write buffer from OLC to the satellite graph WR EP module
  */
-static ar_result_t spdm_send_write_data_buffer(spgm_info_t          *spgm_ptr,
+static ar_result_t spdm_send_write_data_buffer(spgm_info_t *         spgm_ptr,
                                                data_buf_pool_node_t *data_buf_node_ptr,
                                                uint32_t              port_index)
 {
@@ -563,8 +566,9 @@ static ar_result_t spdm_send_write_data_buffer(spgm_info_t          *spgm_ptr,
    INIT_EXCEPTION_HANDLING
    uint32_t               wr_ep_port_id     = 0;
    uint32_t               wr_client_port_id = 0;
+   uint32_t               buff_cnt          = 0;
    write_data_port_obj_t *wr_port_ptr       = NULL;
-   wr_ep_data_header_t   *wr_data_cmd_ptr   = NULL;
+   wr_ep_data_header_t *  wr_data_cmd_ptr   = NULL;
 
    VERIFY(result, (port_index < SPDM_MAX_IO_PORTS));
    VERIFY(result, (NULL != data_buf_node_ptr));
@@ -610,13 +614,17 @@ static ar_result_t spdm_send_write_data_buffer(spgm_info_t          *spgm_ptr,
    wr_data_cmd_ptr->write_data.timestamp_lsw = data_buf_node_ptr->inbuf_ts.value;
    wr_data_cmd_ptr->write_data.timestamp_msw = data_buf_node_ptr->inbuf_ts.value >> 32;
 
+   // add a buff counter to the token
+   wr_port_ptr->port_info.ctrl_cfg.buf_cnt++;
+   buff_cnt = wr_port_ptr->port_info.ctrl_cfg.buf_cnt & (0xFFFF);
+
    // update the active data handler with GPR packet info for the write data command
    spgm_ptr->process_info.active_data_hndl.payload_size = sizeof(data_cmd_wr_sh_mem_ep_data_buffer_v2_t);
    spgm_ptr->process_info.active_data_hndl.payload_ptr  = (uint8_t *)wr_data_cmd_ptr;
    spgm_ptr->process_info.active_data_hndl.src_port     = wr_client_port_id;
    spgm_ptr->process_info.active_data_hndl.dst_port     = wr_ep_port_id;
    spgm_ptr->process_info.active_data_hndl.opcode       = DATA_CMD_WR_SH_MEM_EP_DATA_BUFFER_V2;
-   spgm_ptr->process_info.active_data_hndl.token        = data_buf_node_ptr->token;
+   spgm_ptr->process_info.active_data_hndl.token        = data_buf_node_ptr->token + buff_cnt;
 
 #ifdef SGM_ENABLE_WRITE_DATA_FLOW_LEVEL_MSG
    OLC_SDM_MSG(OLC_SDM_ID,
@@ -651,7 +659,7 @@ static ar_result_t spdm_send_write_data_buffer(spgm_info_t          *spgm_ptr,
    return result;
 }
 
-static ar_result_t spdm_recreate_wr_data_buffer(spgm_info_t          *spgm_ptr,
+static ar_result_t spdm_recreate_wr_data_buffer(spgm_info_t *         spgm_ptr,
                                                 data_buf_pool_node_t *write_data_buf_node_ptr,
                                                 uint32_t              new_input_data_size,
                                                 uint32_t              new_input_md_size,
@@ -676,7 +684,8 @@ static ar_result_t spdm_recreate_wr_data_buffer(spgm_info_t          *spgm_ptr,
       return result;
    }
 
-   new_data_buf_size = ALIGN_128_BYTES(MAX(write_data_buf_node_ptr->data_buf_size, ALIGN_128_BYTES(new_input_data_size)));
+   new_data_buf_size =
+      ALIGN_128_BYTES(MAX(write_data_buf_node_ptr->data_buf_size, ALIGN_128_BYTES(new_input_data_size)));
    new_md_size = ALIGN_128_BYTES(MAX(write_data_buf_node_ptr->meta_data_buf_size, ALIGN_128_BYTES(new_input_md_size)));
 
    if (AR_EOK != (result = sgm_shmem_alloc(new_data_buf_size + new_md_size + 3 * GAURD_PROTECTION_BYTES,
@@ -700,10 +709,10 @@ static ar_result_t spdm_recreate_wr_data_buffer(spgm_info_t          *spgm_ptr,
  * the function check if the write buffer is available and fills the data to send it to
  * the satellite Graph
  */
-ar_result_t spdm_process_data_write(spgm_info_t            *spgm_ptr,
+ar_result_t spdm_process_data_write(spgm_info_t *           spgm_ptr,
                                     uint32_t                port_index,
                                     sdm_cnt_ext_data_buf_t *input_data_ptr,
-                                    bool_t                 *is_buffer_consumed) // todo : VB will need to update
+                                    bool_t *                is_buffer_consumed) // todo : VB will need to update
 {
    ar_result_t result      = AR_EOK;
    ar_result_t temp_result = AR_EOK;
@@ -716,8 +725,8 @@ ar_result_t spdm_process_data_write(spgm_info_t            *spgm_ptr,
    bool_t is_data_present      = FALSE;
    bool_t is_md_present        = FALSE;
 
-   uint8_t               *wr_shm_data_ptr         = NULL;
-   data_buf_pool_node_t  *write_data_buf_node_ptr = NULL;
+   uint8_t *              wr_shm_data_ptr         = NULL;
+   data_buf_pool_node_t * write_data_buf_node_ptr = NULL;
    write_data_port_obj_t *wr_ptr                  = NULL;
 
    *is_buffer_consumed = FALSE;
@@ -853,7 +862,7 @@ ar_result_t spdm_process_data_write(spgm_info_t            *spgm_ptr,
 static ar_result_t spdm_release_write_buffer(spgm_info_t *spgm_ptr, write_data_port_obj_t *wr_port_obj, uint32_t token)
 {
    ar_result_t            result              = AR_EOK;
-   data_buf_pool_node_t  *data_buf_node_ptr   = NULL;
+   data_buf_pool_node_t * data_buf_node_ptr   = NULL;
    shmem_data_buf_pool_t *write_data_pool_ptr = NULL;
    // Input arguments are expected to verified by the caller
 
@@ -901,7 +910,7 @@ ar_result_t spdm_process_data_write_done(spgm_info_t *spgm_ptr, gpr_packet_t *pa
    uint32_t token     = 0;
    uint32_t bit_index = 0;
 
-   write_data_port_obj_t                           *wr_ptr         = NULL;
+   write_data_port_obj_t *                          wr_ptr         = NULL;
    data_cmd_rsp_wr_sh_mem_ep_data_buffer_done_v2_t *write_done_ptr = NULL;
 
    VERIFY(result, (NULL != spgm_ptr));
@@ -913,7 +922,7 @@ ar_result_t spdm_process_data_write_done(spgm_info_t *spgm_ptr, gpr_packet_t *pa
 
    VERIFY(result, (NULL != packet_ptr));
    VERIFY(result, (DATA_CMD_RSP_WR_SH_MEM_EP_DATA_BUFFER_DONE_V2 == packet_ptr->opcode));
-   token = packet_ptr->token;
+   token = packet_ptr->token &0xFFFF0000;
 
    write_done_ptr = (data_cmd_rsp_wr_sh_mem_ep_data_buffer_done_v2_t *)GPR_PKT_GET_PAYLOAD(void, packet_ptr);
    VERIFY(result, (NULL != write_done_ptr));
@@ -949,7 +958,7 @@ ar_result_t spdm_write_dl_pcd(spgm_info_t *spgm_ptr, uint32_t port_index)
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
    uint32_t                            log_id = 0;
-   write_data_port_obj_t              *wr_ptr = NULL;
+   write_data_port_obj_t *             wr_ptr = NULL;
    write_ipc_data_link_process_state_t wdl_state;
 
    wr_ptr = spgm_ptr->process_info.wdp_obj_ptr[port_index];

@@ -335,6 +335,8 @@ typedef struct sdm_data_port_info_t
    uint32_t sat_rd_ep_opfs_bytes;
    /**< operating frame-size of the rd_ep in the satellite graph */
 
+   uint32_t buf_cnt;
+
    ipc_data_link_process_state_t data_link_ps;
 
 } sdm_data_port_info_t;
