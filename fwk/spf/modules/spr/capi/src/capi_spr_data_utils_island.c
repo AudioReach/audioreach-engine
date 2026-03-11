@@ -356,9 +356,15 @@ static void spr_process_output_metadata(capi_spr_t *me_ptr, capi_stream_data_v2_
    }
    else
    {
+
+      module_cmn_md_list_t *next_node = NULL;
+
       while (node_ptr)
       {
          uint32_t md_id = ((module_cmn_md_t *)node_ptr->obj_ptr)->metadata_id;
+
+         // save next pointer before potential free
+         next_node = node_ptr->next_ptr;
 
          // 1. Internal EOS is dropped
          // 2. Flushing EOS is converted to non-flushing
@@ -376,7 +382,7 @@ static void spr_process_output_metadata(capi_spr_t *me_ptr, capi_stream_data_v2_
                     result);
          }
 
-         node_ptr = node_ptr->next_ptr;
+         node_ptr = next_node; //use saved pointer
       }
 
       // At the output of SPR, there will never be a flushing EOS. So mark this as false always
