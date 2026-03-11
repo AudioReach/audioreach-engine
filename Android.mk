@@ -1,3 +1,4 @@
+ifeq ($(strip $(AUDIO_FEATURE_ARE_ON_APPS)),true)
 MY_LOCAL_PATH_ARE := $(call my-dir)
 
 BUILD_ARE_MODULES := $(MY_LOCAL_PATH_ARE)/scripts/make/spf_base.mk
@@ -30,3 +31,5 @@ PROC_DOMAIN_NAME := PROC_DOMAIN_$(CONFIG_PROC_DOMAIN)
 
 include $(MY_LOCAL_PATH_ARE)/modules/build/Android.mk
 include $(MY_LOCAL_PATH_ARE)/fwk/build/Android.mk
+
+endif
