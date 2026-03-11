@@ -7,7 +7,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -152,12 +152,13 @@ ar_result_t gen_topo_md_list_modify_md_when_new_data_arrives(gen_topo_t *       
                                                              uint32_t               end_offset,
                                                              bool_t *               new_marker_eos_ptr,
                                                              bool_t *               has_new_dfg_ptr);
-ar_result_t gen_topo_create_dfg_metadata(uint32_t               log_id,
+
+ar_result_t gen_topo_create_dfg_metadata(gen_topo_t            *topo_ptr,
                                          module_cmn_md_list_t **metadata_list_pptr,
                                          POSAL_HEAP_ID          heap_id,
-                                         module_cmn_md_t **     dfg_md_pptr,
+                                         module_cmn_md_t      **dfg_md_pptr,
                                          uint32_t               bytes_in_buf,
-                                         topo_media_fmt_t *     media_format_ptr);
+                                         topo_media_fmt_t      *media_format_ptr);
 
 ar_result_t gen_topo_clone_md(gen_topo_t *           topo_ptr,
                               module_cmn_md_t *      md_ptr,
@@ -175,12 +176,12 @@ bool_t gen_topo_md_list_has_flushing_eos(module_cmn_md_list_t *list_ptr);
 bool_t gen_topo_md_list_has_flushing_eos_or_dfg(module_cmn_md_list_t *list_ptr);
 bool_t gen_topo_md_list_has_buffer_associated_md(module_cmn_md_list_t *list_ptr);
 
-ar_result_t gen_topo_metadata_create(uint32_t               log_id,
+ar_result_t gen_topo_metadata_create(gen_topo_t            *topo_ptr,
                                      module_cmn_md_list_t **md_list_pptr,
                                      uint32_t               size,
                                      POSAL_HEAP_ID          heap_id,
                                      bool_t                 is_out_band,
-                                     module_cmn_md_t **     md_pptr);
+                                     module_cmn_md_t      **md_pptr);
 
 capi_err_t gen_topo_capi_metadata_destroy(void *                 context_ptr,
                                           module_cmn_md_list_t * md_list_ptr,

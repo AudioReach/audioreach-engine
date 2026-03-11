@@ -9,7 +9,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -60,12 +60,12 @@ static inline gu_module_list_t *pt_cntr_get_gu_sorted_list_ptr(gen_topo_t *topo_
 
       if (module_ptr && (module_ptr == temp_module_ptr))
       {
-#ifdef VERBOSE_LOGGING
+#ifdef VERBOSE_DEBUGGING
          GEN_CNTR_MSG(topo_ptr->gu.log_id,
                       DBG_HIGH_PRIO,
                       "Found gu list ptr 0x%lx for the module 0x%lx",
                       sorted_module_list_ptr,
-                      topo_ptr->gu.module_instance_id);
+                      module_ptr->gc.topo.gu.module_instance_id);
 #endif
          return sorted_module_list_ptr;
       }

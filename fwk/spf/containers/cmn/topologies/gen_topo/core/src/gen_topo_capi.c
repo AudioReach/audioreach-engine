@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -727,6 +727,7 @@ ar_result_t gen_topo_capi_create_from_amdb(gen_topo_module_t *    module_ptr,
    // MIMO modules can't be inplace.
    VERIFY(result, !(inplace && ((module_ptr->gu.num_input_ports > 1) || (module_ptr->gu.num_output_ports > 1))));
    module_ptr->flags.inplace           = inplace;
+   module_ptr->flags.dynamic_inplace   = inplace;
    module_ptr->flags.requires_data_buf = requires_data_buf;
 
    // get required framework extensions

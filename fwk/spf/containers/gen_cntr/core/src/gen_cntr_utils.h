@@ -8,7 +8,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -118,9 +118,12 @@ ar_result_t gen_cntr_check_process_input_media_fmt_data_cmd(gen_cntr_t *        
                                                             gen_cntr_ext_in_port_t *ext_in_port_ptr);
 /** ------------------------------------------- Signal Trigger -----------------------------------------------------*/
 ar_result_t gen_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_index);
-ar_result_t gen_cntr_st_prepare_output_buffers_per_ext_out_port(gen_cntr_t *             me_ptr,
+ar_result_t gen_cntr_st_prepare_input_buffers(gen_cntr_t *me_ptr);
+ar_result_t gen_cntr_st_prepare_output_buffers(gen_cntr_t *me_ptr);
+ar_result_t gen_cntr_st_prepare_output_buffers_per_ext_out_port(gen_cntr_t              *me_ptr,
                                                                 gen_cntr_ext_out_port_t *ext_out_port_ptr);
-void gen_cntr_st_check_print_overrun(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
+ar_result_t gen_cntr_st_prepare_input_buffers_per_port(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
+void        gen_cntr_st_check_print_overrun(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 void gen_cntr_st_underrun(gen_cntr_t *            me_ptr,
                           gen_cntr_ext_in_port_t *ext_in_port_ptr,
                           uint32_t                bytes_required_per_buf);

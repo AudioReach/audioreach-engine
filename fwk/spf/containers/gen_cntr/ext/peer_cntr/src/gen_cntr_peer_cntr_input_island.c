@@ -4,7 +4,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -13,7 +13,6 @@
 #include "cu_events.h"
 #include "media_fmt_extn_api.h"
 
-static ar_result_t gen_cntr_input_dataQ_trigger_peer_cntr(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
 
 static ar_result_t gen_cntr_realloc_ext_in_bufs_ptr(gen_cntr_ext_in_port_t *ext_in_port_ptr,
                                                     uint32_t                bufs_num,
@@ -28,10 +27,7 @@ static ar_result_t gen_cntr_free_input_data_cmd_peer_cntr(gen_cntr_t            
                                                           gen_cntr_ext_in_port_t *ext_in_port_ptr,
                                                           ar_result_t             status,
                                                           bool_t                  is_flush);
-static ar_result_t gen_cntr_copy_peer_cntr_input_to_int_buf(gen_cntr_t             *me_ptr,
-                                                            gen_cntr_ext_in_port_t *ext_in_port_ptr,
-                                                            uint32_t               *bytes_copied_ptr);
-static ar_result_t gen_cntr_process_eos_md_from_peer_cntr(gen_cntr_t             *me_ptr,
+static ar_result_t gen_cntr_process_eos_md_from_peer_cntr(gen_cntr_t *            me_ptr,
                                                           gen_cntr_ext_in_port_t *ext_in_port_ptr,
                                                           module_cmn_md_list_t  **md_list_head_pptr);
 
@@ -349,7 +345,7 @@ outputs in interleaved format. Q31 or Q15. little endian.
 At input, bytes_copied_ptr contains max inputs that we can copy.
 
  ===========================================================================*/
-static ar_result_t gen_cntr_copy_peer_cntr_input_to_int_buf(gen_cntr_t             *me_ptr,
+ar_result_t gen_cntr_copy_peer_cntr_input_to_int_buf(gen_cntr_t *            me_ptr,
                                                             gen_cntr_ext_in_port_t *ext_in_port_ptr,
                                                             uint32_t               *bytes_copied_per_buf_ptr)
 {
@@ -452,6 +448,8 @@ static ar_result_t gen_cntr_input_data_set_up_peer_cntr(gen_cntr_t             *
          gen_topo_exit_island_temporarily(&me_ptr->topo);
          cu_ext_in_handle_prebuffer(&me_ptr->cu, &ext_in_port_ptr->gu, 0);
 
+         THIN_TOPO_SET_EXIT_FLAG((&me_ptr->topo), has_to_preserve_prebuffer, TRUE);
+
          // if prebuffer is pushed into the queue then return as no buffer available to process now
          if (!ext_in_port_ptr->cu.input_data_q_msg.payload_ptr)
          {
@@ -462,6 +460,12 @@ static ar_result_t gen_cntr_input_data_set_up_peer_cntr(gen_cntr_t             *
       spf_msg_header_t      *header        = (spf_msg_header_t *)(ext_in_port_ptr->cu.input_data_q_msg.payload_ptr);
       spf_msg_data_buffer_t *input_buf_ptr = (spf_msg_data_buffer_t *)&header->payload_start;
       inpbuf_md_list_pptr                  = &input_buf_ptr->metadata_list_ptr;
+
+      if (inpbuf_md_list_pptr)
+      {
+         // incremement md count by number of nodes received
+         thin_topo_count_and_incr_active_md_nodes(&me_ptr->topo, input_buf_ptr->metadata_list_ptr);
+      }
 
 // if input buffer do not contain integer PCM samples per channel, return it immediately with error code.
 // Under safe mode to reduce MPPS for HW-EP containers (1 ms)
@@ -487,8 +491,7 @@ static ar_result_t gen_cntr_input_data_set_up_peer_cntr(gen_cntr_t             *
                              DBG_HIGH_PRIO,
                              "Dropping / returning input v1 message for SPF_DEINTERLEAVED_RAW_COMPRESSED - not "
                              "supported!");
-         result |= gen_cntr_free_input_data_cmd(me_ptr, ext_in_port_ptr, AR_EOK, FALSE);
-         return result;
+         return gen_cntr_free_input_data_cmd(me_ptr, ext_in_port_ptr, AR_EOK, FALSE);
       }
 
       flags_ptr = &input_buf_ptr->flags;
@@ -560,7 +563,7 @@ static ar_result_t gen_cntr_input_data_set_up_peer_cntr(gen_cntr_t             *
 /**
  * Encode (AEnc, VEnc), split A2DP (encode, decode), decode with ASM loopback, push mode.
  */
-static ar_result_t gen_cntr_input_dataQ_trigger_peer_cntr(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr)
+ar_result_t gen_cntr_input_dataQ_trigger_peer_cntr(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr)
 {
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING

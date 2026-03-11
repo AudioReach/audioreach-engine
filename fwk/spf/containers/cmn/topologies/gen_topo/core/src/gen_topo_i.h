@@ -7,13 +7,14 @@
  *  
  * 
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #ifndef GEN_TOPO_I_H_
 #define GEN_TOPO_I_H_
 #include "gen_topo.h"
+#include "thin_topo_inline.h"
 
 #ifdef __cplusplus
 extern "C" {

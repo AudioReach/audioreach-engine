@@ -4,7 +4,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -260,16 +260,17 @@ static ar_result_t gen_cntr_populate_peer_cntr_out_buf(gen_cntr_t *             
 {
    ar_result_t result = AR_EOK;
 
-   int64_t *              outbuf_timestamp_ptr = NULL;
-   uint32_t *             outbuf_flag_ptr;
+   int64_t               *outbuf_timestamp_ptr = NULL;
+   uint32_t              *outbuf_flag_ptr;
    module_cmn_md_list_t **outbuf_md_list_pptr;
 
-   spf_msg_header_t *header = (spf_msg_header_t *)(ext_out_port_ptr->cu.out_bufmgr_node.buf_ptr);
-   header->rsp_result       = 0;
+   spf_msg_header_t      *header      = (spf_msg_header_t *)(ext_out_port_ptr->cu.out_bufmgr_node.buf_ptr);
+   spf_msg_data_buffer_t *out_buf_ptr = (spf_msg_data_buffer_t *)&header->payload_start;
+
+   header->rsp_result = 0;
 
    if (!gen_cntr_is_ext_out_v2(ext_out_port_ptr))
    {
-      spf_msg_data_buffer_t *out_buf_ptr = (spf_msg_data_buffer_t *)&header->payload_start;
 
       out_buf_ptr->actual_size = ext_out_port_ptr->buf.actual_data_len;
       out_buf_ptr->max_size    = ext_out_port_ptr->cu.buf_max_size;
@@ -281,7 +282,7 @@ static ar_result_t gen_cntr_populate_peer_cntr_out_buf(gen_cntr_t *             
    else
    {
       spf_msg_data_buffer_v2_t *out_buf_ptr  = (spf_msg_data_buffer_v2_t *)&header->payload_start;
-      spf_msg_single_buf_v2_t * data_buf_ptr = (spf_msg_single_buf_v2_t *)(out_buf_ptr + 1);
+      spf_msg_single_buf_v2_t  *data_buf_ptr = (spf_msg_single_buf_v2_t *)(out_buf_ptr + 1);
 
       for (uint32_t b = 0; b < out_buf_ptr->bufs_num; b++)
       {
@@ -316,18 +317,21 @@ static ar_result_t gen_cntr_populate_peer_cntr_out_buf(gen_cntr_t *             
    }
 
    // Populate the timestamp
-   cu_set_bits(outbuf_flag_ptr,
-               ts.valid,
-               DATA_BUFFER_FLAG_TIMESTAMP_VALID_MASK,
-               DATA_BUFFER_FLAG_TIMESTAMP_VALID_SHIFT);
+   if (ts.valid)
+   {
+      cu_set_bits(&out_buf_ptr->flags,
+                  ts.valid,
+                  DATA_BUFFER_FLAG_TIMESTAMP_VALID_MASK,
+                  DATA_BUFFER_FLAG_TIMESTAMP_VALID_SHIFT);
 
-   // Populate the timestamp continue
-   cu_set_bits(outbuf_flag_ptr,
-               ts.ts_continue,
-               DATA_BUFFER_FLAG_TIMESTAMP_CONTINUE_MASK,
-               DATA_BUFFER_FLAG_TIMESTAMP_CONTINUE_SHIFT);
+      // Populate the timestamp continue
+      cu_set_bits(&out_buf_ptr->flags,
+                  ts.ts_continue,
+                  DATA_BUFFER_FLAG_TIMESTAMP_CONTINUE_MASK,
+                  DATA_BUFFER_FLAG_TIMESTAMP_CONTINUE_SHIFT);
 
-   *outbuf_timestamp_ptr = ts.value;
+      out_buf_ptr->timestamp = ts.value;
+   }
 
    if (NULL != ext_out_port_ptr->md_list_ptr)
    {
@@ -534,7 +538,7 @@ static ar_result_t gen_cntr_send_peer_cntr_out_buffers(gen_cntr_t *             
       spf_msg_header_t *     header      = (spf_msg_header_t *)(ext_out_port_ptr->cu.out_bufmgr_node.buf_ptr);
       spf_msg_data_buffer_t *out_buf_ptr = (spf_msg_data_buffer_t *)&header->payload_start;
       topo_port_state_t      ds_downgraded_state =
-         cu_get_external_output_ds_downgraded_port_state(&me_ptr->cu, &ext_out_port_ptr->gu);
+         cu_get_external_output_ds_downgraded_port_state(&ext_out_port_ptr->cu);
 
       // can happen during overrun in GEN_CNTR or if we force process at DFG or if any downstream is stopped.
       if ((NULL == header) || (TOPO_PORT_STATE_STARTED != ds_downgraded_state))
@@ -606,29 +610,8 @@ static ar_result_t gen_cntr_send_peer_cntr_out_buffers(gen_cntr_t *             
          }
       }
 
-      if (!ext_out_port_ptr->cu.icb_info.is_prebuffer_sent)
-      {
-         // Exit and handle prebuffers only if port has requirement
-         if (cu_check_if_port_requires_prebuffers(&ext_out_port_ptr->cu))
-         {
-            gen_topo_exit_island_temporarily(&me_ptr->topo);
-            cu_handle_prebuffer(&me_ptr->cu,
-                                &ext_out_port_ptr->gu,
-                                out_buf_ptr,
-                                ext_out_port_ptr->cu.buf_max_size -
-                                   (ext_out_port_ptr->cu.media_fmt.pcm.num_channels * gen_topo_compute_if_output_needs_addtional_bytes_for_dm(&(me_ptr->topo),
-                                                                                            (gen_topo_output_port_t *)
-                                                                                               ext_out_port_ptr->gu
-                                                                                                  .int_out_port_ptr)));
-         }
-         else
-         {
-            // if port didnt have prebuf requirement at data flow start, then we can mark sent= TRUE,
-            // If prebuf requriement changes after data flow start, no need to insert prebuffer since its going cause
-            // a glitch, if we need to handle scenario there we need to consider if media format changed
-            ext_out_port_ptr->cu.icb_info.is_prebuffer_sent = TRUE;
-         }
-      }
+      // send if the prebuffer is not yet been sent
+      gen_cntr_check_and_send_prebuffers(me_ptr, ext_out_port_ptr, out_buf_ptr);
 
       result = gen_cntr_send_data_to_downstream_peer_cntr(me_ptr, ext_out_port_ptr, header);
    }

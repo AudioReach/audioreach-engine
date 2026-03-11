@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -331,7 +331,7 @@ ar_result_t spl_cntr_ext_in_port_handle_data_flow_end(spl_cntr_t *            me
          uint32_t         buf_actual_data_len =
             spl_cntr_ext_in_port_get_buf_len((gu_ext_in_port_t *)ext_in_port_ptr, IS_MAX_FALSE);
 
-         result = gen_topo_create_dfg_metadata(me_ptr->topo.t_base.gu.log_id,
+         result = gen_topo_create_dfg_metadata(&me_ptr->topo.t_base,
                                                &(int_in_port_ptr->t_base.common.sdata.metadata_list_ptr),
                                                me_ptr->cu.heap_id,
                                                &out_md_ptr,

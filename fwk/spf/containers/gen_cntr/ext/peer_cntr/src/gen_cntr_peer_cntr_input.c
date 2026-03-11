@@ -4,7 +4,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -85,4 +85,24 @@ ar_result_t gen_cntr_data_ctrl_cmd_handle_inp_media_fmt_from_upstream_cntr(gen_c
                                                    is_data_path);
 
    return result;
+}
+
+ar_result_t gen_cntr_check_if_any_ext_in_has_to_preserve_prebuffer(gen_topo_t *topo_ptr,
+                                                                   bool_t     *has_to_preserve_prebuffer)
+{
+
+   *has_to_preserve_prebuffer = FALSE;
+   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = topo_ptr->gu.ext_in_port_list_ptr; ext_in_port_list_ptr;
+        LIST_ADVANCE(ext_in_port_list_ptr))
+   {
+      gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
+
+      if (ext_in_port_ptr->cu.preserve_prebuffer)
+      {
+         *has_to_preserve_prebuffer = TRUE;
+         return AR_EOK;
+      }
+   }
+
+   return AR_EOK;
 }

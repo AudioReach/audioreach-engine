@@ -9,7 +9,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -776,11 +776,8 @@ ar_result_t cu_deregister_with_pm(cu_base_t *me_ptr);
 /**--------------------------- cu_state_handler ---------------------------*/
 topo_port_state_t topo_sg_state_to_port_state(topo_sg_state_t sg_state);
 
-static inline topo_port_state_t cu_get_external_output_ds_downgraded_port_state(cu_base_t *        me_ptr,
-                                                                                gu_ext_out_port_t *gu_ext_out_port_ptr)
+static inline topo_port_state_t cu_get_external_output_ds_downgraded_port_state(cu_ext_out_port_t *ext_out_port_ptr)
 {
-   uint8_t *          temp_ptr         = (uint8_t *)gu_ext_out_port_ptr;
-   cu_ext_out_port_t *ext_out_port_ptr = (cu_ext_out_port_t *)(temp_ptr + me_ptr->ext_out_port_cu_offset);
    return ext_out_port_ptr->downgraded_port_state;
 }
 

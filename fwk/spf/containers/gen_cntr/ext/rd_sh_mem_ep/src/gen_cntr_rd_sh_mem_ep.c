@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 #include "gen_cntr_i.h"
@@ -83,7 +83,8 @@ ar_result_t gen_cntr_create_rd_sh_mem_ep(gen_cntr_t            *me_ptr,
 
    spf_handle_t *gpr_cb_handle = &module_ptr->gu.output_port_list_ptr->op_port_ptr->ext_out_port_ptr->this_handle;
 
-   module_ptr->flags.inplace = TRUE;
+   module_ptr->flags.inplace         = TRUE;
+   module_ptr->flags.dynamic_inplace = TRUE;
 
    // The require_data_buf for RD_SHMEM_EP is set to TRUE.
    // If RD_SHMEM_EP is the only module in the container, we should process every frame data at the input

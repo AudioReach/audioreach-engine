@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -337,6 +337,8 @@ ar_result_t gen_cntr_flush_input_data_queue(gen_cntr_t             *me_ptr,
    // next frame processing.
    ext_in_port_ptr->cu.preserve_prebuffer       = TRUE;
    me_ptr->topo.flags.need_to_handle_frame_done = TRUE;
+
+   THIN_TOPO_SET_EXIT_FLAG((&me_ptr->topo), has_to_preserve_prebuffer, TRUE);
 
    do
    {
@@ -1836,6 +1838,10 @@ ar_result_t gen_cntr_handle_fwk_events_util_(gen_cntr_t *                me_ptr,
       }
    }
 #endif
+
+   // if currently processing with thin topo, check if anything needs to be updated in thin topo or needs to switch to
+   // gen topo
+   result |= thin_topo_handle_fwk_events(me_ptr, capi_event_flag_ptr, fwk_event_flag_ptr);
 
    capi_event_flag_ptr->word                     = 0;
    fwk_event_flag_ptr->word                      = 0;
