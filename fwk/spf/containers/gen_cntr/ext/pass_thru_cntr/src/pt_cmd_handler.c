@@ -453,7 +453,7 @@ ar_result_t pt_cntr_validate_topo_at_open(pt_cntr_t *me_ptr)
 
 /** Checks media format and threshold.
       1. Checks if all the modules raised same threshold. If there are multiple threshold modules, returns error.
-      2. TODO: need to check supported media format for each port as well .*/
+      2. Check supported media format for each port as well .*/
 ar_result_t pt_cntr_validate_media_fmt_thresh(pt_cntr_t *me_ptr)
 {
    ar_result_t result = AR_EOK;

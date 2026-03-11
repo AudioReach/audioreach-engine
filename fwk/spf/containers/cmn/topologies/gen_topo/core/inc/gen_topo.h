@@ -2206,12 +2206,13 @@ ar_result_t gen_topo_validate_port_sdata(uint32_t                log_id,
       TOPO_MSG_ISLAND(topo_ptr->gu.log_id,                                                                             \
                       DBG_LOW_PRIO,                                                                                    \
                       " Module 0x%lX: " str1 " port id 0x%lx, process " str2                                           \
-                      ": length_per_buf %lu of %lu. buff addr: 0x%p, result 0x%lx",                                    \
+                      ": length_per_buf %lu of %lu. buff addr: 0x%p, buf_origin%lu result 0x%lx",                      \
                       m_iid,                                                                                           \
                       port_id,                                                                                         \
                       cmn_port.bufs_ptr[0].actual_data_len,                                                            \
                       cmn_port.bufs_ptr[0].max_data_len,                                                               \
                       cmn_port.bufs_ptr[0].data_ptr,                                                                   \
+                      cmn_port.flags.buf_origin,                                                                       \
                       result);                                                                                         \
       if (cmn_port.bufs_ptr[0].data_ptr)                                                                               \
       {                                                                                                                \

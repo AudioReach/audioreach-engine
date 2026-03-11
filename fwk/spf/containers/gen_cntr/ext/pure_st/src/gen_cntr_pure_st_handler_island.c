@@ -71,7 +71,7 @@ static ar_result_t gen_cntr_pure_st_setup_internal_input_port_and_preprocess(gen
 
    // note this call can return a fresh buf or a buf already at inplace-nblc-end.
    // returns a failure if buffer couldn't be assigned.
-   TRY(result, gen_topo_check_get_in_buf_from_buf_mgr(&me_ptr->topo, in_port_ptr, NULL));
+   TRY(result, gen_cntr_ext_input_setup_int_port_buf(me_ptr, ext_in_port_ptr, in_port_ptr));
 
 #ifdef VERBOSE_DEBUGGING
    dbg_got_buf = TRUE;
@@ -262,7 +262,6 @@ static ar_result_t gen_cntr_pure_st_data_process_one_frame(gen_cntr_t *me_ptr)
          {
             break;
          }
-         // todo: use posal Inline functions
 
          /** try to fill buf for Signal trigger */
          ext_in_port_ptr->vtbl_ptr->on_trigger(me_ptr, ext_in_port_ptr);
@@ -317,7 +316,7 @@ static ar_result_t gen_cntr_pure_st_data_process_one_frame(gen_cntr_t *me_ptr)
    {
       if (gen_cntr_is_pure_signal_triggered(me_ptr))
       {
-      result = st_topo_process(&me_ptr->topo, &start_module_list_ptr);
+         result = st_topo_process(&me_ptr->topo, &start_module_list_ptr);
       }
       else
       {
@@ -378,6 +377,18 @@ static ar_result_t gen_cntr_pure_st_data_process_one_frame(gen_cntr_t *me_ptr)
             break;
          }
       }
+   }
+
+   // free ext input if it was borrowed by the external input
+   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = me_ptr->topo.gu.ext_in_port_list_ptr;
+        (NULL != ext_in_port_list_ptr);
+        LIST_ADVANCE(ext_in_port_list_ptr))
+   {
+      gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
+      gen_topo_input_port_t  *in_port_ptr     = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
+
+      // check if a borrowed buffer is stuck in the NBLC path and copy to a topo buffer so
+      result |= gen_cntr_clear_borrowed_ext_in_buffer_from_int_ports(me_ptr, ext_in_port_ptr, in_port_ptr, FALSE);
    }
 
    /**  For each external out port, postprocess data, send media fmt and data down. */

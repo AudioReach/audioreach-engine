@@ -180,6 +180,12 @@ ar_result_t gen_cntr_st_prepare_output_buffers_per_ext_out_port(gen_cntr_t      
 
    result = ext_out_port_ptr->vtbl_ptr->setup_bufs(me_ptr, ext_out_port_ptr);
 
+   // assigns ext buffer to topo buffer if possible, else topo buffer will be assigned during module process context
+   if (ext_out_port_ptr->vtbl_ptr->setup_topo_buf)
+   {
+      result = ext_out_port_ptr->vtbl_ptr->setup_topo_buf(me_ptr, ext_out_port_ptr);
+   }
+
    return result;
 }
 

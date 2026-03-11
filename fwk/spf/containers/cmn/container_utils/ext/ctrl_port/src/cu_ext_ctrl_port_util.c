@@ -212,9 +212,6 @@ ar_result_t cu_deinit_ext_ctrl_port(cu_base_t *me_ptr, gu_ext_ctrl_port_t *gu_ex
    {
       cu_flush_incoming_ctrl_msg_queue(me_ptr, gu_ext_ctrl_port_ptr);
 
-      // TODO:<RV> lock the incoming ctrl msg queue, to restrict pushing.
-      // TODO:<RV> lock outgoing ctrl queue, to restrict popping.
-
       // Destroy the incoming intent queue.
       cu_deinit_ext_ctrl_port_queues(me_ptr, gu_ext_ctrl_port_ptr);
    }
@@ -224,13 +221,6 @@ ar_result_t cu_deinit_ext_ctrl_port(cu_base_t *me_ptr, gu_ext_ctrl_port_t *gu_ex
 
    // invalidate the link
    gu_deinit_ext_ctrl_port(gu_ext_ctrl_port_ptr);
-
-   // TODO:<RV>  Handle topo layer destory here.
-   // result |= gen_topo_destroy_ctrl_port(&me_ptr->topo, (gen_topo_ctrl_port_t
-   // *)ext_ctrl_port_ptr->gu_ptr->int_in_port_ptr);
-
-   // Note: need to handle topo layer destroy here ?
-   // result |= gen_topo_destroy_ctrl_port();
    return result;
 }
 

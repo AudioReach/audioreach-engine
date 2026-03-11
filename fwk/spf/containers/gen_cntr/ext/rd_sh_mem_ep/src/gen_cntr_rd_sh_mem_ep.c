@@ -49,9 +49,9 @@ ar_result_t gen_cntr_raise_ts_disc_event_from_rd_sh_mem_ep(gen_cntr_t *       me
                                                            int64_t            timestamp_disc_us);
 
 const gen_cntr_fwk_module_vtable_t rd_sh_mem_ep_vtable = {
-   .set_cfg   = gen_cntr_handle_set_cfg_to_rd_sh_mem_ep,
-   .reg_evt   = gen_cntr_reg_evt_rd_sh_mem_ep,
-   .raise_evt = NULL,
+   .set_cfg             = gen_cntr_handle_set_cfg_to_rd_sh_mem_ep,
+   .reg_evt             = gen_cntr_reg_evt_rd_sh_mem_ep,
+   .raise_evt           = NULL,
    .raise_ts_disc_event = gen_cntr_raise_ts_disc_event_from_rd_sh_mem_ep,
 };
 
@@ -64,10 +64,11 @@ const gen_cntr_ext_out_vtable_t gpr_client_ext_out_vtable = {
    .recreate_out_buf = gen_cntr_recreate_out_buf_gpr_client,
    .prop_media_fmt   = NULL,
    .write_metadata   = gen_cntr_write_metadata_in_client_buffer,
+   .setup_topo_buf   = gen_cntr_rd_sh_mem_setup_topo_buffer,
 };
 
-ar_result_t gen_cntr_create_rd_sh_mem_ep(gen_cntr_t *           me_ptr,
-                                         gen_topo_module_t *    module_ptr,
+ar_result_t gen_cntr_create_rd_sh_mem_ep(gen_cntr_t            *me_ptr,
+                                         gen_topo_module_t     *module_ptr,
                                          gen_topo_graph_init_t *graph_init_ptr)
 {
    ar_result_t result = AR_EOK;
@@ -796,6 +797,14 @@ static ar_result_t gen_cntr_release_gpr_client_buffer_v2(gen_cntr_t *           
    ext_out_port_ptr->buf.md_buf_ptr->mem_map_handle  = 0;
    ext_out_port_ptr->buf.md_buf_ptr->data_ptr        = NULL;
    ext_out_port_ptr->buf.md_buf_ptr->status          = AR_EOK;
+
+   // usually ext buffer gets cleared during the post process. but if the mf was raised, post process will not be
+   // called, and old buffer needs to be released here. Also if internal ports in nblc are borrowing ext buffer free it
+   // here.
+   result |= gen_cntr_clear_borrowed_ext_out_buffer_from_int_ports(me_ptr,
+                                                                   ext_out_port_ptr,
+                                                                   (gen_topo_output_port_t *)
+                                                                      ext_out_port_ptr->gu.int_out_port_ptr);
 
    return result;
 }
@@ -1769,8 +1778,6 @@ ar_result_t gen_cntr_flush_output_data_queue_gpr_client(gen_cntr_t *            
       // no need to release any output buf from queue since they are empty and also belong to enc.
    }
 
-   ext_out_port_ptr->out_buf_gpr_client.payload_ptr = NULL;
-
    return AR_EOK;
 }
 
@@ -1979,6 +1986,83 @@ ar_result_t gen_cntr_raise_ts_disc_event_from_rd_sh_mem_ep(gen_cntr_t *       me
                       "Sending timestamp discontinuity pkt to client failed with %lu",
                       result);
          __gpr_cmd_free(gpr_pkt_ts_disc_ptr);
+      }
+   }
+
+   return result;
+}
+
+ar_result_t gen_cntr_rd_sh_mem_setup_topo_buffer(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr)
+{
+   ar_result_t             result       = AR_EOK;
+   gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
+
+   // either the input trigger caused us to reach here, or buf recreate happened.
+   if ((NULL == ext_out_port_ptr->buf.data_ptr) || (NULL != out_port_ptr->common.bufs_ptr[0].data_ptr))
+   {
+      // In case of signal triggered containers, if ext buffer is not available, topo buffer will be assigned to
+      // internal output during process
+      return result;
+   }
+
+   uint32_t empty_space_available = ext_out_port_ptr->buf.max_data_len - ext_out_port_ptr->buf.actual_data_len;
+
+   if (empty_space_available && (empty_space_available >= out_port_ptr->common.max_buf_len_per_buf))
+   {
+      out_port_ptr->common.bufs_ptr[0].data_ptr =
+         ext_out_port_ptr->buf.data_ptr + ext_out_port_ptr->buf.actual_data_len;
+      out_port_ptr->common.bufs_ptr[0].actual_data_len = 0;
+      out_port_ptr->common.bufs_ptr[0].max_data_len    = out_port_ptr->common.max_buf_len_per_buf;
+
+      out_port_ptr->common.flags.buf_origin = GEN_TOPO_BUF_ORIGIN_EXT_BUF;
+
+#if defined(VERBOSE_DEBUGGING) || defined(BUF_MGMT_DEBUG)
+      GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                   DBG_LOW_PRIO,
+                   " Module 0x%lX: Port 0x%lx, assigned ext output buffer 0x%p to internal port, max_buf_len %lu, "
+                   "buf_origin%u",
+                   out_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                   out_port_ptr->gu.cmn.id,
+                   out_port_ptr->common.bufs_ptr[0].data_ptr,
+                   out_port_ptr->common.bufs_ptr[0].max_data_len,
+                   out_port_ptr->common.flags.buf_origin);
+#endif
+
+      /** Since rd shm is inplace assign the buffer to input here itself to optimize assignment for input.
+
+         Rd shm is a special module which is NBLC boundary module due to requires data buf = TRUE, but also
+         its inplace. Because of rdbf, Rd shm breaks NBLC chain as a result upstream module's cannot peak at
+         ext out and borrow ext buffer. Thats why it needs special handling to make sure upstream (ex: encoder
+         output) can borrow buffer from rd shm even though its not NBLC till ext output.
+
+         This doesnt work for all the modules. It works for Rd shm because it only exercise requires data buf
+         property to make sure module's process gets called even with partial frame, it never return's
+         partially consumed frame after process. Thats why we are able to borrow buffer across Rd shm even
+         through its a NBLC boundary module. And ensure borrowed buffer doesn't gets stuck in topo.
+      */
+      if (out_port_ptr->gu.cmn.module_ptr->input_port_list_ptr &&
+          out_port_ptr->gu.cmn.module_ptr->input_port_list_ptr->ip_port_ptr->conn_out_port_ptr)
+      {
+         gen_topo_input_port_t *in_port_ptr =
+            (gen_topo_input_port_t *)out_port_ptr->gu.cmn.module_ptr->input_port_list_ptr->ip_port_ptr;
+
+         if (NULL == in_port_ptr->common.bufs_ptr[0].data_ptr)
+         {
+            in_port_ptr->common.bufs_ptr[0].data_ptr     = out_port_ptr->common.bufs_ptr[0].data_ptr;
+            in_port_ptr->common.bufs_ptr[0].max_data_len = out_port_ptr->common.bufs_ptr[0].max_data_len;
+            in_port_ptr->common.flags.buf_origin         = GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED;
+#ifdef VERBOSE_DEBUGGING
+            GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                         DBG_LOW_PRIO,
+                         "Module 0x%lX: Port 0x%lx, borrowed ext out buffer 0x%p for the input port, buf_len %lu, "
+                         "buf_origin%u",
+                         in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                         in_port_ptr->gu.cmn.id,
+                         in_port_ptr->common.bufs_ptr[0].data_ptr,
+                         in_port_ptr->common.bufs_ptr[0].max_data_len,
+                         in_port_ptr->common.flags.buf_origin);
+#endif
+         }
       }
    }
 
