@@ -771,7 +771,7 @@ ar_result_t thin_topo_update_process_info(gen_cntr_t *me_ptr)
 
    gu_module_list_t *module_list_ptr = topo_ptr->started_sorted_module_list_ptr;
 
-   // release buffers if not required
+   // assign topo buffers to external inputs first.
    for (; (NULL != module_list_ptr); LIST_ADVANCE(module_list_ptr))
    {
       gen_topo_module_t *module_ptr = (gen_topo_module_t *)module_list_ptr->module_ptr;
@@ -866,10 +866,27 @@ ar_result_t thin_topo_update_process_info(gen_cntr_t *me_ptr)
          }
          else if (TOPO_PORT_STATE_STARTED == in_port_ptr->common.state) /** Assign topo buffer */
          {
+            // for the ext inputs facing nblc path avoid getting buffers from static buffer list because the
+            // external inputs are processed before topo and external input data could be overwritten due to
+            // some upstream module holding the same buffer.
+            spf_list_node_t *opt_static_buf_assign_temp_list_ptr = NULL;
+            if (nblc_start_ext_in_port_ptr)
+            {
+               opt_static_buf_assign_temp_list_ptr = topo_ptr->buf_mgr.opt_static_buf_assign_temp_list_ptr;
+               topo_ptr->buf_mgr.opt_static_buf_assign_temp_list_ptr = NULL;
+            }
+
             result =
                gen_topo_check_get_in_buf_from_buf_mgr(topo_ptr,
                                                       in_port_ptr,
                                                       (gen_topo_output_port_t *)in_port_ptr->gu.conn_out_port_ptr);
+
+            // restore the static buffer list
+            if (nblc_start_ext_in_port_ptr)
+            {
+               topo_ptr->buf_mgr.opt_static_buf_assign_temp_list_ptr = opt_static_buf_assign_temp_list_ptr;
+            }
+
             if (AR_DID_FAIL(result))
             {
                TOPO_MSG(topo_ptr->gu.log_id,
@@ -1010,25 +1027,60 @@ ar_result_t thin_topo_update_process_info(gen_cntr_t *me_ptr)
 
       // ideally after process this particular module will not have any data in inputs, so can be reused for the next
       // modules output. Note that next module input will use the current modules output always.
-      for (gu_input_port_list_t *in_port_list_ptr = module_ptr->gu.input_port_list_ptr; (NULL != in_port_list_ptr);
-           LIST_ADVANCE(in_port_list_ptr))
+      // External inputs buffer are setup first before triggering the topo. Hence every Ext in facing NBLC expects a
+      // separate topo buffer. But the static buffer assignment doesnt assign buffers for ext inputs first, hence any
+      // input facing the external input ports NBLC cannot release because they can pontentailly get assigned to the
+      // external ports of the downstream module.
+      if (!gen_topo_is_inplace_or_disabled_siso(module_ptr))
       {
-         gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
-
-         if (GEN_TOPO_BUF_ORIGIN_BUF_MGR == in_port_ptr->common.flags.buf_origin)
+         for (gu_input_port_list_t *in_port_list_ptr = module_ptr->gu.input_port_list_ptr; (NULL != in_port_list_ptr);
+              LIST_ADVANCE(in_port_list_ptr))
          {
+            gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
+
+            if (GEN_TOPO_BUF_ORIGIN_BUF_MGR == in_port_ptr->common.flags.buf_origin)
+            {
+               gen_cntr_ext_in_port_t *nblc_ext_in_port_ptr =
+                  thin_topo_is_inplace_nblc_from_cur_in_to_ext_in(topo_ptr->gu.log_id, in_port_ptr);
+
+               if (NULL == nblc_ext_in_port_ptr)
+               {
 #ifdef VERBOSE_DEBUGGING
-            GEN_CNTR_MSG(topo_ptr->gu.log_id,
-                         DBG_LOW_PRIO,
-                         "Module 0x%lX: port id 0x%lx, return buf 0x%p statically assigned free list",
-                         module_ptr->gu.module_instance_id,
-                         in_port_ptr->gu.cmn.id,
-                         in_port_ptr->common.bufs_ptr[0].data_ptr);
+                  GEN_CNTR_MSG(topo_ptr->gu.log_id,
+                               DBG_LOW_PRIO,
+                               "Module 0x%lX: port id 0x%lx, return buf 0x%p statically assigned free list",
+                               module_ptr->gu.module_instance_id,
+                               in_port_ptr->gu.cmn.id,
+                               in_port_ptr->common.bufs_ptr[0].data_ptr);
 #endif
-            // add input buffer to the temp free list for the downstream modules to use.
-            topo_buf_manager_static_buf_assign_add_buf_to_temp_free_list(topo_ptr,
-                                                                         in_port_ptr->common.bufs_ptr[0].data_ptr);
+                  // add input buffer to the temp free list for the downstream modules to use.
+                  topo_buf_manager_static_buf_assign_add_buf_to_temp_free_list(topo_ptr,
+                                                                               in_port_ptr->common.bufs_ptr[0]
+                                                                                  .data_ptr);
+               }
+#ifdef VERBOSE_DEBUGGING
+               else
+               {
+                  GEN_CNTR_MSG(topo_ptr->gu.log_id,
+                               DBG_LOW_PRIO,
+                               "Module 0x%lX: cannot return input buffers to statically assigned free list, because "
+                               "its "
+                               "on ext input facing NBLC",
+                               module_ptr->gu.module_instance_id);
+               }
+#endif
+            }
          }
+      }
+      else
+      {
+#ifdef VERBOSE_DEBUGGING
+         GEN_CNTR_MSG(topo_ptr->gu.log_id,
+                      DBG_LOW_PRIO,
+                      "Module 0x%lX: cannot return input buffers to statically assigned free list, because its "
+                      "inplace/disabled.",
+                      module_ptr->gu.module_instance_id);
+#endif
       }
    }
 
