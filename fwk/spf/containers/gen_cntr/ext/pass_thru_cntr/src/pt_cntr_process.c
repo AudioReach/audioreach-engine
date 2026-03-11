@@ -2294,6 +2294,12 @@ ar_result_t pt_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_index
     *
     */
 
+   // clear the HW timestamp from the earlier interrupt context
+   if (me_ptr->gc.st_module.st_module_ts_ptr)
+   {
+      me_ptr->gc.st_module.st_module_ts_ptr->is_valid = FALSE;
+   }
+
 #ifdef VERBOSE_DEBUGGING
    int64_t diff = posal_timer_get_time() - proc_ts_before;
    GEN_CNTR_MSG(me_ptr->gc.topo.gu.log_id,
