@@ -42,7 +42,7 @@ LOCAL_SRC_FILES := \
     ext/sync_fwk_ext/src/spl_cntr_sync_fwk_ext.c \
     ext/voice_delivery_fwk_ext/src/spl_cntr_voice_delivery_fwk_ext.c
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
@@ -56,7 +56,7 @@ LOCAL_SHARED_LIBRARIES := \
     libar-gpr
 
 LOCAL_HEADER_LIBRARIES := libposal_headers libspf_utils_headers libspf_api libspf_interfaces_headers libspf_gu_headers libspf_gen_topo_headers libspf_spl_topo_headers libspf_topo_utils_headers libspf_icb_headers libapm_headers libspf_cu_headers libamdb_headers libprivate_api_headers libplatform_cfg_headers
-LOCAL_STATIC_LIBRARIES := libspf_utils libspf_interfaces libposal libspf_gu libspf_gen_topo libspf_topo_utils libspf_icb libapm libspf_cu libamdb
+LOCAL_STATIC_LIBRARIES := libspf_utils libspf_interfaces libposal libspf_gu libspf_topo_utils libspf_icb libapm libspf_cu libamdb
 
 include $(BUILD_STATIC_LIBRARY)
 
