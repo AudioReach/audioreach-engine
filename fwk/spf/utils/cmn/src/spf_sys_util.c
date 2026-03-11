@@ -328,6 +328,14 @@ ar_result_t spf_sys_util_ssr_register(spf_sys_util_handle_t *handle_ptr,
 
       cur_reg_info_ptr->proc_domain_id = proc_domain_id_list[i];
 
+      // APPS domain has not yet registered itself to service locator framework. Skip it for now.
+      if ((APM_PROC_DOMAIN_ID_APPS == cur_reg_info_ptr->proc_domain_id) ||
+          (APM_PROC_DOMAIN_ID_APPS_2 == cur_reg_info_ptr->proc_domain_id))
+      {
+         AR_MSG(DBG_HIGH_PRIO, "SYS_UTIL: SSR registration skipped for APPS domain");
+         continue;
+      }
+
       ar_osal_servreg_entry_type domain;
       ar_osal_servreg_entry_type service;
       // get the sev reg obj from id
