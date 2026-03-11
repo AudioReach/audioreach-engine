@@ -6,11 +6,12 @@
   \brie
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #include "ar_defs.h"
+#include "vcpm_config_api.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,9 +21,6 @@ extern "C" {
  *  Module ID Definitions
  *----------------------------------------------------------------------------*/
 
-/** @ingroup spf_vcpm_voice_cfg
-    Instance identifier for the VCPM static module. */
-#define VCPM_MODULE_INSTANCE_ID (0x00000004)
 
 /* Instance identifier for the Voice Services static module. */
 #define VOICE_SERVICES_MODULE_INSTANCE_ID (0x00000005)
