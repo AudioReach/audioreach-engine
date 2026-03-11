@@ -236,6 +236,17 @@ ar_result_t posal_memory_heapmgr_create(POSAL_HEAP_ID *heap_id_ptr,
 {
    return AR_EOK;
 }
+ar_result_t posal_memory_heapmgr_create_v2(POSAL_HEAP_ID *          heap_id_ptr,
+                                           void *                   heap_start_ptr,
+                                           uint32_t                 heap_size,
+                                           bool_t                   is_init_heap_needed,
+                                           uint32_t                 heap_type,
+                                           posal_heap_tcm_handle_t *tcm_handle_ptr,
+                                           char *                   tcm_name,
+                                           uint32_t                 tcm_name_len)
+{
+   return AR_EOK;
+}
 
 ar_result_t posal_memory_heapmgr_destroy(POSAL_HEAP_ID origheapId)
 {
