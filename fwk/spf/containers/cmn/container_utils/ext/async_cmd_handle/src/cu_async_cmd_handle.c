@@ -127,7 +127,7 @@ ar_result_t cu_async_cmd_handle_update(cu_base_t *cu_ptr)
 
 bool_t cu_async_cmd_handle_check_and_push_cmd(cu_base_t *cu_ptr)
 {
-   if (cu_ptr->async_cmd_handle && cu_ptr->async_cmd_handle->tp_handle)
+   if (cu_ptr->async_cmd_handle && cu_ptr->async_cmd_handle->tp_handle && cu_ptr->flags.is_real_time)
    {
       switch (cu_ptr->cmd_msg.msg_opcode)
       {

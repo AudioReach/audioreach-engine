@@ -83,7 +83,7 @@ ar_result_t olc_get_set_thread_priority(olc_t *me_ptr, int32_t *priority_ptr, bo
       }
       else
       {
-         is_real_time = olc_is_realtime(&me_ptr->cu);
+         is_real_time = cu_is_realtime(&me_ptr->cu);
          if (!is_real_time)
          {
             new_prio = posal_thread_get_floor_prio(SPF_THREAD_STAT_CNTR_ID);
@@ -252,75 +252,6 @@ ar_result_t olc_ext_out_port_reset(olc_t *me_ptr, olc_ext_out_port_t *ext_out_po
    return result;
 }
 
-static bool_t olc_is_ext_out_port_us_or_ds_rt(olc_t *me_ptr, olc_ext_out_port_t *ext_out_port_ptr)
-{
-   gen_topo_output_port_t *out_port_ptr           = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
-   uint32_t                is_downstream_realtime = FALSE;
-   uint32_t                is_upstream_realtime   = FALSE;
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_OUTPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_UPSTREAM_RT,
-                              out_port_ptr,
-                              &is_upstream_realtime);
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_OUTPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_DOWNSTREAM_RT,
-                              out_port_ptr,
-                              &is_downstream_realtime);
-
-   return (is_downstream_realtime || is_upstream_realtime);
-}
-
-static bool_t olc_is_ext_in_port_us_or_ds_rt(olc_t *me_ptr, olc_ext_in_port_t *ext_in_port_ptr)
-{
-   gen_topo_input_port_t *in_port_ptr            = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
-   uint32_t               is_downstream_realtime = FALSE;
-   uint32_t               is_upstream_realtime   = FALSE;
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_INPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_UPSTREAM_RT,
-                              in_port_ptr,
-                              &is_upstream_realtime);
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_INPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_DOWNSTREAM_RT,
-                              in_port_ptr,
-                              &is_downstream_realtime);
-
-   return (is_downstream_realtime || is_upstream_realtime);
-}
-
-/**
- * OLC is real time if it's external ports are connected to RT entities on either
- *  upstream or downstream
- */
-bool_t olc_is_realtime(cu_base_t *base_ptr)
-{
-   olc_t *me_ptr = (olc_t *)base_ptr;
-
-   for (gu_ext_out_port_list_t *ext_out_port_list_ptr = me_ptr->topo.gu.ext_out_port_list_ptr;
-        (NULL != ext_out_port_list_ptr);
-        LIST_ADVANCE(ext_out_port_list_ptr))
-   {
-      olc_ext_out_port_t *ext_out_port_ptr = (olc_ext_out_port_t *)ext_out_port_list_ptr->ext_out_port_ptr;
-      if (olc_is_ext_out_port_us_or_ds_rt(me_ptr, ext_out_port_ptr))
-      {
-         return TRUE;
-      }
-   }
-
-   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = me_ptr->topo.gu.ext_in_port_list_ptr;
-        (NULL != ext_in_port_list_ptr);
-        LIST_ADVANCE(ext_in_port_list_ptr))
-   {
-      olc_ext_in_port_t *ext_in_port_ptr = (olc_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
-      if (olc_is_ext_in_port_us_or_ds_rt(me_ptr, ext_in_port_ptr))
-      {
-         return TRUE;
-      }
-   }
-   return FALSE;
-}
 
 // Topo to cntr call back to handle propagation at external output port.
 // If the propagated property is is_upstrm_rt, cmd is sent to downstream cntr.

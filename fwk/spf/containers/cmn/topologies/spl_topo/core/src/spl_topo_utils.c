@@ -1204,7 +1204,7 @@ ar_result_t spl_topo_update_simp_module_connections(spl_topo_t *topo_ptr)
    }
 
    // flags will be updated based on the modules
-   topo_ptr->simpt_flags.is_bypass_container = (topo_ptr->t_base.gu.num_parallel_paths == 1)? TRUE: FALSE;
+   topo_ptr->flags.is_bypass_container = (topo_ptr->t_base.gu.num_parallel_paths == 1)? TRUE: FALSE;
 
    topo_ptr->simpt1_flags.any_modules_skip_process = FALSE;
    topo_ptr->simpt1_flags.any_state_not_started    = FALSE;
@@ -1293,7 +1293,7 @@ ar_result_t spl_topo_update_simp_module_connections(spl_topo_t *topo_ptr)
       {
          // if module is blocking data then container can't be bypassed.
          // actually in this case simplified topo can't be used.
-         topo_ptr->simpt_flags.is_bypass_container = FALSE;
+         topo_ptr->flags.is_bypass_container = FALSE;
 
          spf_list_insert_tail((spf_list_node_t **)&topo_ptr->simpt_sorted_module_list_ptr,
                               module_ptr,
@@ -1376,8 +1376,8 @@ ar_result_t spl_topo_update_simp_module_connections(spl_topo_t *topo_ptr)
                                                                               &out_port_ptr)))
       {
          // if module is not elementary then container can't be bypassed.
-         topo_ptr->simpt_flags.is_bypass_container =
-            (!module_ptr->t_base.gu.flags.is_elementary) ? FALSE : topo_ptr->simpt_flags.is_bypass_container;
+         topo_ptr->flags.is_bypass_container =
+            (!module_ptr->t_base.gu.flags.is_elementary) ? FALSE : topo_ptr->flags.is_bypass_container;
 
          spf_list_insert_tail((spf_list_node_t **)&topo_ptr->simpt_sorted_module_list_ptr,
                               module_ptr,
@@ -1423,11 +1423,11 @@ ar_result_t spl_topo_update_simp_module_connections(spl_topo_t *topo_ptr)
    }
 
    //sanity check for container bypass
-   if (topo_ptr->simpt_flags.is_bypass_container)
+   if (topo_ptr->flags.is_bypass_container)
    {
       if (1 != spf_list_count_elements((spf_list_node_t *)topo_ptr->t_base.gu.ext_in_port_list_ptr))
       {
-         topo_ptr->simpt_flags.is_bypass_container = FALSE;
+         topo_ptr->flags.is_bypass_container = FALSE;
          TOPO_MSG(topo_ptr->t_base.gu.log_id,
                   DBG_ERROR_PRIO,
                   "can't bypass container, non-unity external input ports present.");
@@ -1435,7 +1435,7 @@ ar_result_t spl_topo_update_simp_module_connections(spl_topo_t *topo_ptr)
 
       if (1 != spf_list_count_elements((spf_list_node_t *)topo_ptr->t_base.gu.ext_out_port_list_ptr))
       {
-         topo_ptr->simpt_flags.is_bypass_container = FALSE;
+         topo_ptr->flags.is_bypass_container = FALSE;
          TOPO_MSG(topo_ptr->t_base.gu.log_id,
                   DBG_ERROR_PRIO,
                   "can't bypass container, non-unity external input ports present.");
@@ -1443,7 +1443,7 @@ ar_result_t spl_topo_update_simp_module_connections(spl_topo_t *topo_ptr)
 
       if (1 != topo_ptr->t_base.gu.num_parallel_paths)
       {
-         topo_ptr->simpt_flags.is_bypass_container = FALSE;
+         topo_ptr->flags.is_bypass_container = FALSE;
          TOPO_MSG(topo_ptr->t_base.gu.log_id,
                   DBG_ERROR_PRIO,
                   "can't bypass container, more than one path in the topo.");
@@ -1451,7 +1451,7 @@ ar_result_t spl_topo_update_simp_module_connections(spl_topo_t *topo_ptr)
    }
 
    // if container is bypassed then get the enabled elementary module list and attach it to the first module's output port
-   if (topo_ptr->simpt_flags.is_bypass_container)
+   if (topo_ptr->flags.is_bypass_container)
    {
       // get the output port of the module connected on the external output.
       // all the elementary modules will be hosted by this output port.

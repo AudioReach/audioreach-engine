@@ -230,7 +230,7 @@ void olc_vote_pm_conditionally(olc_t *me_ptr, uint32_t period_us, bool_t is_at_l
       period_us = 0;
    }
    vote_type = is_release ? CU_PM_REL_KPPS_BW : CU_PM_REQ_KPPS_BW;
-   cu_vote_latency(&me_ptr->cu, is_release, (olc_is_stm(&me_ptr->cu) || olc_is_realtime(&me_ptr->cu)));
+   cu_vote_latency(&me_ptr->cu, is_release, (olc_is_stm(&me_ptr->cu) || cu_is_realtime(&me_ptr->cu)));
 
    olc_handle_clk_vote_change(me_ptr, vote_type, FORCE_AGGREGATE_FALSE, NULL, NULL);
 }
@@ -336,7 +336,7 @@ ar_result_t olc_perf_vote(olc_t                      *me_ptr,
    if (cmn_conditions || fwk_event_flag_ptr->proc_dur_change || fwk_event_flag_ptr->cntr_run_state_change)
    {
       olc_get_set_thread_priority(me_ptr, NULL, TRUE /*should set */);
-      cu_vote_latency(&me_ptr->cu, is_release, olc_is_realtime(&me_ptr->cu));
+      cu_vote_latency(&me_ptr->cu, is_release, cu_is_realtime(&me_ptr->cu));
    }
 
    return result;

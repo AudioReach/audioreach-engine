@@ -202,7 +202,6 @@ ar_result_t gen_cntr_cache_set_event_prop(gen_cntr_t *       me_ptr,
                                           topo_reg_event_t * event_cfg_payload_ptr,
                                           bool_t             is_register);
 
-bool_t gen_cntr_is_realtime(gen_cntr_t *me_ptr);
 bool_t gen_cntr_is_signal_triggered(gen_cntr_t *me_ptr);
 
 ar_result_t gen_cntr_apply_downgraded_state_on_output_port(cu_base_t *       cu_ptr,

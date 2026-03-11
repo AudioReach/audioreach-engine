@@ -339,6 +339,11 @@ ar_result_t spl_cntr_handle_fwk_events(spl_cntr_t *me_ptr, bool_t is_data_path)
       fwk_event_flag_ptr->rt_ftrt_change = TRUE;
    }
 
+   if (fwk_event_flag_ptr->rt_ftrt_change)
+   {
+      cu_is_realtime(&me_ptr->cu);
+   }
+
    /* update votes
     * 1. if module has updated votes
     * 2. sg and port state change
@@ -398,7 +403,7 @@ ar_result_t spl_cntr_handle_fwk_events(spl_cntr_t *me_ptr, bool_t is_data_path)
       }
 
       spl_cntr_set_thread_priority(me_ptr);
-      cu_vote_latency(&me_ptr->cu, is_at_least_one_sg_started, me_ptr->topo.t_base.flags.is_real_time_topo);
+      cu_vote_latency(&me_ptr->cu, is_at_least_one_sg_started, me_ptr->cu.flags.is_real_time);
    }
 
    // send updated proc duration to the modules.

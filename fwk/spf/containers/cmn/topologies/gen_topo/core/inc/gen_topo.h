@@ -130,7 +130,7 @@ typedef struct gen_topo_module_t             gen_topo_module_t;
 typedef struct gen_topo_input_port_t         gen_topo_input_port_t;
 typedef struct gen_topo_output_port_t        gen_topo_output_port_t;
 typedef struct gen_topo_ctrl_port_t          gen_topo_ctrl_port_t;
-typedef struct gen_topo_process_context_t	   gen_topo_process_context_t;
+typedef struct gen_topo_process_context_t      gen_topo_process_context_t;
 typedef struct gen_topo_module_bypass_t      gen_topo_module_bypass_t;
 typedef struct gen_topo_vtable_t             gen_topo_vtable_t;
 typedef struct gen_topo_common_port_t        gen_topo_common_port_t;
@@ -174,7 +174,7 @@ typedef struct topo_to_cntr_vtable_t
 
    /* Topo callback to containers to handle events to DSP service. */
    ar_result_t (*raise_data_to_dsp_service_event)(gen_topo_module_t *module_context_ptr,
-												              capi_event_info_t *event_info_ptr);
+                                                              capi_event_info_t *event_info_ptr);
 
    /* Topo callback to containers to handle events from DSP service. */
    ar_result_t (*raise_data_from_dsp_service_event)(gen_topo_module_t *module_context_ptr,
@@ -342,8 +342,8 @@ typedef struct gen_topo_port_scratch_flags_t
                                                                    keeping marker_eos set helps algos do zero pushing. marker_eos is also used here. */
    uint8_t           prev_eof : 1;                           /**< whether end of frame is set before process. Used in module process context to set
                                                                   anything_changed flag, if module consumes only EOF but not data.
-																  Note that ST topo doesnt require this flag, since anything_changed is always set at the end
-																  of ST topo processing. */
+                                                                  Note that ST topo doesnt require this flag, since anything_changed is always set at the end
+                                                                  of ST topo processing. */
    uint8_t           is_timestamp_valid : 1;                 /**< Validity of gen_topo_port_scratch_data_t::timestamp */
    uint32_t          is_trigger_present:2;                   /**< Used to save the is trigger present as evaluated during module processing decision, must be used only
                                                                   in the topo process context and should be reset at the end of process */
@@ -515,44 +515,44 @@ typedef struct gen_topo_graph_init_t
 /** Returns gen_topo_capi_event_flag_t.port_thresh field BIT mask */
 static inline uint32_t __gen_topo_capi_event_port_thresh_bitmask()
 {
-	gen_topo_capi_event_flag_t temp_flag;
-	temp_flag.word = 0xFFFFFFFF;
-	temp_flag.port_thresh = 0;
-	return (~temp_flag.word);
+    gen_topo_capi_event_flag_t temp_flag;
+    temp_flag.word = 0xFFFFFFFF;
+    temp_flag.port_thresh = 0;
+    return (~temp_flag.word);
 }
 
 /** Returns gen_topo_capi_event_flag_t.process_state field BIT mask */
 static inline uint32_t __gen_topo_capi_event_process_state_bitmask()
 {
-	gen_topo_capi_event_flag_t temp_flag;
-	temp_flag.word = 0xFFFFFFFF;
-	temp_flag.process_state = 0;
-	return (~temp_flag.word);
+    gen_topo_capi_event_flag_t temp_flag;
+    temp_flag.word = 0xFFFFFFFF;
+    temp_flag.process_state = 0;
+    return (~temp_flag.word);
 }
 
 /** Returns gen_topo_capi_event_flag_t.media_fmt_event field BIT mask */
 static inline uint32_t __gen_topo_capi_event_media_fmt_bitmask()
 {
-	gen_topo_capi_event_flag_t temp_flag;
-	temp_flag.word = 0xFFFFFFFF;
-	temp_flag.media_fmt_event = 0;
-	return (~temp_flag.word);
+    gen_topo_capi_event_flag_t temp_flag;
+    temp_flag.word = 0xFFFFFFFF;
+    temp_flag.media_fmt_event = 0;
+    return (~temp_flag.word);
 }
 
 static inline uint32_t __gen_topo_capi_event_signal_trigger_policy_change_bitmask()
 {
-	gen_topo_capi_event_flag_t temp_flag;
-	temp_flag.word = 0xFFFFFFFF;
-	temp_flag. signal_trigger_policy_change = 0;
-	return (~temp_flag.word);
+    gen_topo_capi_event_flag_t temp_flag;
+    temp_flag.word = 0xFFFFFFFF;
+    temp_flag. signal_trigger_policy_change = 0;
+    return (~temp_flag.word);
 }
 
 static inline uint32_t __gen_topo_capi_event_data_trigger_policy_change_bitmask()
 {
-	gen_topo_capi_event_flag_t temp_flag;
-	temp_flag.word = 0xFFFFFFFF;
-	temp_flag. data_trigger_policy_change = 0;
-	return (~temp_flag.word);
+    gen_topo_capi_event_flag_t temp_flag;
+    temp_flag.word = 0xFFFFFFFF;
+    temp_flag. data_trigger_policy_change = 0;
+    return (~temp_flag.word);
 }
 
 #define  GT_CAPI_EVENT_PORT_THRESH_BIT_MASK     (__gen_topo_capi_event_port_thresh_bitmask())
@@ -569,7 +569,6 @@ typedef struct gen_topo_flags_t
                                                    container ever/never had a module which raises Data TP or Signal TP. */
    uint32_t is_signal_triggered : 1;      /**< whether container is signal triggered */
    uint32_t is_signal_triggered_active : 1;      /**< whether signal triggered module is signal triggered or not*/
-   uint32_t is_real_time_topo : 1;       /**< true if any external port is real time */
 
    uint32_t need_to_handle_frame_done   : 1;    /**< Set if handle frame done event is set */
    uint32_t is_dm_enabled       : 1;      /**< Set if atleast one DM module is operating in a DM mode. */
@@ -611,8 +610,8 @@ typedef struct gen_topo_flags_t
 
 typedef struct gen_topo_port_mf_utils_t
 {
-  spf_list_node_t *mf_list_ptr;    	/**< list of media format blocks assigned to different ports in this topo.*/
-  uint32_t node_count;			/**< number of different media format blocks assigned to different ports in this topo. */
+  spf_list_node_t *mf_list_ptr;     /**< list of media format blocks assigned to different ports in this topo.*/
+  uint32_t node_count;          /**< number of different media format blocks assigned to different ports in this topo. */
 } gen_topo_port_mf_utils_t;
 
 /**
@@ -672,9 +671,9 @@ typedef struct gen_topo_sg_t
  */
 enum
 {
-	BLOCKED_DATA_TRIGGER_IN_ST = 0, /**< Data trigger in Signal trigger container is not allowed for this module.*/
-	ALLOW_DATA_TRIGGER_IN_ST_EVENT = 1, /**< Module has raised event to allow Data trigger in Signal trigger container.*/
-	ALLOW_DATA_TRIGGER_IN_ST_PROPAGATION = 2 /**< Data trigger in Signal trigger container is allowed for this module via propagation of ALLOW_DATA_TRIGGER_IN_ST_EVENT event*/
+    BLOCKED_DATA_TRIGGER_IN_ST = 0, /**< Data trigger in Signal trigger container is not allowed for this module.*/
+    ALLOW_DATA_TRIGGER_IN_ST_EVENT = 1, /**< Module has raised event to allow Data trigger in Signal trigger container.*/
+    ALLOW_DATA_TRIGGER_IN_ST_PROPAGATION = 2 /**< Data trigger in Signal trigger container is allowed for this module via propagation of ALLOW_DATA_TRIGGER_IN_ST_EVENT event*/
 };
 
 /**
@@ -684,7 +683,7 @@ typedef union gen_topo_module_flags_t
 {
    struct
    {
-	  /***Static Flags***/
+      /***Static Flags***/
       uint64_t inplace             : 1;
       uint64_t dynamic_inplace     : 1;    /**< Indicates if module changed itself to inplace dynamically.
                                                 This flag is intended to optimize buffer usage for MIMO modules
@@ -717,7 +716,7 @@ typedef union gen_topo_module_flags_t
       uint64_t is_dm_disabled           : 1;    /**< Indicates if modules has enabled/disabled dm >*/
       uint64_t dm_mode                  : 2;    /**< Indicates operating dm mode [value range is enum gen_topo_dm_mode_t] */
 
-      uint64_t is_nblc_boundary_module	 : 1;    /**< Indicates if module is at the nblc boundary >*/
+      uint64_t is_nblc_boundary_module   : 1;    /**< Indicates if module is at the nblc boundary >*/
 
       uint64_t voted_island_exit : 1;            /**< For modules this flag indicates whether module voted for island exit>*/
 
@@ -889,7 +888,7 @@ typedef struct gen_topo_common_port_t
    topo_port_state_t             state;                     /**< Downgraded state = downgrade of (self state, connected port state)*/
    topo_data_flow_state_t        data_flow_state;           /**< Data flow state. currently no requirement for output ports. applicable for input port only. */
 
-   topo_media_fmt_t              *media_fmt_ptr;	         /**< Port's media format.
+   topo_media_fmt_t              *media_fmt_ptr;             /**< Port's media format.
                                                                media format pointers are shared with other ports as well, it should not be updated directly.
                                                                read can be done directly.
                                                                to write, first update the media format in a temporary variable (stack) and then update using
@@ -1052,10 +1051,10 @@ static inline void gen_topo_get_mod_heap_id_and_log_id(uint32_t *    log_id_ptr,
 static inline bool_t gen_topo_is_port_in_realtime_path(gen_topo_common_port_t *cmn_port_ptr)
 {
    // create is US,DS RT bit mask
-	gen_topo_port_flags_t temp_flag;
-	temp_flag.word = 0xFFFFFFFF;
-	temp_flag.is_downstream_realtime         =  0;
-	temp_flag.is_upstream_realtime           =  0;
+    gen_topo_port_flags_t temp_flag;
+    temp_flag.word = 0xFFFFFFFF;
+    temp_flag.is_downstream_realtime         =  0;
+    temp_flag.is_upstream_realtime           =  0;
    uint32_t CMN_PORT_FLAG_RT_FLAGS_BIT_MASK = (~temp_flag.word);
 
    // return if port in rt path

@@ -248,7 +248,7 @@ static bool_t gen_cntr_need_to_process_frames(gen_cntr_t *me_ptr,
 
    // if topo is non real time then break the loop to process command Q.
    // this is to avoid delay in processing command Q during NT mode data processing.
-   if (!me_ptr->topo.flags.is_real_time_topo &&
+   if (!me_ptr->cu.flags.is_real_time &&
        posal_channel_poll_inline(me_ptr->cu.channel_ptr, GEN_CNTR_CMD_BIT_MASK))
    {
       me_ptr->topo.flags.process_pending = TRUE;
