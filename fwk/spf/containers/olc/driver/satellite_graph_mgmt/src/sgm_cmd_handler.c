@@ -700,7 +700,7 @@ ar_result_t sgm_handle_register_module_events(spgm_info_t *spgm_ptr,
       return AR_ENOMEMORY;
    }
 
-   token_to_send = posal_atomic_increment(spgm_ptr->token_instance);
+   sgm_get_unique_token(spgm_ptr, &token_to_send);
 
    // populate the event list node
    event_node_ptr->module_iid          = miid;

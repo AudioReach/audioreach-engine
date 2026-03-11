@@ -71,6 +71,7 @@ typedef struct spgm_info_t
    posal_queue_t *       rsp_q_ptr;
    posal_queue_t *       evnt_q_ptr;
    posal_atomic_word_t   token_instance;
+   uint32_t              base_token;
    sgmc_rsp_h_vtable_t * cmd_rsp_vtbl;
    sgmc_rsp_h_vtable_t * servreg_error_notify_cmd_rsp_vtbl;
    spgm_cmd_rsp_node_t   rsp_info;

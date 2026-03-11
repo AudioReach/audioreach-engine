@@ -264,7 +264,7 @@ static ar_result_t spdm_add_node_to_data_pool(spgm_info_t *          spgm_ptr,
 
       memset(cur_node_ptr, 0, sizeof(data_buf_pool_node_t));
       cur_node_ptr->pending_alloc = TRUE;
-      token                       = posal_atomic_increment(spgm_ptr->token_instance);
+      sgm_get_unique_token(spgm_ptr, &token);
       cur_node_ptr->token         = token;
 
       if (AR_EOK != (result = sgm_util_add_node_to_list(spgm_ptr,

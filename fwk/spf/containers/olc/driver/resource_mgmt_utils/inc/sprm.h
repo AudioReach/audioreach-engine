@@ -29,7 +29,7 @@ OLC Structure Definitions
 #define SPDM_MAX_IO_PORTS 8
 
 // defines the dynamic tken start value
-#define DYNAMIC_TOKEN_START_VAL 1000
+#define DYNAMIC_TOKEN_START_VAL 0x1000000
 
 // Structure for shared memory handle for every allocation from the mdf loaned memory pool
 typedef struct sgm_shmem_handle_t
@@ -66,6 +66,7 @@ ar_result_t sgm_shmem_alloc(uint32_t shmem_size, uint32_t satellite_proc_domain,
 ar_result_t sgm_shmem_free(sgm_shmem_handle_t *shmem);
 
 /**--------------------------------- IPC communication utils ----------------------------------*/
+ar_result_t sgm_get_unique_token(spgm_info_t *spgm_info, uint32_t *unique_token_ptr);
 ar_result_t sgm_ipc_send_data_pkt(spgm_info_t *spgm_info);
 ar_result_t sgm_ipc_send_command_to_dst(spgm_info_t *spgm_info, uint32_t dst_port);
 ar_result_t sgm_ipc_send_command_to_dst_with_token(spgm_info_t *spgm_info, uint32_t dst_port, uint32_t token);
