@@ -35,6 +35,7 @@ extern "C" {
 #define CAPI_GATE_KPPS 50
 #define GATE_NUM_FRAMEWORK_EXTENSIONS 1
 #define GATE_NUM_US_PER_MS 1000
+#define GATE_SCHEDULING_JITTER_US 100
 //#define GATE_DBG 1
 /*------------------------------------------------------------------------
  * Type definitions
