@@ -38,7 +38,7 @@ ar_result_t audio_dam_stream_write(audio_dam_stream_writer_t *writer_handle,
          if (bytes_to_consume > writer_handle->driver_ptr->frame_max_data_len_in_bytes)
          {
 #ifdef DEBUG_AUDIO_DAM_DRIVER
-            DAM_MSG_ISLAND(drv_ptr->iid,
+            DAM_MSG_ISLAND(writer_handle->driver_ptr->iid,
                            DBG_LOW_PRIO,
                            "DAM_DRIVER: ch_id=%d, iter = %d, bytes_to_consume = %lu consuming only %lu",
                            writer_handle->wr_client_arr_ptr[iter].circ_buf_ptr->id,
@@ -99,7 +99,7 @@ ar_result_t audio_dam_stream_write(audio_dam_stream_writer_t *writer_handle,
          if (0 == writer_handle->wr_client_arr_ptr[iter].circ_buf_ptr->circ_buf_size)
          {
 #ifdef DEBUG_AUDIO_DAM_DRIVER
-            DAM_MSG_ISLAND(drv_ptr->iid,
+            DAM_MSG_ISLAND(writer_handle->driver_ptr->iid,
                            DBG_ERROR_PRIO,
                            "DAM_DRIVER: Stream writer buffer not created for ch_id=%d, iter = %d skipping it ",
                            writer_handle->wr_client_arr_ptr[iter].circ_buf_ptr->id,
@@ -110,7 +110,7 @@ ar_result_t audio_dam_stream_write(audio_dam_stream_writer_t *writer_handle,
          else
          {
 #ifdef DEBUG_AUDIO_DAM_DRIVER
-            DAM_MSG_ISLAND(drv_ptr->iid,
+            DAM_MSG_ISLAND(writer_handle->driver_ptr->iid,
                            DBG_ERROR_PRIO,
                            "DAM_DRIVER: Stream writer buffering failed. ch_id=%d, iter = %d",
                            writer_handle->wr_client_arr_ptr[iter].circ_buf_ptr->id,
@@ -120,7 +120,7 @@ ar_result_t audio_dam_stream_write(audio_dam_stream_writer_t *writer_handle,
          }
       }
 #ifdef DEBUG_AUDIO_DAM_DRIVER
-      DAM_MSG_ISLAND(drv_ptr->iid,
+      DAM_MSG_ISLAND(writer_handle->driver_ptr->iid,
                      DBG_HIGH_PRIO,
                      "DAM_DRIVER: Stream writer buffering done. ch_id=%d, iter = %d, actual_data_len = %d",
                      writer_handle->wr_client_arr_ptr[iter].circ_buf_ptr->id,
