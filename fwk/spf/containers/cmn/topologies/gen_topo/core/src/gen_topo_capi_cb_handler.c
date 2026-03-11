@@ -16,6 +16,7 @@
 /** GPR/API related */
 #include "gpr_api_inline.h"
 #include "gpr_ids_domains.h"
+#include "thin_topo_inline.h"
 
 /** port field is invalid if its zero. */
 #define COMPARE_FMT_AND_SET(                                                                                           \
@@ -642,6 +643,7 @@ capi_err_t gen_topo_handle_output_media_format_event(void *             ctxt_ptr
          {
             out_port_ptr->common.flags.media_fmt_event = is_mf_valid_and_changed;
          }
+         THIN_TOPO_SET_EXIT_FLAG(topo_ptr, has_unsupported_mf, TRUE);
 
          break;
       }
