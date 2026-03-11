@@ -187,7 +187,7 @@ ar_result_t spl_cntr_input_data_q_trigger(cu_base_t *base_ptr, uint32_t channel_
 #ifdef PROC_DELAY_DEBUG
          gen_topo_module_t *module_ptr = (gen_topo_module_t*) ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr;
 
-         if (APM_SUB_GRAPH_SID_VOICE_CALL == module_ptr->gu.sg_ptr->sid)
+         if (IS_VOICE_SCENARIO_ID(module_ptr->gu.sg_ptr->sid))
          {
             SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
                                   DBG_HIGH_PRIO,

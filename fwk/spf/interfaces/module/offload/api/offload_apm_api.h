@@ -13,6 +13,9 @@
 
 #include "spf_begin_pack.h"
 
+/* Scenario ID reserved and mapped for SAT_VOICE_CALL scenario identification . */
+#define APM_SUB_GRAPH_SID_SAT_VOICE_CALL 4 //APM_SUB_GRAPH_SID_RESERVED_1
+
 struct apm_imcl_peer_domain_info_t
 {
    uint32_t module_iid;

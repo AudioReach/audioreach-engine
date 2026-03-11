@@ -108,7 +108,7 @@ ar_result_t cu_vote_latency(cu_base_t *me_ptr, bool_t is_release, bool_t is_real
       return AR_EOK;
    }
 
-   if (me_ptr->voice_info_ptr)
+   if ((me_ptr->voice_info_ptr) && (FALSE == me_ptr->voice_info_ptr->is_satellite_voice_sid))
    {
       return AR_EOK;
    }
@@ -220,8 +220,9 @@ ar_result_t cu_handle_clk_vote_change(cu_base_t *       me_ptr,
 {
    ar_result_t result = AR_EOK;
 
-   bool_t is_voice_scenario = (NULL != me_ptr->voice_info_ptr);
-   bool_t is_release        = (CU_PM_REQ_KPPS_BW != vote_type);
+   bool_t is_voice_scenario =
+      ((NULL != me_ptr->voice_info_ptr) && (FALSE == me_ptr->voice_info_ptr->is_satellite_voice_sid));
+   bool_t is_release = (CU_PM_REQ_KPPS_BW != vote_type);
 
    /* Multiply the scale factor and pCPP to the current KPPS value and vote with new floor clock.
    This scale factor is set when an event is raised by the encoder if it needs to process data

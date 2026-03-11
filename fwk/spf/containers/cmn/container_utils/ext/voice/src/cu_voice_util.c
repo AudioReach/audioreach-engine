@@ -24,7 +24,7 @@ bool_t cu_has_voice_sid(cu_base_t *base_ptr)
       if (sg_list_ptr->sg_ptr)
       {
          gu_sg_t *sg_ptr = sg_list_ptr->sg_ptr;
-         if (APM_SUB_GRAPH_SID_VOICE_CALL == sg_ptr->sid)
+         if (IS_VOICE_SCENARIO_ID(sg_ptr->sid))
          {
             return TRUE;
          }
@@ -58,10 +58,14 @@ ar_result_t cu_create_voice_info(cu_base_t *base_ptr, spf_msg_cmd_graph_open_t *
    gu_sg_t *sg_ptr = gu_find_subgraph(gu_ptr, sg_cmd_ptr->sub_graph_id);
    VERIFY(result, sg_ptr);
 
-   if (APM_SUB_GRAPH_SID_VOICE_CALL == sg_ptr->sid)
+   if (IS_VOICE_SCENARIO_ID(sg_ptr->sid))
    {
       MALLOC_MEMSET(base_ptr->voice_info_ptr, cu_voice_info_t, sizeof(cu_voice_info_t), base_ptr->heap_id, result);
       CU_MSG(base_ptr->gu_ptr->log_id, DBG_HIGH_PRIO, "Allocated memory for voice info");
+      if (APM_SUB_GRAPH_SID_SAT_VOICE_CALL == sg_ptr->sid)
+      {
+         base_ptr->voice_info_ptr->is_satellite_voice_sid = TRUE;
+      }
    }
 
    CATCH(result, CU_MSG_PREFIX, base_ptr->gu_ptr->log_id)
