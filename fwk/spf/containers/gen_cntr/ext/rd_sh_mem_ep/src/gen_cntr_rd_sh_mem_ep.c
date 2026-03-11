@@ -2005,12 +2005,26 @@ ar_result_t gen_cntr_rd_sh_mem_setup_topo_buffer(gen_cntr_t *me_ptr, gen_cntr_ex
       return result;
    }
 
+   // if PCM and non-interleaved format its not supported by rd shm
+   if ((SPF_IS_PCM_DATA_FORMAT(out_port_ptr->common.media_fmt_ptr->data_format)) &&
+       (TOPO_INTERLEAVED != out_port_ptr->common.media_fmt_ptr->pcm.interleaving))
+   {
+      return result;
+   }
+
    uint32_t empty_space_available = ext_out_port_ptr->buf.max_data_len - ext_out_port_ptr->buf.actual_data_len;
 
    if (empty_space_available && (empty_space_available >= out_port_ptr->common.max_buf_len_per_buf))
    {
-      out_port_ptr->common.bufs_ptr[0].data_ptr =
-         ext_out_port_ptr->buf.data_ptr + ext_out_port_ptr->buf.actual_data_len;
+      uint32_t buf_addr = (uint32_t)(ext_out_port_ptr->buf.data_ptr + ext_out_port_ptr->buf.actual_data_len);
+
+      // if buffer is not 8 byte aligned, skip reusing client buffer.
+      if(buf_addr & 0x7)
+      {
+         return result;
+      }
+
+      out_port_ptr->common.bufs_ptr[0].data_ptr        = (int8_t *)buf_addr;
       out_port_ptr->common.bufs_ptr[0].actual_data_len = 0;
       out_port_ptr->common.bufs_ptr[0].max_data_len    = out_port_ptr->common.max_buf_len_per_buf;
 
@@ -2048,7 +2062,7 @@ ar_result_t gen_cntr_rd_sh_mem_setup_topo_buffer(gen_cntr_t *me_ptr, gen_cntr_ex
 
          if (NULL == in_port_ptr->common.bufs_ptr[0].data_ptr)
          {
-            in_port_ptr->common.bufs_ptr[0].data_ptr     = out_port_ptr->common.bufs_ptr[0].data_ptr;
+            in_port_ptr->common.bufs_ptr[0].data_ptr     = (int8_t *)buf_addr;
             in_port_ptr->common.bufs_ptr[0].max_data_len = out_port_ptr->common.bufs_ptr[0].max_data_len;
             in_port_ptr->common.flags.buf_origin         = GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED;
 #ifdef VERBOSE_DEBUGGING
