@@ -958,7 +958,7 @@ capi_err_t spr_timer_enable(capi_spr_t *me_ptr)
                                          abs_timertype,
                                          POSAL_TIMER_USER,
                                          (posal_signal_t)me_ptr->signal_ptr,
-                                         POSAL_HEAP_DEFAULT);
+                                         me_ptr->heap_id);
          if (rc)
          {
             SPR_MSG(me_ptr->miid, DBG_ERROR_PRIO, "Timer creation failed");
