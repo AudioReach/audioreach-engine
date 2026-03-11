@@ -187,3 +187,85 @@ LOCAL_SPF_MODULE_QACT_MODULE_TYPE := "generic"
 LOCAL_SPF_MODULE_H2XML_HEADERS    := "$(MY_LOCAL_PATH_ARE)/fwk/api/modules/rd_sh_mem_ep_api.h"
 
 include $(BUILD_ARE_MODULES)
+
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := lib_placeholder_dec
+LOCAL_MODULE_TAGS := optional
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_C_INCLUDES := \
+    $(LOCAL_PATH)/ext/placeholder/inc
+
+LOCAL_SRC_FILES := \
+    ext/placeholder/src/gen_cntr_placeholder.c
+
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+
+LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
+LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
+
+ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
+    LOCAL_CFLAGS += -fsanitize=shadow-call-stack
+endif
+
+LOCAL_SHARED_LIBRARIES := \
+    liblx-osal \
+    libar-gpr
+
+LOCAL_HEADER_LIBRARIES := libspf_gen_cntr_headers libspf_interfaces_headers libapm_headers libspf_utils_headers libspf_api libposal_headers libspf_cu_headers libplatform_cfg_headers libspf_gu_headers libspf_gen_topo_headers libspf_topo_utils_headers libspf_icb_headers libamdb_headers
+LOCAL_STATIC_LIBRARIES := libspf_gen_cntr libspf_interfaces libapm libspf_utils libposal libspf_cu libspf_gu libspf_gen_topo libspf_topo_utils libspf_icb libamdb
+
+LOCAL_SPF_MODULE_KCONFIG          := CONFIG_PLACEHOLDER_ENC_DEC
+LOCAL_SPF_MODULE_NAME             := $(LOCAL_MODULE)
+LOCAL_SPF_MODULE_MAJOR_VER        := 1
+LOCAL_SPF_MODULE_MINOR_VER        := 0
+LOCAL_SPF_MODULE_AMDB_ITYPE       := "capi"
+LOCAL_SPF_MODULE_AMDB_MTYPE       := "framework"
+LOCAL_SPF_MODULE_AMDB_MID         := "0x07001009"
+LOCAL_SPF_MODULE_AMDB_TAG         := "framework"
+LOCAL_SPF_MODULE_AMDB_MOD_NAME    := "MODULE_ID_PLACEHOLDER_DECODER"
+LOCAL_SPF_MODULE_QACT_MODULE_TYPE := "generic"
+LOCAL_SPF_MODULE_H2XML_HEADERS    := "$(MY_LOCAL_PATH_ARE)/fwk/api/modules/common_enc_dec_api.h"
+
+include $(BUILD_ARE_MODULES)
+
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := lib_placeholder_enc
+LOCAL_MODULE_TAGS := optional
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_C_INCLUDES := \
+    $(LOCAL_PATH)/ext/placeholder/inc
+
+LOCAL_SRC_FILES := \
+    ext/placeholder/src/gen_cntr_placeholder.c
+
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+
+LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
+LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
+
+ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
+    LOCAL_CFLAGS += -fsanitize=shadow-call-stack
+endif
+
+LOCAL_SHARED_LIBRARIES := \
+    liblx-osal \
+    libar-gpr
+
+LOCAL_HEADER_LIBRARIES := libspf_gen_cntr_headers libspf_interfaces_headers libapm_headers libspf_utils_headers libspf_api libposal_headers libspf_cu_headers libplatform_cfg_headers libspf_gu_headers libspf_gen_topo_headers libspf_topo_utils_headers libspf_icb_headers libamdb_headers
+LOCAL_STATIC_LIBRARIES := libspf_gen_cntr libspf_interfaces libapm libspf_utils libposal libspf_cu libspf_gu libspf_gen_topo libspf_topo_utils libspf_icb libamdb
+
+LOCAL_SPF_MODULE_KCONFIG          := CONFIG_PLACEHOLDER_ENC_DEC
+LOCAL_SPF_MODULE_NAME             := $(LOCAL_MODULE)
+LOCAL_SPF_MODULE_MAJOR_VER        := 1
+LOCAL_SPF_MODULE_MINOR_VER        := 0
+LOCAL_SPF_MODULE_AMDB_ITYPE       := "capi"
+LOCAL_SPF_MODULE_AMDB_MTYPE       := "framework"
+LOCAL_SPF_MODULE_AMDB_MID         := "0x07001008"
+LOCAL_SPF_MODULE_AMDB_TAG         := "framework"
+LOCAL_SPF_MODULE_AMDB_MOD_NAME    := "MODULE_ID_PLACEHOLDER_ENCODER"
+LOCAL_SPF_MODULE_QACT_MODULE_TYPE := "generic"
+LOCAL_SPF_MODULE_H2XML_HEADERS    := "$(MY_LOCAL_PATH_ARE)/fwk/api/modules/common_enc_dec_api.h"
+
+include $(BUILD_ARE_MODULES)
