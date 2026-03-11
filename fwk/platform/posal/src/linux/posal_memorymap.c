@@ -245,7 +245,6 @@ void posal_memorymap_global_init()
       AR_MSG(DBG_ERROR_PRIO, "posal_memorymap: plat_vfio_device_init failed with result : %d", result);
    }
 #endif /* POSAL_MMAP_VFIO */
-   pa_key_index = 1;
 }
 
 void posal_memorymap_global_deinit()
