@@ -103,6 +103,12 @@ ar_result_t spf_svc_alloc_rsp_payload(uint32_t       log_id,
    /** Increment the cmd payload pointer to point to module param data header start */
    curr_payload_ptr += sizeof(apm_cmd_header_t);
 
+   // overflow check
+   if (curr_payload_ptr > curr_payload_ptr + cmd_payload_size) {
+      result = AR_EBADPARAM;
+      return result;
+   }
+
    /** Get the payload end address */
    payload_end_ptr = curr_payload_ptr + cmd_payload_size;
 
@@ -127,7 +133,7 @@ ar_result_t spf_svc_alloc_rsp_payload(uint32_t       log_id,
             mod_param_size = sizeof(apm_module_param_data_t) + mod_data_ptr->param_size;
 
             /** Param data should be at least 4 byte aligned. If not, then abort command processing */
-            if (!IS_ALIGN_4_BYTE(mod_data_ptr->param_size) || ((curr_payload_ptr + mod_param_size) > payload_end_ptr))
+            if (!IS_ALIGN_4_BYTE(mod_data_ptr->param_size) || (payload_end_ptr < curr_payload_ptr) || (mod_param_size > (size_t)(payload_end_ptr - curr_payload_ptr)))
             {
                AR_MSG(DBG_ERROR_PRIO,
                       "CALI:%08lX: Module [IID: 0x%lX] param ID [0x%lX], param size[%lu] is not correct",
