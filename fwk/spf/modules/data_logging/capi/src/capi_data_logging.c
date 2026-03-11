@@ -197,6 +197,17 @@ capi_err_t check_alloc_log_buf(capi_data_logging_t *me_ptr)
             }
          }
       }
+      else
+      {
+          // normalize the buffer size if there are valid channels to log,
+          // this should handle the case for raw compressed de-interleaved.
+          log_buf_size = (log_buf_size / num_chs_to_log) * num_chs_to_log;
+          DATA_LOGGING_MSG(me_ptr->nlpi_me_ptr->iid,
+                            DBG_HIGH_PRIO,
+                            "data format %lu, number of channels to log %lu",
+                            me_ptr->media_format.header.format_header.data_format,
+                            num_chs_to_log);
+      }
    }
    else
    {
