@@ -446,7 +446,6 @@ ar_result_t sgm_destroy_path(spgm_info_t *spgm_ptr, uint32_t master_path_id)
          cont_node_ptr = cont_node_ptr->next_ptr;
          if (0 == pd_event_reg_node_ptr->num_path_ref)
          {
-            cont_node_ptr = cont_node_ptr->next_ptr;
             // event deregister
             OLC_SGM_MSG(OLC_SGM_ID,
                         DBG_MED_PRIO,
