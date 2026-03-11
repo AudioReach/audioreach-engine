@@ -84,6 +84,8 @@ capi_err_t capi_gate_until_deadline_process(capi_gate_t *       me_ptr,
          calc_deadline_time_us = cur_time_us + (rounded_up_frame_interval_us - bytes_us_available) +
                                  me_ptr->proc_dur_us + rounded_up_ep_transmit_delay_us + const_delay_us;
 
+         calc_deadline_time_us -= me_ptr->deadline_offset_us;
+
          AR_MSG(DBG_HIGH_PRIO,
                 "capi_gate: Process: BT deadline time msw:%lu lsw:%lu, "
                 "calc_deadline_time_us msw: %lu lsw:%lu, "
@@ -100,10 +102,11 @@ capi_err_t capi_gate_until_deadline_process(capi_gate_t *       me_ptr,
                 rounded_up_ep_transmit_delay_us);
 
          AR_MSG(DBG_HIGH_PRIO,
-                "capi_gate: Process: bytes_available %d round up frame us %d  const delay %d",
+                "capi_gate: Process: bytes_available %d round up frame us %d  const delay %d deadline_offset %d",
                 bytes_us_available,
                 rounded_up_frame_interval_us,
-                const_delay_us);
+                const_delay_us,
+                me_ptr->deadline_offset_us);
 
          /* deadline time in the past*/
          /* moving the deadline time to the next frame only if the calc_deadline_time_us is more than 100us ahead of deadline_us
