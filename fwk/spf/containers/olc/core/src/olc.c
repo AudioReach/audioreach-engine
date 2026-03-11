@@ -68,7 +68,7 @@ static const cu_cntr_vtable_t olc_cntr_funcs = {
    .operate_on_subgraph                     = olc_operate_on_subgraph,
    .post_operate_on_subgraph                = olc_post_operate_on_subgraph,
    .set_get_cfg                             = NULL,
-   .register_events                         = NULL,
+   .register_events                         = olc_register_events_utils,
 
    .init_ext_in_port                        = olc_init_ext_in_port,
    .deinit_ext_in_port                      = olc_deinit_ext_in_port,
