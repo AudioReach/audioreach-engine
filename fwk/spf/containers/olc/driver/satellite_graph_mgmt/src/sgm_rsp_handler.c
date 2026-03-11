@@ -59,9 +59,11 @@ static ar_result_t spgm_cmd_rsp_handler(cu_base_t *cu_ptr, spgm_info_t *spgm_ptr
 
          OLC_SGM_MSG(OLC_SGM_ID,
                      DBG_HIGH_PRIO,
-                     "cmd_rsp: processing ibasic response with cmd_opcode(0x%lX) token(0x%lX) ",
+                     "cmd_rsp: processing ibasic response with cmd_opcode(0x%lX) "
+                     "token(0x%lX) ptime %llu",
                      rsp_ptr->opcode,
-                     packet_ptr->token);
+                     packet_ptr->token,
+                     spgm_ptr->p_cmd_exec_ts);
 
          switch (rsp_ptr->opcode)
          {
@@ -220,6 +222,13 @@ static ar_result_t spgm_cmd_rsp_handler(cu_base_t *cu_ptr, spgm_info_t *spgm_ptr
          rsp_info->opcode     = packet_ptr->opcode;
          rsp_info->token      = packet_ptr->token;
          sgm_get_cache_cmd_msg(spgm_ptr, rsp_info->opcode, rsp_info->token, &rsp_info->cmd_msg);
+
+         OLC_SGM_MSG(OLC_SGM_ID,
+                     DBG_HIGH_PRIO,
+                     "cmd_rsp: processing GET CFG response with cmd_opcode(0x%lX) token(0x%lX) ptime %llu",
+                     rsp_info->opcode,
+                     packet_ptr->token,
+					 spgm_ptr->p_cmd_exec_ts);
 
          if (APM_MODULE_INSTANCE_ID != packet_ptr->src_port)
          {

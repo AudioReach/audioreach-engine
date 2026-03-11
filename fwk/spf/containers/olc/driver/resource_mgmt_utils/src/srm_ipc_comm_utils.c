@@ -35,6 +35,8 @@ ar_result_t sgm_ipc_send_command(spgm_info_t *spgm_ptr)
 
    token                                = posal_atomic_increment(spgm_ptr->token_instance);
    spgm_ptr->active_cmd_hndl_ptr->token = token;
+   /** Capture the timestamp for this IPC command sent */
+   spgm_ptr->active_cmd_hndl_ptr->ipc_cmd_sent_ts_us = posal_timer_get_time();
 
    gpr_cmd_alloc_send_t args;
    args.src_domain_id = spgm_ptr->sgm_id.master_pd;
@@ -68,6 +70,8 @@ ar_result_t sgm_ipc_send_command_to_dst_with_token(spgm_info_t *spgm_ptr, uint32
    }
 
    spgm_ptr->active_cmd_hndl_ptr->token = token;
+   /** Capture the timestamp for this IPC command sent */
+   spgm_ptr->active_cmd_hndl_ptr->ipc_cmd_sent_ts_us = posal_timer_get_time();
 
    gpr_cmd_alloc_send_t args;
    args.src_domain_id = spgm_ptr->sgm_id.master_pd;
@@ -103,6 +107,8 @@ ar_result_t sgm_ipc_send_command_to_dst(spgm_info_t *spgm_ptr, uint32_t dst_port
 
    token                                = posal_atomic_increment(spgm_ptr->token_instance);
    spgm_ptr->active_cmd_hndl_ptr->token = token;
+   /** Capture the timestamp for this IPC command sent */
+   spgm_ptr->active_cmd_hndl_ptr->ipc_cmd_sent_ts_us = posal_timer_get_time();
 
    gpr_cmd_alloc_send_t args;
    args.src_domain_id = spgm_ptr->sgm_id.master_pd;
@@ -191,13 +197,20 @@ uint32_t sdm_gpr_callback(gpr_packet_t *packet_ptr, void *callback_data)
             {
                rsp_ptr = (gpr_ibasic_rsp_result_t *)GPR_PKT_GET_PAYLOAD(void, packet_ptr);
                VERIFY(result, (NULL != rsp_ptr));
+               OLC_SGM_MSG(OLC_SGM_ID,
+                           DBG_HIGH_PRIO,
+                           "data_cmd_rsp: rcvd from satellite with opcode(0x%lX) token(0x%lX) pkt_ptr(0x%lX)",
+						   rsp_ptr->opcode,
+                           packet_ptr->token,
+                           packet_ptr);
                switch (rsp_ptr->opcode)
                {
                   case APM_CMD_SET_CFG:
+                  case APM_CMD_REGISTER_MODULE_EVENTS:
                   {
                      if (NULL != packet_ptr)
                      {
-                        __gpr_cmd_free(packet_ptr);
+                          __gpr_cmd_free(packet_ptr);
                      }
                      break;
                   }

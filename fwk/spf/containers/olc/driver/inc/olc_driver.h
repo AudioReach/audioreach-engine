@@ -77,6 +77,7 @@ typedef struct spgm_info_t
    sdm_process_info_t    process_info;
    spf_list_node_t *     event_reg_list_ptr; // obj ptr of type (spgm_event_info_t)
    sgm_path_delay_info_t path_delay_list;
+   uint32_t             p_cmd_exec_ts;
 } spgm_info_t;
 
 ar_result_t olc_create_graph_open_payload(spgm_info_t *             spgm_ptr,
