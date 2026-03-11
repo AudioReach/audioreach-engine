@@ -80,7 +80,8 @@ Macros
 #define FRAME_LEN_40000_US       (40000)
 
 
-#define LATENCY_VOTE_MIN         (40) //ms
+#define LATENCY_VOTE_MIN         (10) //us
+#define LATENCY_VOTE_LOW         (40) //us
 #define LATENCY_VOTE_MAX         (0xFFFFFFFF)
 #define LATENCY_VOTE_RT_FACTOR   (3)  // 3% tolerance
 #define LATENCY_VOTE_NRT_FACTOR  (70) // 70% tolerance

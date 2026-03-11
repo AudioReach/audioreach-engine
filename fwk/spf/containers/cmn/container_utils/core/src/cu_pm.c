@@ -141,10 +141,15 @@ ar_result_t cu_vote_latency(cu_base_t *me_ptr, bool_t is_release, bool_t is_real
       // Example: For 1 ms frame_len_us latency votes for RT/NRT are 30us and 700us respectively
       new_vote = (tolerance_factor * me_ptr->cntr_proc_duration) / 100;
 
-      // floor min latency to 40ms
-      if (new_vote < LATENCY_VOTE_MIN)
+      // for sub millisecond frame durations (like 83us) the sleep latency tolerance is very low, hence voting 10us if
+      // frame duration is less than 500us to prevent DSP entry into any sleep mode.
+      if (me_ptr->cntr_proc_duration <= 500)
       {
-         new_vote = LATENCY_VOTE_MIN; // Hack to make latency vote 40us
+         new_vote = LATENCY_VOTE_MIN; // voting 10us to prevent entering all sleep modes.
+      }
+      else if (new_vote < LATENCY_VOTE_LOW)  // floor min latency to 40us if proc duration is > 500us
+      {
+         new_vote = LATENCY_VOTE_LOW; // Hack to make latency vote 40us
       }
       CU_MSG(me_ptr->gu_ptr->log_id,
              DBG_HIGH_PRIO,
