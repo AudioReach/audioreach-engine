@@ -45,7 +45,7 @@ static const uint32_t satellite_domain_list[MAX_SATELLITE_DOMAINS] =
          APM_PROC_DOMAIN_ID_APPS_2
 };
 
-#define MAX_NUM_UNLOANED_MAPS 5
+#define MAX_NUM_UNLOANED_MAPS 10
 
 /** Memset to FFFFFFFF*/
 #define APM_OFFLOAD_MEMSET(ptr, size)                                                                                  \
