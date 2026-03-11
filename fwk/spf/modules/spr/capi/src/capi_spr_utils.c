@@ -425,6 +425,8 @@ capi_err_t capi_spr_data_port_op_handler(capi_spr_t *me_ptr, capi_buf_t *params_
                   me_ptr->primary_output_arr_idx = UMAX_32;
                   me_ptr->flags.has_rcvd_first_buf = FALSE;
                   me_ptr->flags.has_rendered_first_buf = FALSE;
+
+                  capi_spr_check_raise_session_time_reset_event(me_ptr);
                   capi_spr_avsync_reset_session_clock_params(me_ptr->avsync_ptr);
 
                   // Destroy hold buffer
@@ -1182,6 +1184,77 @@ capi_err_t capi_spr_process_register_event_to_dsp_client(capi_spr_t *           
                        "with 0x%x",
                        reg_event_ptr->dest_address,
                        me_ptr->underrun_event_info.dest_address);
+               capi_result |= CAPI_EFAILED;
+            }
+         }
+         break;
+      }
+      case EVENT_ID_SPR_SESSION_TIME_RESET:
+      {
+         if (reg_event_ptr->is_register)
+         {
+            if (0 == me_ptr->session_time_reset_event_info.dest_address)
+            {
+
+               SPR_MSG(me_ptr->miid,
+                       DBG_HIGH_PRIO,
+                       "Registering for client 0x%x with token %d for EVENT_ID_SPR_SESSION_TIME_RESET",
+                       reg_event_ptr->dest_address,
+                       reg_event_ptr->token);
+
+               me_ptr->session_time_reset_event_info.event_id     = reg_event_ptr->event_id;
+               me_ptr->session_time_reset_event_info.dest_address = reg_event_ptr->dest_address;
+               me_ptr->session_time_reset_event_info.token        = reg_event_ptr->token;
+
+            }
+            else if (me_ptr->session_time_reset_event_info.dest_address == reg_event_ptr->dest_address)
+            {
+               SPR_MSG(me_ptr->miid,
+                       DBG_ERROR_PRIO,
+                       "warning: Client 0x%x already registered for EVENT_ID_SPR_SESSION_TIME_RESET. Ignoring!",
+                       reg_event_ptr->dest_address);
+            }
+            else
+            {
+               SPR_MSG(me_ptr->miid,
+                       DBG_ERROR_PRIO,
+                       "Failing client 0x%x trying to register for EVENT_ID_SPR_SESSION_TIME_RESET. Previously registered with "
+                       "0x%x",
+                       reg_event_ptr->dest_address,
+                       me_ptr->session_time_reset_event_info.dest_address);
+               capi_result |= CAPI_EFAILED;
+            }
+         }
+         else // de-register
+         {
+            if (me_ptr->underrun_event_info.dest_address == reg_event_ptr->dest_address)
+            {
+               SPR_MSG(me_ptr->miid,
+                       DBG_HIGH_PRIO,
+                       "De-registering for client 0x%x with token %d for EVENT_ID_SPR_SESSION_TIME_RESET",
+                       me_ptr->session_time_reset_event_info.dest_address,
+                       me_ptr->session_time_reset_event_info.token);
+
+               me_ptr->session_time_reset_event_info.dest_address = 0;
+               me_ptr->session_time_reset_event_info.token        = 0;
+               me_ptr->session_time_reset_event_info.event_id     = 0;
+            }
+            else if (0 == me_ptr->session_time_reset_event_info.dest_address)
+            {
+               SPR_MSG(me_ptr->miid,
+                       DBG_ERROR_PRIO,
+                       "Failing client 0x%x trying to de-register for EVENT_ID_SPR_SESSION_TIME_RESET. No registrations found",
+                       reg_event_ptr->dest_address);
+               capi_result |= CAPI_EFAILED;
+            }
+            else
+            {
+               SPR_MSG(me_ptr->miid,
+                       DBG_ERROR_PRIO,
+                       "Failing client 0x%x trying to de-register for EVENT_ID_SPR_SESSION_TIME_RESET. Previously registered "
+                       "with 0x%x",
+                       reg_event_ptr->dest_address,
+                       me_ptr->session_time_reset_event_info.dest_address);
                capi_result |= CAPI_EFAILED;
             }
          }

@@ -393,6 +393,12 @@ typedef struct capi_spr_t
    // Info needed to store the no underrun occurance and time of last printed.
    capi_cmn_underrun_info_t underrun_info;
 
+   // reset session time info
+   param_id_spr_session_time_reset_info_t reset_sess_time_info;
+
+   // event registration information for underrun events
+   spr_reg_event_info_t session_time_reset_event_info;
+
 } capi_spr_t;
 
 /*==============================================================================
@@ -503,6 +509,7 @@ void capi_spr_update_frame_duration_in_bytes(capi_spr_t *me_ptr);
 capi_err_t capi_spr_process_register_event_to_dsp_client(capi_spr_t *                            me_ptr,
                                                          capi_register_event_to_dsp_client_v2_t *reg_event_ptr);
 void capi_spr_check_raise_underrun_event(capi_spr_t *me_ptr, underrun_status_t *status_ptr, uint32_t output_port_idx);
+void capi_spr_check_raise_session_time_reset_event(capi_spr_t *me_ptr);
 capi_err_t capi_spr_change_trigger_policy_util_(capi_spr_t *me_ptr, bool_t need_to_drop, bool_t force);
 capi_err_t capi_spr_check_timer_disable_update_tp(capi_spr_t *me_ptr);
 

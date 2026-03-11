@@ -536,6 +536,7 @@ capi_err_t capi_spr_avsync_setup_first_input(capi_spr_t *me_ptr, capi_stream_dat
    capi_err_t result = CAPI_EOK;
 
    avsync_ptr->flags.is_first_buf_rcvd = TRUE;
+   avsync_ptr->av_reset_info.mode = me_ptr->reset_sess_time_info.mode;
 
 #ifdef AVSYNC_DEBUG
    SPR_MSG_ISLAND(me_ptr->miid, DBG_HIGH_PRIO, "avsync: Received first buffer");

@@ -661,6 +661,7 @@ static capi_err_t capi_spr_simple_process_input(capi_spr_t *me_ptr, capi_stream_
       avsync_ptr->flags.is_first_buf_rendered = TRUE;
       avsync_ptr->curr_wall_clock_us          = posal_timer_get_time();
 
+      avsync_ptr->av_reset_info.mode = me_ptr->reset_sess_time_info.mode;
       spr_avsync_set_render_decision(avsync_ptr, RENDER);
 
       capi_spr_avsync_update_input_info(me_ptr, (capi_stream_data_t *)input);
@@ -948,13 +949,22 @@ static void spr_process_input_metadata(capi_spr_t *me_ptr, capi_stream_data_v2_t
                  "SPR_MD_DBG: Found Reset Session Time MD. Absorbed with result 0x%x",
                  result);
 
-         capi_spr_avsync_reset_session_clock_for_gapless(me_ptr->avsync_ptr);
+         if(SPR_SESSION_TIME_RESET_MODE_DEFAULT == spr_avsync_get_reset_session_time_mode(me_ptr->avsync_ptr))
+         {
+            capi_spr_check_raise_session_time_reset_event(me_ptr);
+            capi_spr_avsync_reset_session_clock_for_gapless(me_ptr->avsync_ptr);
+         }
+         else
+         {
+            SPR_MSG_ISLAND(me_ptr->miid, DBG_HIGH_PRIO, "avsync: skipping gapless session time reset");
+         }
+
       }
 
       if(MODULE_CMN_MD_ID_SCALE_SESSION_TIME == md_id)
       {
     	  module_cmn_md_t *md_ptr = (module_cmn_md_t*)node_ptr->obj_ptr;
-    	  //TODO: RR: Assumed inband for now.
+    	  //TODO: Assumed inband for now.
     	  md_session_time_scale_t *tsm_md_ptr  = (md_session_time_scale_t *)&(md_ptr->metadata_buf);
 
     	  if(is_spr_avsync_enabled(me_ptr->avsync_ptr))

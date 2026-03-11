@@ -109,6 +109,7 @@ typedef struct avsync_t
    spr_avsync_config_t client_config;        // Configuration provided by the client as part of PARAM_ID_AVSYNC_CONFIG
    spr_int_buffer_t    hold_buffer;          // Buffer used by SPR to store the data during a hold scenario
    avsync_flags_t      flags;                // Flags associated with this structure
+   param_id_spr_session_time_reset_info_t av_reset_info; // Mode for session time update
 
 } avsync_t;
 /*==============================================================================
@@ -129,6 +130,7 @@ capi_err_t capi_spr_avsync_reset_session_clock_for_gapless(avsync_t *avsync_ptr)
 capi_err_t capi_spr_avsync_update_expected_session_time(avsync_t *avsync_ptr, int64_t update_bytes, uint32_t sr, uint32_t bps);
 
 capi_err_t capi_spr_process_avsync_config_param(capi_spr_t *me_ptr, param_id_spr_avsync_config_t *params_ptr);
+capi_err_t capi_spr_process_session_time_reset_param(capi_spr_t *me_ptr, param_id_spr_session_time_reset_info_t *params_ptr);
 void capi_spr_avsync_check_update_primary_output_port(capi_spr_t *me_ptr);
 
 capi_err_t capi_spr_add_input_to_hold_list(capi_spr_t *me_ptr, capi_stream_data_v2_t *input_ptr);
@@ -243,6 +245,11 @@ static inline render_decision_t spr_avsync_get_render_decision(avsync_t *avsync_
 static inline uint32_t spr_avsync_get_render_mode(avsync_t *avsync_ptr)
 {
    return avsync_ptr ? avsync_ptr->client_config.render_mode : SPR_RENDER_MODE_IMMEDIATE;
+}
+
+static inline uint32_t spr_avsync_get_reset_session_time_mode(avsync_t *avsync_ptr)
+{
+   return avsync_ptr? avsync_ptr->av_reset_info.mode : SPR_SESSION_TIME_RESET_MODE_DEFAULT;
 }
 
 #ifdef __cplusplus
