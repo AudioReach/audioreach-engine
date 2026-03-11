@@ -34,19 +34,19 @@
 
 bool_t apm_db_get_sat_contaniners_parent_cont_id(spf_list_node_t *sat_cont_info_ptr,
                                                  uint32_t         sat_cont_id,
-                                                 uint32_t *       parent_cont_id);
+                                                 uint32_t        *parent_cont_id);
 
-ar_result_t apm_check_and_cache_satellite_container_config(apm_t *              apm_info_ptr,
+ar_result_t apm_check_and_cache_satellite_container_config(apm_t               *apm_info_ptr,
                                                            apm_container_cfg_t *cont_cfg_ptr,
-                                                           bool_t *             is_cont_offloaded);
+                                                           bool_t              *is_cont_offloaded);
 
 ar_result_t apm_clear_cont_satellite_cont_list(apm_t *apm_info_ptr, apm_container_t *container_node_ptr);
 
-ar_result_t apm_check_alloc_add_to_peer_domain_ctrl_list(spf_list_node_t **           list_head_pptr,
+ar_result_t apm_check_alloc_add_to_peer_domain_ctrl_list(spf_list_node_t            **list_head_pptr,
                                                          apm_imcl_peer_domain_info_t *remote_peer_info_ptr,
-                                                         uint32_t *                   node_cntr_ptr);
+                                                         uint32_t                    *node_cntr_ptr);
 
-ar_result_t apm_parse_imcl_peer_domain_info_list(apm_t *  apm_info_ptr,
+ar_result_t apm_parse_imcl_peer_domain_info_list(apm_t   *apm_info_ptr,
                                                  uint8_t *mod_pid_payload_ptr,
                                                  uint32_t payload_size);
 
@@ -60,19 +60,19 @@ bool_t apm_offload_is_master_pid();
 
 ar_result_t apm_send_debug_info_to_sat(apm_t *apm_info_ptr);
 
-ar_result_t apm_offload_basic_rsp_handler(apm_t *         apm_info_ptr,
+ar_result_t apm_offload_basic_rsp_handler(apm_t          *apm_info_ptr,
                                           apm_cmd_ctrl_t *apm_cmd_ctrl_ptr,
-                                          gpr_packet_t *  gpr_pkt_ptr);
+                                          gpr_packet_t   *gpr_pkt_ptr);
 
 ar_result_t apm_offload_utils_deinit();
 
-ar_result_t apm_offload_get_ctrl_link_remote_peer_info(apm_module_ctrl_link_cfg_t * curr_ctrl_link_cfg_ptr,
-                                                       uint8_t *                    sat_prv_cfg_ptr,
-                                                       apm_module_t **              module_node_ptr_list,
+ar_result_t apm_offload_get_ctrl_link_remote_peer_info(apm_module_ctrl_link_cfg_t  *curr_ctrl_link_cfg_ptr,
+                                                       uint8_t                     *sat_prv_cfg_ptr,
+                                                       apm_module_t               **module_node_ptr_list,
                                                        apm_imcl_peer_domain_info_t *remote_peer_info_ptr,
-                                                       uint32_t *                   local_peer_idx_ptr);
+                                                       uint32_t                    *local_peer_idx_ptr);
 
-ar_result_t apm_search_in_sat_prv_peer_cfg_for_miid(uint8_t * sat_prv_cfg_ptr,
+ar_result_t apm_search_in_sat_prv_peer_cfg_for_miid(uint8_t  *sat_prv_cfg_ptr,
                                                     uint32_t  miid,
                                                     uint32_t *peer_domain_id_ptr);
 
@@ -80,8 +80,8 @@ ar_result_t apm_search_in_sat_prv_peer_cfg_for_miid(uint8_t * sat_prv_cfg_ptr,
    Global Defines
 ==============================================================================*/
 
-apm_offload_utils_vtable_t offload_util_funcs =
-   {.apm_offload_shmem_cmd_handler_fptr = apm_offload_shmem_cmd_handler,
+apm_offload_utils_vtable_t offload_util_funcs = {
+   .apm_offload_shmem_cmd_handler_fptr = apm_offload_shmem_cmd_handler,
 
    .apm_offload_basic_rsp_handler_fptr = apm_offload_basic_rsp_handler,
 
@@ -116,7 +116,7 @@ apm_offload_utils_vtable_t offload_util_funcs =
    .apm_debug_info_cfg_hdlr_fptr = apm_send_debug_info_to_sat,
 
    .apm_offload_mem_mgr_reset_fptr = apm_offload_mem_mgr_reset,
-   
+
    .apm_offload_handle_scale_factor_info_fptr = apm_offload_handle_scale_factor_info
 };
 
@@ -124,9 +124,9 @@ static apm_offload_utils_sat_pd_info_t g_apm_sat_pd_info = { 0 };
 
 bool_t apm_db_get_sat_contaniners_parent_cont_id(spf_list_node_t *sat_cont_info_ptr,
                                                  uint32_t         sat_cont_id,
-                                                 uint32_t *       parent_cont_id)
+                                                 uint32_t        *parent_cont_id)
 {
-   spf_list_node_t *               curr_ptr;
+   spf_list_node_t                *curr_ptr;
    apm_satellite_cont_node_info_t *cont_list_node_ptr = NULL;
 
    curr_ptr = sat_cont_info_ptr;
@@ -165,7 +165,7 @@ static bool_t apm_check_is_container_process_domain_master(uint32_t container_pr
 }
 
 static ar_result_t apm_parse_container_get_process_domain(apm_container_cfg_t *container_cfg_ptr,
-                                                          uint32_t *           container_proc_id_ptr)
+                                                          uint32_t            *container_proc_id_ptr)
 {
    ar_result_t result = AR_EOK;
 
@@ -206,7 +206,7 @@ static ar_result_t apm_parse_container_get_process_domain(apm_container_cfg_t *c
 }
 
 static ar_result_t apm_parse_container_get_parent_id(apm_container_cfg_t *container_cfg_ptr,
-                                                     uint32_t *           parent_container_id)
+                                                     uint32_t            *parent_container_id)
 {
    ar_result_t result = AR_ENEEDMORE;
    /** Validate the payload pointer */
@@ -251,18 +251,18 @@ static ar_result_t apm_parse_container_get_parent_id(apm_container_cfg_t *contai
  *  If the payload corresponds to satellite DSP, then process the configuration further
  *  to cache the satellite container configuration and associate it with its parent container.
  */
-static ar_result_t apm_cache_satellite_container_config(apm_t *              apm_info_ptr,
+static ar_result_t apm_cache_satellite_container_config(apm_t               *apm_info_ptr,
                                                         apm_container_cfg_t *cont_cfg_ptr,
                                                         uint32_t             sat_cont_proc_id)
 {
    ar_result_t                     result                    = AR_EOK;
    uint32_t                        parent_container_id       = 0;
-   uint8_t *                       sat_cont_config_ptr       = NULL;
-   apm_container_t *               parent_container_node_ptr = NULL;
+   uint8_t                        *sat_cont_config_ptr       = NULL;
+   apm_container_t                *parent_container_node_ptr = NULL;
    apm_satellite_cont_node_info_t *sat_container_node_ptr    = NULL;
-   apm_cont_cmd_ctrl_t *           cont_cmd_ctrl_ptr;
-   spf_list_node_t **              list_pptr;
-   uint32_t *                      num_list_nodes_ptr;
+   apm_cont_cmd_ctrl_t            *cont_cmd_ctrl_ptr;
+   spf_list_node_t               **list_pptr;
+   uint32_t                       *num_list_nodes_ptr;
 
    if (AR_EOK != (result = apm_parse_container_get_parent_id(cont_cfg_ptr, &parent_container_id)))
    {
@@ -362,9 +362,9 @@ static ar_result_t apm_cache_satellite_container_config(apm_t *              apm
  *  If the payload corresponds to satellite DSP, then process the configuration further
  *  to cache the satellite container configuration and associate it with its parent container.
  */
-ar_result_t apm_check_and_cache_satellite_container_config(apm_t *              apm_info_ptr,
+ar_result_t apm_check_and_cache_satellite_container_config(apm_t               *apm_info_ptr,
                                                            apm_container_cfg_t *cont_cfg_ptr,
-                                                           bool_t *             is_cont_offloaded)
+                                                           bool_t              *is_cont_offloaded)
 {
    ar_result_t result = AR_EOK;
 
@@ -411,7 +411,7 @@ ar_result_t apm_clear_cont_satellite_cont_list(apm_t *apm_info_ptr, apm_containe
 {
    ar_result_t result = AR_EOK;
 
-   spf_list_node_t *               curr_ptr               = NULL;
+   spf_list_node_t                *curr_ptr               = NULL;
    apm_satellite_cont_node_info_t *sat_container_node_ptr = NULL;
 
    if (0 < container_node_ptr->sat_cont_list.num_of_satellite_cnts)
@@ -451,7 +451,7 @@ ar_result_t apm_clear_cont_satellite_cont_list(apm_t *apm_info_ptr, apm_containe
    return result;
 }
 
-ar_result_t apm_search_in_sat_prv_peer_cfg_for_miid(uint8_t * sat_prv_cfg_ptr,
+ar_result_t apm_search_in_sat_prv_peer_cfg_for_miid(uint8_t  *sat_prv_cfg_ptr,
                                                     uint32_t  miid,
                                                     uint32_t *peer_domain_id_ptr)
 {
@@ -471,11 +471,11 @@ ar_result_t apm_search_in_sat_prv_peer_cfg_for_miid(uint8_t * sat_prv_cfg_ptr,
    return result;
 }
 
-ar_result_t apm_offload_get_ctrl_link_remote_peer_info(apm_module_ctrl_link_cfg_t * curr_ctrl_link_cfg_ptr,
-                                                       uint8_t *                    sat_prv_cfg_ptr,
-                                                       apm_module_t **              module_node_ptr_list,
+ar_result_t apm_offload_get_ctrl_link_remote_peer_info(apm_module_ctrl_link_cfg_t  *curr_ctrl_link_cfg_ptr,
+                                                       uint8_t                     *sat_prv_cfg_ptr,
+                                                       apm_module_t               **module_node_ptr_list,
                                                        apm_imcl_peer_domain_info_t *remote_peer_info_ptr,
-                                                       uint32_t *                   local_peer_idx_ptr)
+                                                       uint32_t                    *local_peer_idx_ptr)
 {
    ar_result_t result = AR_EOK;
 
@@ -529,7 +529,7 @@ ar_result_t apm_offload_get_ctrl_link_remote_peer_info(apm_module_ctrl_link_cfg_
    return result;
 }
 
-ar_result_t apm_parse_imcl_peer_domain_info_list(apm_t *  apm_info_ptr,
+ar_result_t apm_parse_imcl_peer_domain_info_list(apm_t   *apm_info_ptr,
                                                  uint8_t *mod_pid_payload_ptr,
                                                  uint32_t payload_size)
 {
@@ -566,13 +566,13 @@ ar_result_t apm_parse_imcl_peer_domain_info_list(apm_t *  apm_info_ptr,
    return result;
 }
 
-ar_result_t apm_check_alloc_add_to_peer_domain_ctrl_list(spf_list_node_t **           list_head_pptr,
+ar_result_t apm_check_alloc_add_to_peer_domain_ctrl_list(spf_list_node_t            **list_head_pptr,
                                                          apm_imcl_peer_domain_info_t *remote_peer_info_ptr,
-                                                         uint32_t *                   node_cntr_ptr)
+                                                         uint32_t                    *node_cntr_ptr)
 {
    bool_t                       is_first_node = FALSE;
    apm_imcl_peer_domain_info_t *data_ptr      = NULL;
-   void *                       obj_ptr       = NULL;
+   void                        *obj_ptr       = NULL;
 
    if (*node_cntr_ptr < 1)
    {
@@ -694,7 +694,7 @@ static ar_result_t apm_offload_handle_sat_pd_info(apm_t *apm_info_ptr, apm_modul
    ar_result_t                       result                  = AR_EOK;
    uint32_t                          required_payload        = 0;
    uint32_t                          host_domain_id          = 0;
-   apm_offload_utils_sat_pd_info_t * apm_sat_pd_info_ptr     = &g_apm_sat_pd_info;
+   apm_offload_utils_sat_pd_info_t  *apm_sat_pd_info_ptr     = &g_apm_sat_pd_info;
    apm_param_id_satellite_pd_info_t *payload_sat_pd_info_ptr = NULL;
 
    required_payload = sizeof(apm_param_id_satellite_pd_info_t);
@@ -857,19 +857,19 @@ ar_result_t apm_offload_handle_pd_info(apm_t *apm_info_ptr, apm_module_param_dat
 
 static ar_result_t apm_offload_parse_voice_session_info(apm_t *apm_info_ptr, uint8_t *mod_pid_payload_ptr, uint32_t payload_size)
 {
-   ar_result_t                   result                      = AR_EOK;
-   apm_sub_graph_t *             sub_graph_node_ptr          = NULL;
-   apm_container_t *             contr_node_ptr              = NULL;
-   uint32_t                      local_domain_id             = 0;
-   uint32_t                      num_cfgs;
-   uint8_t *                     curr_payload_ptr;
-   apm_param_id_offload_voice_session_info_t *pid_data_ptr;
+   ar_result_t                                        result             = AR_EOK;
+   apm_sub_graph_t                                   *sub_graph_node_ptr = NULL;
+   apm_container_t                                   *contr_node_ptr     = NULL;
+   uint32_t                                           local_domain_id    = 0;
+   uint32_t                                           num_cfgs;
+   uint8_t                                           *curr_payload_ptr;
+   apm_param_id_offload_voice_session_info_t         *pid_data_ptr;
    apm_param_id_offload_voice_session_info_payload_t *curr_sg_cfg_ptr;
-   uint32_t                      expected_payload_size;
-   spf_list_node_t         *container_list_ptr;
-   apm_cont_cached_cfg_t *cont_cached_cfg_ptr;
-   apm_cont_cmd_ctrl_t *  cont_cmd_ctrl_ptr;
-   apm_offload_voice_session_info_t *voice_info_ptr;
+   uint32_t                                           expected_payload_size;
+   spf_list_node_t                                   *container_list_ptr;
+   apm_cont_cached_cfg_t                             *cont_cached_cfg_ptr;
+   apm_cont_cmd_ctrl_t                               *cont_cmd_ctrl_ptr;
+   apm_offload_voice_session_info_t                  *voice_info_ptr;
 
    /** Validate the payload pointer */
    if (!mod_pid_payload_ptr || !payload_size)
@@ -896,108 +896,104 @@ static ar_result_t apm_offload_parse_voice_session_info(apm_t *apm_info_ptr, uin
    }
 
    num_cfgs = pid_data_ptr->num_configs;
-  
-  /** Compute min payload size */
-  expected_payload_size = sizeof(apm_param_id_offload_voice_session_info_t) + (num_cfgs * sizeof(apm_param_id_offload_voice_session_info_payload_t));
-  
-  /** Validate provided payload size */
-  if (payload_size < expected_payload_size)
-  {
-     AR_MSG(DBG_ERROR_PRIO,
-            "SG_PARSE: Insufficient payload size[%lu bytes], min size[%lu bytes], num_cfgs sg[%lu]",
-            payload_size,
-            expected_payload_size,
-            num_cfgs);
-  
-     return AR_EBADPARAM;
-  }
-  
-  AR_MSG(DBG_MED_PRIO,
-         "SG_PARSE: Processing num_cfgs[%lu], payload_size[%lu bytes]",
-         num_cfgs,
-         payload_size);
-  
-  /** Get the pointer to start of sub-graph object list */
-  curr_payload_ptr = mod_pid_payload_ptr + sizeof(apm_param_id_offload_voice_session_info_t);
-  
-  /** Iterate over the list of sub-graph config objects */
-  for (uint32_t idx = num_cfgs; idx > 0; idx--)
-  {
-     /** Get the pointer to current sub-graph object */
-     curr_sg_cfg_ptr = (apm_param_id_offload_voice_session_info_payload_t *)curr_payload_ptr;
-  
-     if ((AR_INVALID_INSTANCE_ID == curr_sg_cfg_ptr->sg_id) ||
-         (curr_sg_cfg_ptr->sg_id < AR_DYNAMIC_INSTANCE_ID_RANGE_BEGIN))
-     {
-  
-        AR_MSG(DBG_ERROR_PRIO, "SG_PARSE: Invalid SG_ID: [0x%lX]", curr_sg_cfg_ptr->sg_id);
-  
-        return AR_EBADPARAM;
-     }
-  
-     /** Check if the sub-graph ID already exists in the graph data base. */
-     result = apm_db_get_sub_graph_node(&apm_info_ptr->graph_info,
-                                        curr_sg_cfg_ptr->sg_id,
-                                        &sub_graph_node_ptr,
-                                        APM_DB_OBJ_QUERY);
-                                        
-     if ( ( AR_EOK != result ) || ( NULL == sub_graph_node_ptr) )
-     {
-        AR_MSG(DBG_ERROR_PRIO, "SG_PARSE: Invalid SG_node or SG_ID: [0x%lX]", curr_sg_cfg_ptr->sg_id);
-        return AR_EBADPARAM;
-     }
-     container_list_ptr = sub_graph_node_ptr->container_list_ptr;
 
-     while (container_list_ptr )
-     {
-       contr_node_ptr = container_list_ptr->obj_ptr;
-       /** Get the pointer to host container's command control
-        *  pointer */
-       apm_get_cont_cmd_ctrl_obj(contr_node_ptr, apm_info_ptr->curr_cmd_ctrl_ptr, &cont_cmd_ctrl_ptr);
-     
-       /** Get the pointer to container cached configuration params
-        *  corresponding to current APM command */
-       cont_cached_cfg_ptr = &cont_cmd_ctrl_ptr->cached_cfg_params;
+   /** Compute min payload size */
+   expected_payload_size = sizeof(apm_param_id_offload_voice_session_info_t) +
+                           (num_cfgs * sizeof(apm_param_id_offload_voice_session_info_payload_t));
 
-       if (NULL == (voice_info_ptr = (apm_offload_voice_session_info_t *)
-                       posal_memory_malloc(sizeof(apm_offload_voice_session_info_t), POSAL_HEAP_DEFAULT)))
-       {
-          AR_MSG(DBG_ERROR_PRIO,
-                 "apm_aggregate_cntr_payload(): Failed to allocate memory for caching cont info, "
-                 "CONT_ID[0x%lX]",
-                 contr_node_ptr->container_id);
+   /** Validate provided payload size */
+   if (payload_size < expected_payload_size)
+   {
+      AR_MSG(DBG_ERROR_PRIO,
+             "SG_PARSE: Insufficient payload size[%lu bytes], min size[%lu bytes], num_cfgs sg[%lu]",
+             payload_size,
+             expected_payload_size,
+             num_cfgs);
 
-          return AR_ENOMEMORY;
-       }
+      return AR_EBADPARAM;
+   }
 
-       /** Populate the allocated cached object */
-       voice_info_ptr->header.param_id = CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO;
-       voice_info_ptr->sg_id = curr_sg_cfg_ptr->sg_id;
-       voice_info_ptr->kpps_sf = curr_sg_cfg_ptr->kpps_sf;
-       voice_info_ptr->bw_sf = curr_sg_cfg_ptr->bw_sf;
+   AR_MSG(DBG_MED_PRIO, "SG_PARSE: Processing num_cfgs[%lu], payload_size[%lu bytes]", num_cfgs, payload_size);
 
-       /** Add this param ID to the cached configuration list of this contr */
-       if (AR_EOK != (result = apm_db_add_node_to_list(&cont_cached_cfg_ptr->cont_cfg_params.param_data_list_ptr,
-                                                       voice_info_ptr,
-                                                       &cont_cached_cfg_ptr->cont_cfg_params.num_cfg_params)))
-       {
-          return result;
-       }
-       
-       /** Add this container node to the list of container pending
-           *  send message */
-       if (AR_EOK != (result = apm_add_cont_to_pending_msg_send_list(apm_info_ptr->curr_cmd_ctrl_ptr,
-                                                                     contr_node_ptr,
-                                                                     cont_cmd_ctrl_ptr)))
-       {
-          return result;
-       }
-       container_list_ptr = container_list_ptr->next_ptr;
-     }
-     
-                                        
-  }
-  return result;
+   /** Get the pointer to start of sub-graph object list */
+   curr_payload_ptr = mod_pid_payload_ptr + sizeof(apm_param_id_offload_voice_session_info_t);
+
+   /** Iterate over the list of sub-graph config objects */
+   for (uint32_t idx = num_cfgs; idx > 0; idx--)
+   {
+      /** Get the pointer to current sub-graph object */
+      curr_sg_cfg_ptr = (apm_param_id_offload_voice_session_info_payload_t *)curr_payload_ptr;
+
+      if ((AR_INVALID_INSTANCE_ID == curr_sg_cfg_ptr->sg_id) ||
+          (curr_sg_cfg_ptr->sg_id < AR_DYNAMIC_INSTANCE_ID_RANGE_BEGIN))
+      {
+
+         AR_MSG(DBG_ERROR_PRIO, "SG_PARSE: Invalid SG_ID: [0x%lX]", curr_sg_cfg_ptr->sg_id);
+
+         return AR_EBADPARAM;
+      }
+
+      /** Check if the sub-graph ID already exists in the graph data base. */
+      result = apm_db_get_sub_graph_node(&apm_info_ptr->graph_info,
+                                         curr_sg_cfg_ptr->sg_id,
+                                         &sub_graph_node_ptr,
+                                         APM_DB_OBJ_QUERY);
+
+      if ((AR_EOK != result) || (NULL == sub_graph_node_ptr))
+      {
+         AR_MSG(DBG_ERROR_PRIO, "SG_PARSE: Invalid SG_node or SG_ID: [0x%lX]", curr_sg_cfg_ptr->sg_id);
+         return AR_EBADPARAM;
+      }
+      container_list_ptr = sub_graph_node_ptr->container_list_ptr;
+
+      while (container_list_ptr)
+      {
+         contr_node_ptr = container_list_ptr->obj_ptr;
+         /** Get the pointer to host container's command control
+          *  pointer */
+         apm_get_cont_cmd_ctrl_obj(contr_node_ptr, apm_info_ptr->curr_cmd_ctrl_ptr, &cont_cmd_ctrl_ptr);
+
+         /** Get the pointer to container cached configuration params
+          *  corresponding to current APM command */
+         cont_cached_cfg_ptr = &cont_cmd_ctrl_ptr->cached_cfg_params;
+
+         if (NULL == (voice_info_ptr = (apm_offload_voice_session_info_t *)
+                         posal_memory_malloc(sizeof(apm_offload_voice_session_info_t), POSAL_HEAP_DEFAULT)))
+         {
+            AR_MSG(DBG_ERROR_PRIO,
+                   "apm_aggregate_cntr_payload(): Failed to allocate memory for caching cont info, "
+                   "CONT_ID[0x%lX]",
+                   contr_node_ptr->container_id);
+
+            return AR_ENOMEMORY;
+         }
+
+         /** Populate the allocated cached object */
+         voice_info_ptr->header.param_id = CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO;
+         voice_info_ptr->sg_id           = curr_sg_cfg_ptr->sg_id;
+         voice_info_ptr->kpps_sf         = curr_sg_cfg_ptr->kpps_sf;
+         voice_info_ptr->bw_sf           = curr_sg_cfg_ptr->bw_sf;
+
+         /** Add this param ID to the cached configuration list of this contr */
+         if (AR_EOK != (result = apm_db_add_node_to_list(&cont_cached_cfg_ptr->cont_cfg_params.param_data_list_ptr,
+                                                         voice_info_ptr,
+                                                         &cont_cached_cfg_ptr->cont_cfg_params.num_cfg_params)))
+         {
+            return result;
+         }
+
+         /** Add this container node to the list of container pending
+          *  send message */
+         if (AR_EOK != (result = apm_add_cont_to_pending_msg_send_list(apm_info_ptr->curr_cmd_ctrl_ptr,
+                                                                       contr_node_ptr,
+                                                                       cont_cmd_ctrl_ptr)))
+         {
+            return result;
+         }
+         container_list_ptr = container_list_ptr->next_ptr;
+      }
+   }
+   return result;
 }
 ar_result_t apm_offload_handle_scale_factor_info(apm_t *apm_info_ptr, apm_module_param_data_t *mod_data_ptr)
 {
@@ -1007,13 +1003,15 @@ ar_result_t apm_offload_handle_scale_factor_info(apm_t *apm_info_ptr, apm_module
    {
       case APM_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO:
       {
-        uint8_t* mod_pid_payload_ptr = ((uint8_t *)mod_data_ptr) + sizeof(apm_module_param_data_t);
-        result = apm_offload_parse_voice_session_info( apm_info_ptr, mod_pid_payload_ptr, mod_data_ptr->param_size );
-        break;
+         uint8_t *mod_pid_payload_ptr = ((uint8_t *)mod_data_ptr) + sizeof(apm_module_param_data_t);
+         result = apm_offload_parse_voice_session_info(apm_info_ptr, mod_pid_payload_ptr, mod_data_ptr->param_size);
+         break;
       }
       default:
       {
-         AR_MSG(DBG_ERROR_PRIO, "APM: apm_offload_handle_scale_factor_info: Unsupported pid 0x%X", mod_data_ptr->param_id);
+         AR_MSG(DBG_ERROR_PRIO,
+                "APM: apm_offload_handle_scale_factor_info: Unsupported pid 0x%X",
+                mod_data_ptr->param_id);
          result = AR_EUNSUPPORTED;
          break;
       }
@@ -1027,9 +1025,9 @@ ar_result_t apm_send_debug_info_to_sat(apm_t *apm_info_ptr)
    uint32_t                         host_domain_id      = 0;
    apm_offload_utils_sat_pd_info_t *apm_sat_pd_info_ptr = &g_apm_sat_pd_info;
    uint32_t                         size                = 0;
-   uint8_t *                        payload             = NULL;
-   apm_cmd_header_t *               cmd_header          = NULL;
-   apm_cmd_ctrl_t *                 apm_cmd_ctrl_ptr    = apm_info_ptr->curr_cmd_ctrl_ptr;
+   uint8_t                         *payload             = NULL;
+   apm_cmd_header_t                *cmd_header          = NULL;
+   apm_cmd_ctrl_t                  *apm_cmd_ctrl_ptr    = apm_info_ptr->curr_cmd_ctrl_ptr;
 
    if (!apm_offload_is_master_pid())
    {
@@ -1056,6 +1054,16 @@ ar_result_t apm_send_debug_info_to_sat(apm_t *apm_info_ptr)
          ar_result_t   local_result    = AR_EOK;
          gpr_packet_t *gpr_pkt_ptr     = NULL;
          uint32_t      sat_proc_domain = apm_sat_pd_info_ptr->proc_domain_list[sat_pd_idx];
+
+         /** GPR of the CDSP satellite domain may not be UP, so that may cause this gpr pkt send operation
+          * to fail, so bypassing this for now as a temporary solution. */
+         if (sat_proc_domain == APM_PROC_DOMAIN_ID_CDSP)
+         {
+            AR_MSG(DBG_ERROR_PRIO,
+                   "apm_send_debug_info_to_sat: Debug info cannot be sent to sat domain id [%lu]",
+                   sat_proc_domain);
+            continue;
+         }
 
          gpr_cmd_alloc_ext_t args;
          args.src_domain_id = host_domain_id; // Master ID
@@ -1122,9 +1130,9 @@ ar_result_t apm_send_debug_info_to_sat(apm_t *apm_info_ptr)
 ar_result_t apm_offload_send_master_pd_info(apm_t *apm_info_ptr, uint32_t sat_proc_domain)
 {
    ar_result_t       result           = AR_EOK;
-   apm_cmd_ctrl_t *  apm_cmd_ctrl_ptr = apm_info_ptr->curr_cmd_ctrl_ptr;
-   gpr_packet_t *    gpr_pkt_ptr      = NULL;
-   uint8_t *         payload          = NULL;
+   apm_cmd_ctrl_t   *apm_cmd_ctrl_ptr = apm_info_ptr->curr_cmd_ctrl_ptr;
+   gpr_packet_t     *gpr_pkt_ptr      = NULL;
+   uint8_t          *payload          = NULL;
    apm_cmd_header_t *cmd_header       = NULL;
    uint32_t          size             = 0;
    uint32_t          host_domain_id   = 0;
@@ -1199,7 +1207,7 @@ ar_result_t apm_send_close_all_to_sat(apm_t *apm_info_ptr)
 {
    ar_result_t                      result              = AR_EOK;
    apm_offload_utils_sat_pd_info_t *apm_sat_pd_info_ptr = &g_apm_sat_pd_info;
-   apm_cmd_ctrl_t *                 apm_cmd_ctrl_ptr    = apm_info_ptr->curr_cmd_ctrl_ptr;
+   apm_cmd_ctrl_t                  *apm_cmd_ctrl_ptr    = apm_info_ptr->curr_cmd_ctrl_ptr;
    uint32_t                         host_domain_id      = 0;
 
    /** Only send the close all from master */
@@ -1278,7 +1286,7 @@ bool_t apm_offload_is_master_pid()
 bool_t apm_offload_utils_is_valid_sat_pd(uint32_t sat_proc_domain_id)
 {
    apm_offload_utils_sat_pd_info_t *apm_sat_pd_info_ptr = &g_apm_sat_pd_info;
-   uint32_t *                       cur_proc_domain_id  = apm_sat_pd_info_ptr->proc_domain_list;
+   uint32_t                        *cur_proc_domain_id  = apm_sat_pd_info_ptr->proc_domain_list;
    if (0 != apm_sat_pd_info_ptr->num_proc_domain_ids)
    {
       for (uint32_t i = 0; i < apm_sat_pd_info_ptr->num_proc_domain_ids; i++)
@@ -1311,9 +1319,9 @@ ar_result_t apm_offload_utils_get_sat_proc_domain_list(apm_offload_utils_sat_pd_
    return AR_EBADPARAM;
 }
 
-ar_result_t apm_offload_basic_rsp_handler(apm_t *         apm_info_ptr,
+ar_result_t apm_offload_basic_rsp_handler(apm_t          *apm_info_ptr,
                                           apm_cmd_ctrl_t *apm_cmd_ctrl_ptr,
-                                          gpr_packet_t *  gpr_pkt_ptr)
+                                          gpr_packet_t   *gpr_pkt_ptr)
 {
    ar_result_t              result               = AR_EOK;
    gpr_ibasic_rsp_result_t *curr_rsp_payload_ptr = NULL;
