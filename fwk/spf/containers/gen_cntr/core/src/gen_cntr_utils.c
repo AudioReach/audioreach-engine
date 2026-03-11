@@ -315,6 +315,50 @@ ar_result_t gen_cntr_handle_cntr_period_change(cu_base_t *base_ptr)
    return AR_EOK;
 }
 
+ar_result_t gen_cntr_handle_cntr_set_calibration_ops_done(cu_base_t *base_ptr)
+{
+   gen_cntr_t *me_ptr   = (gen_cntr_t *)base_ptr;
+   capi_err_t  err_code = CAPI_EOK;
+
+   for (gu_sg_list_t *sg_list_ptr = me_ptr->topo.gu.sg_list_ptr; (NULL != sg_list_ptr); LIST_ADVANCE(sg_list_ptr))
+   {
+      for (gu_module_list_t *module_list_ptr = sg_list_ptr->sg_ptr->module_list_ptr; (NULL != module_list_ptr);
+           LIST_ADVANCE(module_list_ptr))
+      {
+         gen_topo_module_t *module_ptr = (gen_topo_module_t *)module_list_ptr->module_ptr;
+
+         if (FALSE == module_ptr->flags.supports_calibration_ops_done)
+         {
+            continue;
+         }
+
+         err_code = gen_topo_capi_set_param(me_ptr->topo.gu.log_id,
+                                            module_ptr->capi_ptr,
+                                            INTF_EXTN_CALIBRATION_OPS_DONE,
+                                            NULL, 0);
+
+         if ((err_code != AR_EOK) && (err_code != AR_EUNSUPPORTED))
+         {
+
+            GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                         DBG_ERROR_PRIO,
+                         "Module 0x%lX: setting calibration ops done failed",
+                         module_ptr->gu.module_instance_id);
+            return err_code;
+         }
+         else
+         {
+            GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                         DBG_LOW_PRIO,
+                         "Module 0x%lX: setting calibration ops done success",
+                         module_ptr->gu.module_instance_id
+                         );
+         }
+      }
+   }
+   return AR_EOK;
+}
+
 /**
  * keeps Media format and other data messages
  */

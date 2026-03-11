@@ -63,6 +63,7 @@ const cu_cntr_vtable_t pt_cntr_cntr_funcs = {
 
    .dcm_topo_set_param 						   = gen_cntr_dcm_topo_set_param,
    .handle_cntr_period_change 				= gen_cntr_handle_cntr_period_change,
+   .handle_cntr_set_calibration_ops_done     = NULL,
 
    .initiate_duty_cycle_island_entry         = gen_cntr_initiate_duty_cycle_island_entry,
    .initiate_duty_cycle_island_exit          = gen_cntr_initiate_duty_cycle_island_exit,

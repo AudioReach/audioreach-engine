@@ -505,6 +505,7 @@ static ar_result_t gen_topo_capi_query_intf_extn_support(void *             amdb
                               { INTF_EXTN_PROP_IS_RT_PORT_PROPERTY,  FALSE, { NULL, 0, 0 } },      \
                               { INTF_EXTN_DUTY_CYCLING_ISLAND_MODE,  FALSE, { NULL, 0, 0 } },      \
                               { INTF_EXTN_PERIOD,                    FALSE, { NULL, 0, 0 } },      \
+                              { INTF_EXTN_CALIBRATION_OPS_DONE,      FALSE, { NULL, 0, 0 } },      \
                               { INTF_EXTN_STM_TS,                    FALSE, { NULL, 0, 0 } },      \
                             }
 
@@ -596,6 +597,11 @@ static ar_result_t gen_topo_capi_query_intf_extn_support(void *             amdb
                case INTF_EXTN_PERIOD:
                {
                   module_ptr->flags.supports_period = TRUE;
+                  break;
+               }
+               case INTF_EXTN_CALIBRATION_OPS_DONE:
+               {
+                  module_ptr->flags.supports_calibration_ops_done = TRUE;
                   break;
                }
                case INTF_EXTN_STM_TS:

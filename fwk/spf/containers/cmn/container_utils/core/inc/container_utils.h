@@ -604,6 +604,8 @@ typedef struct cu_cntr_vtable_t
 
    ar_result_t (*rtm_dump_data_port_media_fmt)(void *vtopo_ptr, uint32_t container_instance_id, uint32_t port_media_fmt_report_enable);
 
+   ar_result_t (*handle_cntr_set_calibration_ops_done)(cu_base_t *me_ptr);
+
 } cu_cntr_vtable_t;
 
 /* =======================================================================
