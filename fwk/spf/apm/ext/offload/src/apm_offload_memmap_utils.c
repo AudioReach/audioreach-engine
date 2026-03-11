@@ -183,7 +183,7 @@ ar_result_t apm_offload_master_memorymap_register(uint32_t     mem_map_client,
                                                            heap_mgr_type,
                                                            NULL,
                                                            NULL,
-                                                           NULL)))
+                                                           0)))
    {
       AR_MSG(DBG_ERROR_PRIO, "Offload: APM Loaned MemMap Register: Failed to create heap manager");
       return result;
