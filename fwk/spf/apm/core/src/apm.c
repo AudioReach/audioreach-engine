@@ -417,6 +417,13 @@ ar_result_t apm_create()
       AR_MSG(DBG_ERROR_PRIO, "APM INIT: Failed to register with GPR, result: 0x%8x", gpr_result);
    }
 
+   uint32_t host_domain_id = 0;
+   __gpr_cmd_get_host_domain_id(&host_domain_id);
+
+   // Set the start value of container count based on processor domain.
+   // This would help different SPF instances to start with unique log_id
+   apm_info_ptr->graph_info.container_count = (uint16_t)(256 * host_domain_id);
+
    AR_MSG(DBG_HIGH_PRIO, "APM thread launched successfully");
 
    return result;

@@ -139,6 +139,12 @@ ar_result_t spdm_send_read_data_buffer(spgm_info_t          *spgm_ptr,
    rd_cmd_ptr   = &rd_ptr->db_obj.data_header.read_data;
    shmem_offset = data_buf_node_ptr->ipc_data_buf.mem_attr.offset;
 
+   uint8_t *rd_guard_info_ptr = (uint8_t *)data_buf_node_ptr->ipc_data_buf.shm_mem_ptr;
+   memscpy(rd_guard_info_ptr,
+           GAURD_PROTECTION_BYTES,
+           &rd_ptr->db_obj.mem_gaurd_header,
+           sizeof(sdm_data_port_guard_header_info_t));
+
    // fill read data buffer
    rd_cmd_ptr->read_data.data_buf_addr_lsw   = shmem_offset + GAURD_PROTECTION_BYTES;
    rd_cmd_ptr->read_data.data_buf_addr_msw   = 0;
@@ -766,6 +772,12 @@ ar_result_t spdm_process_data_write(spgm_info_t            *spgm_ptr,
    // fill the data in the buffer
    if (is_data_present || is_md_present)
    {
+      uint8_t *wr_guard_info_ptr = (uint8_t *)write_data_buf_node_ptr->ipc_data_buf.shm_mem_ptr;
+      memscpy(wr_guard_info_ptr,
+              GAURD_PROTECTION_BYTES,
+              &wr_ptr->db_obj.mem_gaurd_header,
+              sizeof(sdm_data_port_guard_header_info_t));
+
       if (is_data_present)
       {
          wr_shm_data_size = write_data_buf_node_ptr->data_buf_size;
