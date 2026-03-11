@@ -1553,6 +1553,20 @@ struct vcpm_param_timeline_resync_info_v1_t {
 #include "spf_end_pack.h"
 ;
 
+
+/** @ingroup spf_vcpm_timing_cfg
+    Identifier for the parameter that sets the timing info
+    from the modem to the VCPM.
+
+    @msgpayload
+    vcpm_param_timing_info_t
+ */
+
+/* this param's behavior and payload are exactly similar to VCPM_PARAM_ID_TIMING_INFO
+   But to check whether client support frame type event or not, we are using this new param
+*/
+#define VCPM_PARAM_ID_TIMING_INFO_V2 ( 0x08001B01 )
+
 typedef struct vcpm_param_timeline_resync_info_v1_t vcpm_param_timeline_resync_info_v1_t;
 
 /** @ingroup spf_vcpm_timeline_resync_cfg

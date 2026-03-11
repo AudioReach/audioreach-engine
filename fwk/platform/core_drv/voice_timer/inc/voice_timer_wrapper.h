@@ -66,6 +66,9 @@ typedef struct voice_timer_subscribe_info_t
 
    uint64_t abs_vfr_timestamp;
    /**< Indicates the Qtimer TS at which the periodic soft VFR should start. */
+
+   posal_timer_callback_func_t client_cb_fun_ptr;
+   void *cb_context_ptr;
 } voice_timer_subscribe_info_t;
 
 /* voice timer unsubscribe info */

@@ -1011,7 +1011,7 @@ capi_err_t capi_smart_sync_pass_through_data(capi_smart_sync_t * me_ptr,
 capi_err_t capi_smart_sync_subscribe_to_voice_timer(capi_smart_sync_t *me_ptr)
 {
    capi_err_t                   capi_result = CAPI_EOK;
-   voice_timer_subscribe_info_t sub_info;
+   voice_timer_subscribe_info_t sub_info={0};
 
    sub_info.avtimer_timestamp_us_pptr = &(me_ptr->vfr_timestamp_us_ptr);
    sub_info.client_id                 = me_ptr->module_instance_id;
