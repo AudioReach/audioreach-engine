@@ -139,6 +139,7 @@ capi_err_t capi_check_and_close_the_gate(capi_audio_dam_t *me_ptr, uint32_t op_a
    // For Acoustic Activity Detection usecase, we do not support best channel feature, so we dont have to revert the channel order.
    if (FALSE == me_ptr->out_port_info_arr[op_arr_index].is_peer_aad)
    {
+	  posal_island_trigger_island_exit();
       capi_audio_dam_reorder_chs_at_gate_close(me_ptr, op_arr_index, is_destroy);
 
       // In AAD usecase, do not update KPPS in process context.
