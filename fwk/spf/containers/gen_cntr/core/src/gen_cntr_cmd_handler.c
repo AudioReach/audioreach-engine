@@ -2376,7 +2376,10 @@ ar_result_t gen_cntr_initiate_duty_cycle_island_entry(cu_base_t *base_ptr)
 
    if (!me_ptr->cu.pm_info.flags.module_disallows_duty_cycling)
    {
-      gen_cntr_listen_to_controls(me_ptr);
+      /* Listen only to the control commands and not Data triggers
+         wakeups. This step should not be skipped for IoT application.
+         TODO: Generalize this implementation*/
+      //gen_cntr_listen_to_controls(me_ptr);
       gen_cntr_handle_events_after_cmds(me_ptr, FALSE, result);
       cu_send_island_entry_ack_to_dcm(&me_ptr->cu);
    }
