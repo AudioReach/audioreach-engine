@@ -1386,7 +1386,7 @@ static ar_result_t memorymap_util_cmd_handler(uint32_t client_token,
          mem_reg_attrib_ptr->base_virt_addr            = cont_phy_regions_ptr[0].virt_addr;
          mem_reg_attrib_ptr->mem_reg_size              = cont_phy_regions_ptr[0].mem_size;
          mem_reg_attrib_ptr->rem_reg_size              =
-               (cont_phy_regions_ptr[0].virt_addr + cont_phy_regions_ptr[0].mem_size) - mem_reg_attrib_ptr->req_virt_adrr;
+               (uint32_t)((uintptr_t)cont_phy_regions_ptr[0].virt_addr_ptr + cont_phy_regions_ptr[0].mem_size) - mem_reg_attrib_ptr->req_virt_adrr;
          virt_addr                                     = mem_reg_attrib_ptr->req_virt_adrr;
       }
       else
