@@ -1596,20 +1596,12 @@ int32 s32_add_s32_s32_sat(int32 var1, int32 var2)
     int64 dSum;
 
     dSum = (int64) var1 + (int64) var2;
-    L_Sum = var1 + var2;
 
-    if (dSum != (int64) L_Sum)
-    {
-        /* overflow occurred */
-        L_Sum = s32_saturate_s64(dSum);  // OP_COUNT(-4);
+    /* safely saturate the 64-bit result back to 32-bit */
+    L_Sum = s32_saturate_s64(dSum);  // OP_COUNT(-4);
 
 #ifdef WMOPS_FX
-        counter_fx.saturate--;
-#endif
-
-    }
-
-#ifdef WMOPS_FX
+    counter_fx.saturate--;
     counter_fx.add32_sat++;
 #endif
 
@@ -3744,20 +3736,12 @@ int32 s32_sub_s32_s32_sat(int32 var1, int32 var2)
     int64 dSum;
 
     dSum = (int64) var1 - (int64) var2;
-    L_Sum = var1 - var2;
 
-    if (dSum != L_Sum)
-    {
-        /* overflow occurred */
-        L_Sum = s32_saturate_s64(dSum);
+    /* safely saturate the 64-bit result back to 32-bit */
+    L_Sum = s32_saturate_s64(dSum);
 
 #ifdef WMOPS_FX
-        counter_fx.saturate--;
-#endif
-
-    }
-
-#ifdef WMOPS_FX
+    counter_fx.saturate--;
     counter_fx.add32_sat++;
 #endif
 

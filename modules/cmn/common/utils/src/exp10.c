@@ -56,8 +56,8 @@ int32_t exp10_fixed(int32_t input)
    shiftFactorQ31 = s16_sub_s16_s16(s16_extract_s32_h(termB), 15);
 
    /* termC is 2^f*/
-   termC = s32_add_s32_s32(s32_deposit_s16_h(EXP10C0_Q15),u32_mult_u16_u16(s16_extract_s32_h(fractionalPartSquared), EXP10C2_Q15));
-   termC = s32_sub_s32_s32(termC, u32_mult_u16_u16(EXP10C1_Q15, fractionalPart));
+   termC = s32_add_s32_s32_sat(s32_deposit_s16_h(EXP10C0_Q15),u32_mult_u16_u16(s16_extract_s32_h(fractionalPartSquared), EXP10C2_Q15));
+   termC = s32_sub_s32_s32_sat(termC, u32_mult_u16_u16(EXP10C1_Q15, fractionalPart));
 
    /* denormalize and return exp10 in Q15 */
    return s32_shl_s32_sat(termC, shiftFactorQ31);
