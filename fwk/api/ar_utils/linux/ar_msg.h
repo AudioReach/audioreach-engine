@@ -50,11 +50,11 @@
 
 
 // Legacy debug priority messages
-#define DBG_LOW_PRIO AR_LOW_PRIO     /**< Low priority debug message. */
-#define DBG_MED_PRIO AR_MED_PRIO     /**< Medium priority debug message. */
+#define DBG_LOW_PRIO AR_HIGH_PRIO     /**< Low priority debug message. */
+#define DBG_MED_PRIO AR_HIGH_PRIO     /**< Medium priority debug message. */
 #define DBG_HIGH_PRIO AR_HIGH_PRIO   /**< High priority debug message. */
 #define DBG_ERROR_PRIO AR_ERROR_PRIO /**< Error priority debug message. */
-#define DBG_FATAL_PRIO AR_FATAL_PRIO /**< Fatal priority debug message. */
+#define DBG_FATAL_PRIO AR_HIGH_PRIO /**< Fatal priority debug message. */
 #define MSG_LEGACY_ERROR DBG_ERROR_PRIO
 #define MSG_LEGACY_HIGH DBG_HIGH_PRIO
 #define MSG_LEGACY_MED DBG_MED_PRIO
@@ -89,7 +89,6 @@
 
 #undef AR_MSG_LOG
 
-#if ARSDK_BUILD_ENABLED
 #if defined (ARSPF_PLATFORM_LRH)
 #define AR_MSG_LOG( xx_ss_sid, xx_ss_mask, xx_fmt, ...) \
    do { \
@@ -134,22 +133,6 @@
       } \
    } while(0)
 #endif //if defined (ARSPF_PLATFORM_LRH)
-#else
-#define AR_MSG_LOG( xx_ss_sid, xx_ss_mask, xx_fmt, ...) \
-   do { \
-      if (ar_log_debugmsg_enable) \
-      { \
-         static const char *msg_tag = AR_MSG_TAG; \
-         static const char filename[] = LOCAL_FILE_NAME; \
-         static const uint32_t line_no = __LINE__; \
-         ar_log( xx_ss_mask, msg_tag, filename, line_no, xx_fmt, ##__VA_ARGS__); \
-         if (DBG_FATAL_PRIO == (xx_ss_mask)) \
-         { \
-            assert(0); \
-         } \
-      } \
-   } while(0)
-#endif //#if ARSDK_BUILD_ENABLED
 
 #define AR_MSG_DFLT_MSG_SSID MSG_SSID_QDSP6
 
