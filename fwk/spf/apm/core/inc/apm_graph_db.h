@@ -8,7 +8,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -153,6 +153,22 @@ struct apm_sub_graph_prop_t
    /**< Overall property payload size */
 };
 
+typedef struct apm_client_context_t
+{
+	uint8_t client_domain_id;
+	/**< First client ID(domain id) for which SG is listed */
+
+	uint32_t client_port_id;
+	/**< First client ID(port id) for which SG is listed */
+
+	apm_sub_graph_state_t   prev_state;
+	/**< client specific previous Sub-graph state */
+
+	apm_sub_graph_state_t   curr_state;
+	   /**< client specific current Sub-graph state */
+
+}apm_client_context_t;
+
 /** Sub-graph info struture */
 typedef struct apm_sub_graph_t apm_sub_graph_t;
 
@@ -165,7 +181,7 @@ struct apm_sub_graph_t
    /**< Sub-graph property structure */
 
    apm_sub_graph_state_t   state;
-   /**< Sub-graph state */
+   /**< current actual Sub-graph state */
 
    uint32_t                num_containers;
    /**< Number of containers within this sub-graph. */
@@ -176,6 +192,19 @@ struct apm_sub_graph_t
 
    apm_sub_graph_cfg_t     *cfg_cmd_payload;
    /**< Cache the payload pointer for command */
+
+   spf_list_node_t         *client_list_ptr;
+   /**< Cache the client context for a particular SG */
+   /**node type apm_client_context_t*/
+
+	uint32_t                num_client;
+	/**< Number of client for which this SG is referred */
+
+	bool_t                  is_calibrated;
+	/**< Subgraph calibration state
+	 * Used to check calibration state of subgraph
+	 * during APM_CMD_DB_DEFAULT_SET_CFG
+	 */
 };
 
 /*------------------------------------------------------------------------------
@@ -195,6 +224,69 @@ struct apm_list_t
    spf_list_node_t     *list_ptr;
    /**< list pointer */
 };
+
+typedef struct apm_module_data_port_conn_t
+{
+	//TODO- Add src host/dst host at top and add the connections under that structure
+	// Enhancement
+	uint32_t src_mod_inst_id;
+	/**< Instance identifier for the source module. */
+
+	uint32_t src_mod_op_port_id;
+	/**< Output port identifier for the source module. */
+
+	uint32_t dst_mod_inst_id;
+	/**< Instance identifier for the destination module. */
+
+	uint32_t dst_mod_ip_port_id;
+	/**< Input port identifier for the destination module. */
+
+	uint32_t src_host_sub_graph_id;
+	/**< host sub graph ID of the src module */
+
+	uint32_t dst_host_sub_graph_id;
+		/**< host sub graph ID of the dst module */
+
+	spf_list_node_t  *client_list_ptr;
+	/**< Cache the client context for a particular SG */
+	/**node type apm_client_context_t*/
+
+	uint32_t   num_client;
+	/**< Number of client for which this SG is referred */
+}apm_module_data_port_conn_t;
+
+typedef struct apm_module_ctrl_port_conn_t
+{
+	//TODO- Add src host/dst host at top and add the connections under that structure
+		// Enhancement
+   uint32_t peer_1_mod_iid;
+   /**< Instance identifier for the first peer module. */
+
+   uint32_t peer_1_mod_ctrl_port_id;
+   /**< Control port identifier for the first peer module. */
+
+   uint32_t peer_2_mod_iid;
+   /**< Instance identifier for the second peer module. */
+
+   uint32_t peer_2_mod_ctrl_port_id;
+   /**< Control port identifier for the second peer module. */
+
+   uint32_t num_props;
+   /**< Number of link properties (default = 0). */
+
+   uint32_t peer_1_sub_graph_id;
+   /**< host sub graph ID of the src module */
+
+   uint32_t peer_2_sub_graph_id;
+   /**< host sub graph ID of the dst module */
+
+   spf_list_node_t  *client_list_ptr;
+   /**< Cache the client context for a particular SG */
+   /**node type apm_client_context_t*/
+
+   uint32_t   num_client;
+   /**< Number of client for which this SG is referred */
+}apm_module_ctrl_port_conn_t;
 
 typedef struct apm_cont_graph_t  apm_cont_graph_t;
 
@@ -784,6 +876,18 @@ struct apm_graph_info_t
    /**< List of sub-graph ID's
         Node Type: apm_cont_port_connect_info_t */
 
+   uint32_t             num_conn;
+    /**< Number of connections at boundary */
+
+   spf_list_node_t     *conn_cfg_list_ptr;
+   /**< Pointer to the list of connections*/
+
+   uint32_t             num_ctrl_link;
+   /**< Number of connections at boundary */
+
+   spf_list_node_t     *ctrl_link_cfg_list_ptr;
+   /**< Pointer to the list of connections*/
+
    uint32_t          num_containers;
    /**< Number of containers */
 
@@ -869,6 +973,16 @@ ar_result_t apm_db_get_sub_graph_node(apm_graph_info_t *graph_info_ptr,
                                       uint32_t          sub_graph_id,
                                       apm_sub_graph_t **sub_graph_pptr,
                                       apm_db_query_t    query_type);
+
+ar_result_t apm_db_get_mod_connection(apm_graph_info_t             *graph_info_ptr,
+                                      apm_module_conn_cfg_t        *conn_cfg_ptr,
+                                      apm_module_data_port_conn_t **conn_cfg_pptr,
+                                      apm_db_query_t                query_type);
+
+ar_result_t apm_db_get_mod_ctrl_link(apm_graph_info_t             *graph_info_ptr,
+                                     apm_module_ctrl_link_cfg_t   *ctrl_link_cfg_ptr,
+                                     apm_module_ctrl_port_conn_t **ctrl_link_cfg_pptr,
+                                     apm_db_query_t                query_type);
 
 ar_result_t apm_db_get_container_node(apm_graph_info_t *graph_info_ptr,
                                       uint32_t          container_id,

@@ -4,7 +4,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -55,7 +55,76 @@ bool_t gen_cntr_st_need_to_poll_for_input_data(gen_cntr_ext_in_port_t *ext_in_po
    return FALSE;
 }
 
-static ar_result_t gen_cntr_st_prepare_input_buffers(gen_cntr_t *me_ptr)
+ar_result_t gen_cntr_st_prepare_input_buffers_per_port(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr)
+{
+   ar_result_t             result          = AR_EOK;
+   gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
+
+   // checks if port is blocked/stopped on signal trigger.
+   gen_topo_data_need_t rc = gen_topo_in_port_needs_data(&me_ptr->topo, in_port_ptr);
+   if (GEN_TOPO_DATA_BLOCKED == rc)
+   {
+      return result;
+   }
+
+#ifdef VERBOSE_DEBUGGING
+   uint32_t num_polled_buffers = 0;
+#endif
+   while (TRUE)
+   {
+      if (ext_in_port_ptr->cu.input_data_q_msg.payload_ptr)
+      {
+         // if already holding on to an input buffer [partial buffer], copy data from the buffer.
+         result = gen_cntr_setup_internal_input_port_and_preprocess(me_ptr, ext_in_port_ptr, NULL);
+
+         // If the internal topo buffer is filled continue to setup the next input port.
+         // here, in_port_ptr->common.buf.data_ptr must be present
+         // and hence using max_data_len is ok compared to max_buf_len
+         if (in_port_ptr->common.bufs_ptr[0].actual_data_len == in_port_ptr->common.bufs_ptr[0].max_data_len)
+         {
+            ext_in_port_ptr->flags.ready_to_go      = TRUE;
+            in_port_ptr->common.sdata.flags.erasure = FALSE;
+            break;
+         }
+      }
+
+      // Stop popping buffers if,
+      //   1. Need to poll returns FALSE or
+      //   2. If there is no trigger signal set for the queue.
+      if (!gen_cntr_st_need_to_poll_for_input_data(ext_in_port_ptr) ||
+          !posal_queue_poll(ext_in_port_ptr->gu.this_handle.q_ptr))
+      {
+         break;
+      }
+
+      /** try to fill buf for Signal trigger */
+      ext_in_port_ptr->vtbl_ptr->on_trigger(me_ptr, ext_in_port_ptr);
+
+      if (AR_DID_FAIL(result))
+      {
+         GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                      DBG_ERROR_PRIO,
+                      "process failed for ext input port 0x%lx of Module 0x%lX ",
+                      in_port_ptr->gu.cmn.id,
+                      in_port_ptr->gu.cmn.module_ptr->module_instance_id);
+      }
+
+#ifdef VERBOSE_DEBUGGING
+      num_polled_buffers++;
+
+      GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                   DBG_LOW_PRIO,
+                   "Ext input port 0x%lx of Module 0x%lX. num_polled_buffers %lu ",
+                   in_port_ptr->gu.cmn.id,
+                   in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                   num_polled_buffers);
+#endif
+   }
+
+   return result;
+}
+
+ar_result_t gen_cntr_st_prepare_input_buffers(gen_cntr_t *me_ptr)
 {
    ar_result_t result = AR_EOK;
 
@@ -65,68 +134,7 @@ static ar_result_t gen_cntr_st_prepare_input_buffers(gen_cntr_t *me_ptr)
    {
       gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)in_port_list_ptr->ext_in_port_ptr;
 
-      gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
-
-      // checks if port is blocked/stopped on signal trigger.
-      gen_topo_data_need_t rc = gen_topo_in_port_needs_data(&me_ptr->topo, in_port_ptr);
-      if (GEN_TOPO_DATA_BLOCKED == rc)
-      {
-         continue;
-      }
-
-#ifdef VERBOSE_DEBUGGING
-      uint32_t num_polled_buffers = 0;
-#endif
-      while (TRUE)
-      {
-         if (ext_in_port_ptr->cu.input_data_q_msg.payload_ptr)
-         {
-            // if already holding on to an input buffer [partial buffer], copy data from the buffer.
-            result = gen_cntr_setup_internal_input_port_and_preprocess(me_ptr, ext_in_port_ptr, NULL);
-
-            // If the internal topo buffer is filled continue to setup the next input port.
-            // here, in_port_ptr->common.buf.data_ptr must be present
-            // and hence using max_data_len is ok compared to max_buf_len
-            if (in_port_ptr->common.bufs_ptr[0].actual_data_len == in_port_ptr->common.bufs_ptr[0].max_data_len)
-            {
-               ext_in_port_ptr->flags.ready_to_go      = TRUE;
-               in_port_ptr->common.sdata.flags.erasure = FALSE;
-               break;
-            }
-         }
-
-         // Stop popping buffers if,
-         //   1. Need to poll returns FALSE or
-         //   2. If there is no trigger signal set for the queue.
-         if (!gen_cntr_st_need_to_poll_for_input_data(ext_in_port_ptr) ||
-             !posal_queue_poll(ext_in_port_ptr->gu.this_handle.q_ptr))
-         {
-            break;
-         }
-
-         /** try to fill buf for Signal trigger */
-         ext_in_port_ptr->vtbl_ptr->on_trigger(me_ptr, ext_in_port_ptr);
-
-         if (AR_DID_FAIL(result))
-         {
-            GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
-                         DBG_ERROR_PRIO,
-                         "process failed for ext input port 0x%lx of Module 0x%lX ",
-                         in_port_ptr->gu.cmn.id,
-                         in_port_ptr->gu.cmn.module_ptr->module_instance_id);
-         }
-
-#ifdef VERBOSE_DEBUGGING
-         num_polled_buffers++;
-
-         GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
-                      DBG_LOW_PRIO,
-                      "Ext input port 0x%lx of Module 0x%lX. num_polled_buffers %lu ",
-                      in_port_ptr->gu.cmn.id,
-                      in_port_ptr->gu.cmn.module_ptr->module_instance_id,
-                      num_polled_buffers);
-#endif
-      }
+      result |= gen_cntr_st_prepare_input_buffers_per_port(me_ptr, ext_in_port_ptr);
    }
 
    return result;
@@ -180,10 +188,16 @@ ar_result_t gen_cntr_st_prepare_output_buffers_per_ext_out_port(gen_cntr_t      
 
    result = ext_out_port_ptr->vtbl_ptr->setup_bufs(me_ptr, ext_out_port_ptr);
 
+   // assigns ext buffer to topo buffer if possible, else topo buffer will be assigned during module process context
+   if (ext_out_port_ptr->vtbl_ptr->setup_topo_buf)
+   {
+      result = ext_out_port_ptr->vtbl_ptr->setup_topo_buf(me_ptr, ext_out_port_ptr);
+   }
+
    return result;
 }
 
-static ar_result_t gen_cntr_st_prepare_output_buffers(gen_cntr_t *me_ptr)
+ar_result_t gen_cntr_st_prepare_output_buffers(gen_cntr_t *me_ptr)
 {
    ar_result_t result = AR_EOK;
 
@@ -198,13 +212,41 @@ static ar_result_t gen_cntr_st_prepare_output_buffers(gen_cntr_t *me_ptr)
    return result;
 }
 
+#ifdef USES_THIN_TOPO
+/* This function must be called only from the gen topo context, to check if its possible to switch to thin topo.*/
+GEN_CNTR_STATIC ar_result_t gen_cntr_check_and_switch_to_thin_topo(gen_cntr_t *me_ptr)
+{
+   // return if cannot enter thin topo
+   if (check_if_needed_to_exit_thin_topo(&me_ptr->topo))
+   {
+#if defined(VERBOSE_DEBUGGING)
+      GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
+                          DBG_HIGH_PRIO,
+                          "Cannot switch to Thin Topo exit_flags:0x%lx",
+                          me_ptr->topo.exit_flags.word);
+#endif
+      return AR_EOK;
+   }
+
+   // if already in thin topo its unexpected.
+   if (check_if_cntr_is_processing_with_thin_topo(&me_ptr->topo))
+   {
+      GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, "Unexpected! cannot be in thin topo at this point");
+      return AR_EOK;
+   }
+
+   gen_topo_exit_island_temporarily(&me_ptr->topo);
+   return gen_cntr_switch_to_thin_topo_util_(me_ptr);
+}
+#endif
+
 ar_result_t gen_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_index)
 {
    ar_result_t result = AR_EOK;
    gen_cntr_t *me_ptr = (gen_cntr_t *)cu_ptr;
 
 #ifdef VERBOSE_DEBUGGING
-   GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_LOW_PRIO, "gen_cntr_trigger: Received trigger signal");
+   GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_LOW_PRIO, "gen_cntr_trigger: Received signal trigger");
 #endif
 
    // Increment in process context
@@ -296,6 +338,11 @@ ar_result_t gen_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_inde
       result = gen_cntr_data_process_frames(me_ptr);
    }
 
+#ifdef USES_THIN_TOPO
+   /** checks if the conditions are met to switch to thin topo, and updates the mask. */
+   result = gen_cntr_check_and_switch_to_thin_topo(me_ptr);
+#endif
+
    if (AR_DID_FAIL(result))
    {
       GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, "Failure in processing data on signal trigger");
@@ -349,7 +396,7 @@ ar_result_t gen_cntr_st_check_input_and_underrun(gen_cntr_t *me_ptr, gen_cntr_ex
    uint32_t bytes_required_per_buf = in_port_ptr->common.bufs_ptr[0].max_data_len;
 
    // No need to underrun if the external input has sufficient data as required at the nblc end
-   if (in_port_ptr->nblc_end_ptr &&
+   if (in_port_ptr->nblc_end_ptr && in_port_ptr->nblc_end_ptr->common.bufs_ptr[0].actual_data_len &&
        (SPF_IS_PACKETIZED_OR_PCM(in_port_ptr->nblc_end_ptr->common.media_fmt_ptr->data_format)) &&
        (SPF_IS_PACKETIZED_OR_PCM(in_port_ptr->common.media_fmt_ptr->data_format)))
    {

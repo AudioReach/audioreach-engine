@@ -24,6 +24,7 @@ SPDX-License-Identifier: BSD-3-Clause-Clear
 #include "gpr_api_inline.h"
 #include "apm.h"
 #include "apm_cntr_if.h"
+#include "apm_offload_mem.h"
 #include "irm.h"
 #include "rtm_logging_api.h"
 //#include "irm_offload_utils.h"
@@ -153,15 +154,16 @@ typedef struct irm_t
 
 struct irm_cmd_ctrl_t
 {
-   uint16_t         token;              /**< Token used to identify the command ctrl obj */
-   uint32_t         cmd_opcode;         /**< Command opcode under process */
-   spf_msg_t        cmd_msg;            /**< Command payload GK msg */
-   uint32_t         dst_domain_id;      /**< Destination proc domain id */
-   bool_t           is_out_of_band;     /**< Flag to indicate out of band */
-   uint32_t         bytes_written;      /**< Number of bytes written to the original payload*/
-   uint32_t         num_resp_pending;   /**< Indicates how many responses remain for the offloaded cmd */
-   void *           loaned_mem_ptr;     /**< Loaned mem ptr associated with the cmd payload. NULL if inband. */
-   void *           master_payload_ptr; /**< Loaned mem ptr associated with the cmd payload. NULL if inband. */
+   uint16_t               token;              /**< Token used to identify the command ctrl obj */
+   uint32_t               cmd_opcode;         /**< Command opcode under process */
+   spf_msg_t              cmd_msg;            /**< Command payload GK msg */
+   uint32_t               dst_domain_id;      /**< Destination proc domain id */
+   bool_t                 is_out_of_band;     /**< Flag to indicate out of band */
+   uint32_t               bytes_written;      /**< Number of bytes written to the original payload*/
+   uint32_t               num_resp_pending;   /**< Indicates how many responses remain for the offloaded cmd */
+   apm_offload_ret_info_t ret_info;           /**< offload shared memory info*/
+   void *                 loaned_mem_ptr;     /**< Loaned mem ptr associated with the cmd payload. NULL if inband. */
+   void *                 master_payload_ptr; /**< Loaned mem ptr associated with the cmd payload. NULL if inband. */
    spf_list_node_t *get_cfg_rsp_cmd_ctrl_list_ptr; /**< list of irm_get_cfg_resp_cmd_ctrl_t to get the location of the
                                                       responses for get cfg msgs */
 };

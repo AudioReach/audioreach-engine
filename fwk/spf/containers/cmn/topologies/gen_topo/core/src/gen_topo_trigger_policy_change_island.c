@@ -7,13 +7,12 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #include "gen_topo.h"
-
-
+#include "thin_topo_inline.h"
 
 static ar_result_t gen_topo_validate_trigger_non_trigger(uint32_t                          log_id,
                                                          fwk_extn_port_nontrigger_group_t *nontriggerable_ports_ptr,
@@ -457,6 +456,11 @@ capi_err_t gen_topo_change_trigger_policy_cb_fn(gen_topo_trigger_t              
          if (need_to_set_fwk_tgp_change_event)
          {
             GEN_TOPO_SET_ONE_CAPI_EVENT_FLAG(topo_ptr, signal_trigger_policy_change);
+
+            if(check_if_thin_topo_manager_is_initialized(topo_ptr))
+            {
+               thin_topo_reset_signal_tgp_flag(topo_ptr);
+            }
          }
       }
    }
@@ -486,7 +490,9 @@ void gen_topo_update_data_tpm_count(gen_topo_t *topo_ptr)
    }
 
    TOPO_MSG_ISLAND(topo_ptr->gu.log_id,
-                  DBG_LOW_PRIO,
-                  "Number of active data trigger modules in this topo num_data_tpm %lu",
-                  topo_ptr->num_data_tpm);
+                   DBG_LOW_PRIO,
+                   "Number of active data trigger modules in this topo num_data_tpm %lu",
+                   topo_ptr->num_data_tpm);
+
+   THIN_TOPO_SET_EXIT_FLAG(topo_ptr, has_active_data_tgp_extn, (topo_ptr->num_data_tpm ? TRUE : FALSE));
 }

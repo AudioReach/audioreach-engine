@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -333,22 +333,6 @@ static ar_result_t apm_gpr_cmd_handler(apm_t *apm_info_ptr, spf_msg_t *msg_ptr)
       case APM_CMD_GRAPH_SUSPEND:
       {
          result = apm_process_gpr_cmd(apm_info_ptr, msg_ptr);
-
-         break;
-      }
-      case APM_CMD_SHARED_SATELLITE_MEM_MAP_REGIONS:
-      case APM_CMD_RSP_SHARED_MEM_MAP_REGIONS:
-      case APM_CMD_SHARED_SATELLITE_MEM_UNMAP_REGIONS:
-      {
-         if (ext_utils_ptr->offload_vtbl_ptr && ext_utils_ptr->offload_vtbl_ptr->apm_offload_shmem_cmd_handler_fptr)
-         {
-            result = ext_utils_ptr->offload_vtbl_ptr->apm_offload_shmem_cmd_handler_fptr(apm_info_ptr, msg_ptr);
-         }
-         else
-         {
-            result = AR_EUNSUPPORTED;
-         }
-
          break;
       }
       default:
@@ -394,11 +378,14 @@ ar_result_t apm_cmdq_gpr_cmd_handler(apm_t *apm_info_ptr, spf_msg_t *msg_ptr)
       case APM_CMD_GLOBAL_SHARED_MEM_MAP_REGIONS:
       case APM_CMD_SHARED_MEM_UNMAP_REGIONS:
       case APM_CMD_GLOBAL_SHARED_MEM_UNMAP_REGIONS:
+      case APM_CMD_SHARED_MEM_MAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_UNMAP_REGIONS_V2:
+      case APM_CMD_SHARED_MEM_REGION_ACCESS_INFO:
       {
          if (ext_utils_ptr->shmem_vtbl_ptr && ext_utils_ptr->shmem_vtbl_ptr->apm_shmem_cmd_handler_fptr)
          {
             result =
-               ext_utils_ptr->shmem_vtbl_ptr->apm_shmem_cmd_handler_fptr(apm_info_ptr->memory_map_client, msg_ptr);
+               ext_utils_ptr->shmem_vtbl_ptr->apm_shmem_cmd_handler_fptr(apm_info_ptr, msg_ptr);
          }
          else /** Shared mem operation is unsupported */
          {
@@ -413,6 +400,20 @@ ar_result_t apm_cmdq_gpr_cmd_handler(apm_t *apm_info_ptr, spf_msg_t *msg_ptr)
             __gpr_cmd_end_command(gpr_pkt_ptr, result);
          }
 
+         break;
+      }
+      case APM_CMD_SHARED_SATELLITE_MEM_MAP_REGIONS:
+      case APM_CMD_RSP_SHARED_MEM_MAP_REGIONS:
+      case APM_CMD_SHARED_SATELLITE_MEM_UNMAP_REGIONS:
+      {
+         if (ext_utils_ptr->offload_vtbl_ptr && ext_utils_ptr->offload_vtbl_ptr->apm_offload_shmem_cmd_handler_fptr)
+         {
+            result = ext_utils_ptr->offload_vtbl_ptr->apm_offload_shmem_cmd_handler_fptr(apm_info_ptr, msg_ptr);
+         }
+         else
+         {
+            result = AR_EUNSUPPORTED;
+         }
          break;
       }
       case APM_CMD_GET_SPF_STATE:

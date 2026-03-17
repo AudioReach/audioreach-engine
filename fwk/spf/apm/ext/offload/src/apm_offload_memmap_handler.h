@@ -10,7 +10,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -48,6 +48,10 @@ ar_result_t apm_offload_shmem_cmd_handler(apm_t *apm_info_ptr, spf_msg_t *msg_pt
 ar_result_t apm_offload_mem_basic_rsp_handler(apm_t *         apm_info_ptr,
                                               apm_cmd_ctrl_t *apm_cmd_ctrl_ptr,
                                               gpr_packet_t *  gpr_pkt_ptr);
+
+ar_result_t apm_offload_mem_basic_rsp_handler_v2(apm_t          *apm_info_ptr,
+                                                 apm_cmd_ctrl_t *apm_cmd_ctrl_ptr,
+                                                 gpr_packet_t   *gpr_pkt_ptr);
 #ifdef __cplusplus
 }
 #endif //__cplusplus

@@ -71,12 +71,14 @@ typedef struct spgm_info_t
    posal_queue_t *       rsp_q_ptr;
    posal_queue_t *       evnt_q_ptr;
    posal_atomic_word_t   token_instance;
+   uint32_t              base_token;
    sgmc_rsp_h_vtable_t * cmd_rsp_vtbl;
    sgmc_rsp_h_vtable_t * servreg_error_notify_cmd_rsp_vtbl;
    spgm_cmd_rsp_node_t   rsp_info;
    sdm_process_info_t    process_info;
    spf_list_node_t *     event_reg_list_ptr; // obj ptr of type (spgm_event_info_t)
    sgm_path_delay_info_t path_delay_list;
+   uint32_t             p_cmd_exec_ts;
 } spgm_info_t;
 
 ar_result_t olc_create_graph_open_payload(spgm_info_t *             spgm_ptr,
@@ -123,6 +125,14 @@ ar_result_t sgm_handle_persistent_cfg(spgm_info_t *                     spgm_ptr
                                       bool_t                            is_inband,
                                       bool_t                            is_deregister,
                                       spgm_set_get_cfg_cmd_extn_info_t *cmd_extn_ptr);
+
+ar_result_t sgm_handle_persistent_cfg_v2(spgm_info_t *                     spgm_ptr,
+                                         void **                           param_data_pptr,
+                                         uint32_t                          num_config,
+                                         uint32_t                          payload_size,
+                                         bool_t                            is_inband,
+                                         bool_t                            is_deregister,
+                                         spgm_set_get_cfg_cmd_extn_info_t *cmd_extn_ptr);
 
 ar_result_t sgm_handle_set_get_cfg(spgm_info_t *                     spgm_ptr,
                                    spf_msg_cmd_param_data_cfg_t *    gmc_apm_param_data_cfg_ptr,

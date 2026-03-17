@@ -64,14 +64,21 @@ ar_result_t sgm_get_cache_cmd_msg(spgm_info_t *spgm_ptr, uint32_t opcode, uint32
 {
    ar_result_t           result              = AR_EOK;
    spgm_cmd_hndl_node_t *active_cmd_hndl_ptr = NULL;
+   int64_t               p_time_us           = 0;
 
    /*bool_t get_cmd_node = */
-   olc_get_cmd_hndl_node(spgm_ptr->cmd_hndl_list.cmd_hndl_list_ptr,
-                         spgm_ptr->cmd_hndl_list.num_active_cmd_hndls,
-                         &active_cmd_hndl_ptr,
-                         token);
+   bool_t has_active_handle = olc_get_cmd_hndl_node(spgm_ptr->cmd_hndl_list.cmd_hndl_list_ptr,
+                                                    spgm_ptr->cmd_hndl_list.num_active_cmd_hndls,
+                                                    &active_cmd_hndl_ptr,
+                                                    token);
 
-   *cmd_msg = &active_cmd_hndl_ptr->cmd_msg;
+   if (has_active_handle)
+   {
+      p_time_us               = (posal_timer_get_time() - active_cmd_hndl_ptr->ipc_cmd_sent_ts_us);
+      spgm_ptr->p_cmd_exec_ts = (uint32_t)p_time_us;
+
+      *cmd_msg = &active_cmd_hndl_ptr->cmd_msg;
+   }
    return result;
 }
 

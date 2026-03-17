@@ -31,7 +31,7 @@
 /** Variable for setting priority threshold for the debug message in simulator. */
 extern uint8_t ar_logs_debugmsg_lowest_prio;
 
-// use ar osal for non diag usecases 
+// use ar osal for non diag usecases
 #include "ar_osal_log.h"
 
 // Undefine earlier definitions of diag declerations
@@ -75,9 +75,9 @@ extern uint8_t ar_logs_debugmsg_lowest_prio;
 #endif
 
 // user pd
-#if !defined(ROOTPD_AVS_INTEGRATION) 
+#if !defined(ROOTPD_AVS_INTEGRATION)
 
-#define AR_MSG_DOMAIN_ID  2 
+#define AR_MSG_DOMAIN_ID  2
 #define PROC_DOMAIN  " ADSP: "
 
 #undef AR_MSG_LOG
@@ -95,7 +95,7 @@ extern uint8_t ar_logs_debugmsg_lowest_prio;
                                                         .msg_header.b.num_words    = 2 + num_args,                     \
                                                         .msg_format_ptr            = (char *)xx_ar_log_format,         \
                                                         .msg_filename_ptr          = xx_ar_log_file };                 \
-         uint32_t time_ms = ar_timer_get_time_in_ms();										                           \
+         uint32_t time_ms = ar_timer_get_time_in_ms();                                                                 \
          ar_dbg_log(&xx_ar_log_msg, time_ms, ##__VA_ARGS__);                                                           \
          if (DBG_FATAL_PRIO == (priority))                                                                             \
          {                                                                                                             \
@@ -119,7 +119,7 @@ extern uint8_t ar_logs_debugmsg_lowest_prio;
                                                         .msg_header.b.num_words    = 2 + num_args,                     \
                                                         .msg_format_ptr            = (char *)xx_ar_log_format,         \
                                                         .msg_filename_ptr          = xx_ar_log_file };                 \
-         uint32_t time_ms = ar_timer_get_time_in_ms();							                                       \
+         uint32_t time_ms = ar_timer_get_time_in_ms();                                                                 \
          ar_dbg_log(&xx_ar_log_msg, time_ms, ##__VA_ARGS__);                                                           \
          if (DBG_FATAL_PRIO == (priority))                                                                             \
          {                                                                                                             \
@@ -134,7 +134,12 @@ extern uint8_t ar_logs_debugmsg_lowest_prio;
 #if defined(ROOTPD_AVS_INTEGRATION)
 
 #define AR_MSG_DOMAIN_ID 1
-#define PROC_DOMAIN  " MDSP: "
+
+#ifdef ADSP0_IMG
+   #define PROC_DOMAIN " ADSP1: "
+#else
+   #define PROC_DOMAIN  " MDSP: "
+#endif
 
 #undef AR_MSG_LOG
 #define AR_MSG_LOG(num_args, priority, xx_fmt, ...)                                                                    \
@@ -343,7 +348,7 @@ extern uint8_t ar_logs_debugmsg_lowest_prio;
 #define AR_MSG_ISLAND_x(_N) AR_TOKENPASTE(ISLAND_MSG, _N)
 
 #ifndef MSG_SSID_QDSP6
-#define MSG_SSID_QDSP6 
+#define MSG_SSID_QDSP6
 #endif // AR_MSG_DFLT_MSG_SSID
 
 #if defined(ISLAND_TEST)
@@ -351,11 +356,15 @@ extern uint8_t ar_logs_debugmsg_lowest_prio;
 #define AR_MSG_ISLAND AR_NON_GUID(_AR_MSG_ISLAND_)
 #else
 #undef AR_MSG_ISLAND
-#define AR_MSG_ISLAND AR_NON_GUID(AR_MSG)
+#define AR_MSG_ISLAND AR_NON_GUID(AR_MSG_I)
 #endif
 
 /* This Logging macro supports variable arguments*/
 #define AR_MSG(xx_ss_mask, xx_fmt, ...)                                                                                \
+   AR_MSG_x(AR_VA_NUM_ARGS(__VA_ARGS__))(MSG_SSID_QDSP6, xx_ss_mask, PROC_DOMAIN xx_fmt, ##__VA_ARGS__)
+
+/* This Logging macro supports variable arguments*/
+#define AR_MSG_I(xx_ss_mask, xx_fmt, ...)                                                                                \
    AR_MSG_x(AR_VA_NUM_ARGS(__VA_ARGS__))(MSG_SSID_QDSP6, xx_ss_mask, PROC_DOMAIN xx_fmt, ##__VA_ARGS__)
 
 /* This Logging macro supports variable arguments*/

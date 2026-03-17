@@ -5,7 +5,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -24,7 +24,7 @@ bool_t cu_has_voice_sid(cu_base_t *base_ptr)
       if (sg_list_ptr->sg_ptr)
       {
          gu_sg_t *sg_ptr = sg_list_ptr->sg_ptr;
-         if (APM_SUB_GRAPH_SID_VOICE_CALL == sg_ptr->sid)
+         if (IS_VOICE_SCENARIO_ID(sg_ptr->sid))
          {
             return TRUE;
          }
@@ -58,10 +58,14 @@ ar_result_t cu_create_voice_info(cu_base_t *base_ptr, spf_msg_cmd_graph_open_t *
    gu_sg_t *sg_ptr = gu_find_subgraph(gu_ptr, sg_cmd_ptr->sub_graph_id);
    VERIFY(result, sg_ptr);
 
-   if (APM_SUB_GRAPH_SID_VOICE_CALL == sg_ptr->sid)
+   if (IS_VOICE_SCENARIO_ID(sg_ptr->sid))
    {
       MALLOC_MEMSET(base_ptr->voice_info_ptr, cu_voice_info_t, sizeof(cu_voice_info_t), base_ptr->heap_id, result);
       CU_MSG(base_ptr->gu_ptr->log_id, DBG_HIGH_PRIO, "Allocated memory for voice info");
+      if (APM_SUB_GRAPH_SID_SAT_VOICE_CALL == sg_ptr->sid)
+      {
+         base_ptr->voice_info_ptr->is_satellite_voice_sid = TRUE;
+      }
    }
 
    CATCH(result, CU_MSG_PREFIX, base_ptr->gu_ptr->log_id)
@@ -110,6 +114,80 @@ ar_result_t cu_voice_session_cfg(cu_base_t *base_ptr, int8_t *param_payload_ptr,
    CU_MSG(base_ptr->gu_ptr->log_id,
           DBG_HIGH_PRIO,
           "CMD:VOICE_SESSION_CFG: Done Executing voice session cfg cmd, current channel mask=0x%x. result=%lu",
+          base_ptr->curr_chan_mask,
+          result);
+
+   return result;
+}
+
+ar_result_t cu_set_calibration_ops_done(cu_base_t *base_ptr, int8_t *param_payload_ptr, uint32_t *param_size_ptr)
+{
+   ar_result_t result = AR_EOK;
+   INIT_EXCEPTION_HANDLING
+
+   VERIFY(result, (NULL != base_ptr->voice_info_ptr));
+
+   CU_MSG(base_ptr->gu_ptr->log_id,
+          DBG_HIGH_PRIO,
+          "CMD:CALIBRATION_OPS: Executing dynamic calibration ops done SET-param. current channel mask=0x%x",
+          base_ptr->curr_chan_mask);
+
+   if(NULL != base_ptr->cntr_vtbl_ptr->handle_cntr_set_calibration_ops_done)
+   {
+      result |= base_ptr->cntr_vtbl_ptr->handle_cntr_set_calibration_ops_done(base_ptr);
+   }
+   else
+   {
+      result = AR_EUNSUPPORTED;
+   }
+
+   CATCH(result, CU_MSG_PREFIX, base_ptr->gu_ptr->log_id)
+   {
+   }
+
+   CU_MSG(base_ptr->gu_ptr->log_id,
+          DBG_HIGH_PRIO,
+          "CMD:VOICE_CALIBRATION_OPS: Done Executing voice set calibration ops, current channel mask=0x%x. result=%lu",
+          base_ptr->curr_chan_mask,
+          result);
+
+   return result;
+}
+
+ar_result_t cu_offload_voice_session_cfg(cu_base_t *base_ptr, int8_t *param_payload_ptr, uint32_t *param_size_ptr)
+{
+   ar_result_t result = AR_EOK;
+   INIT_EXCEPTION_HANDLING
+
+   cntr_param_id_offload_voice_session_info_t *voice_session_info_ptr = NULL;
+   VERIFY(result, (NULL != base_ptr->voice_info_ptr));
+
+   CU_MSG(base_ptr->gu_ptr->log_id,
+          DBG_HIGH_PRIO,
+          "CMD:OFFLOAD_VOICE_SESSION_CFG: Executing offload voice session cfg SET-param. current channel mask=0x%x",
+          base_ptr->curr_chan_mask);
+
+   VERIFY(result, *param_size_ptr >= sizeof(cntr_param_id_offload_voice_session_info_t));
+   voice_session_info_ptr = (cntr_param_id_offload_voice_session_info_t *)param_payload_ptr;
+
+   VERIFY(result, (NULL != voice_session_info_ptr));
+
+   CU_MSG(base_ptr->gu_ptr->log_id,
+          DBG_HIGH_PRIO,
+          "CMD:OFFLOAD_VOICE_SESSION_CFG: sg_id = 0x%lX, kpps_sf = %d, bw_sf = %d",
+          voice_session_info_ptr->sg_id,
+          voice_session_info_ptr->kpps_sf,
+          voice_session_info_ptr->bw_sf);
+
+   base_ptr->cntr_vtbl_ptr->handle_cntr_set_offload_voice_session_info(base_ptr, voice_session_info_ptr);
+
+   CATCH(result, CU_MSG_PREFIX, base_ptr->gu_ptr->log_id)
+   {
+   }
+
+   CU_MSG(base_ptr->gu_ptr->log_id,
+          DBG_HIGH_PRIO,
+          "CMD:OFFLOAD_VOICE_SESSION_CFG: Done Executing offload voice session cfg cmd, current channel mask=0x%x. result=%lu",
           base_ptr->curr_chan_mask,
           result);
 

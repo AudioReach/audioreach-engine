@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -83,7 +83,7 @@ ar_result_t olc_get_set_thread_priority(olc_t *me_ptr, int32_t *priority_ptr, bo
       }
       else
       {
-         is_real_time = olc_is_realtime(&me_ptr->cu);
+         is_real_time = cu_is_realtime(&me_ptr->cu);
          if (!is_real_time)
          {
             new_prio = posal_thread_get_floor_prio(SPF_THREAD_STAT_CNTR_ID);
@@ -252,75 +252,6 @@ ar_result_t olc_ext_out_port_reset(olc_t *me_ptr, olc_ext_out_port_t *ext_out_po
    return result;
 }
 
-static bool_t olc_is_ext_out_port_us_or_ds_rt(olc_t *me_ptr, olc_ext_out_port_t *ext_out_port_ptr)
-{
-   gen_topo_output_port_t *out_port_ptr           = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
-   uint32_t                is_downstream_realtime = FALSE;
-   uint32_t                is_upstream_realtime   = FALSE;
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_OUTPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_UPSTREAM_RT,
-                              out_port_ptr,
-                              &is_upstream_realtime);
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_OUTPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_DOWNSTREAM_RT,
-                              out_port_ptr,
-                              &is_downstream_realtime);
-
-   return (is_downstream_realtime || is_upstream_realtime);
-}
-
-static bool_t olc_is_ext_in_port_us_or_ds_rt(olc_t *me_ptr, olc_ext_in_port_t *ext_in_port_ptr)
-{
-   gen_topo_input_port_t *in_port_ptr            = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
-   uint32_t               is_downstream_realtime = FALSE;
-   uint32_t               is_upstream_realtime   = FALSE;
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_INPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_UPSTREAM_RT,
-                              in_port_ptr,
-                              &is_upstream_realtime);
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_INPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_DOWNSTREAM_RT,
-                              in_port_ptr,
-                              &is_downstream_realtime);
-
-   return (is_downstream_realtime || is_upstream_realtime);
-}
-
-/**
- * OLC is real time if it's external ports are connected to RT entities on either
- *  upstream or downstream
- */
-bool_t olc_is_realtime(cu_base_t *base_ptr)
-{
-   olc_t *me_ptr = (olc_t *)base_ptr;
-
-   for (gu_ext_out_port_list_t *ext_out_port_list_ptr = me_ptr->topo.gu.ext_out_port_list_ptr;
-        (NULL != ext_out_port_list_ptr);
-        LIST_ADVANCE(ext_out_port_list_ptr))
-   {
-      olc_ext_out_port_t *ext_out_port_ptr = (olc_ext_out_port_t *)ext_out_port_list_ptr->ext_out_port_ptr;
-      if (olc_is_ext_out_port_us_or_ds_rt(me_ptr, ext_out_port_ptr))
-      {
-         return TRUE;
-      }
-   }
-
-   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = me_ptr->topo.gu.ext_in_port_list_ptr;
-        (NULL != ext_in_port_list_ptr);
-        LIST_ADVANCE(ext_in_port_list_ptr))
-   {
-      olc_ext_in_port_t *ext_in_port_ptr = (olc_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
-      if (olc_is_ext_in_port_us_or_ds_rt(me_ptr, ext_in_port_ptr))
-      {
-         return TRUE;
-      }
-   }
-   return FALSE;
-}
 
 // Topo to cntr call back to handle propagation at external output port.
 // If the propagated property is is_upstrm_rt, cmd is sent to downstream cntr.
@@ -679,7 +610,8 @@ ar_result_t olc_create_module(gen_topo_t *           topo_ptr,
                /* Make sure that the only in port of this module is also an external port.*/
                VERIFY(result, NULL != module_ptr->gu.input_port_list_ptr->ip_port_ptr->ext_in_port_ptr);
 
-               module_ptr->flags.inplace = TRUE;
+               module_ptr->flags.inplace         = TRUE;
+               module_ptr->flags.dynamic_inplace = TRUE;
                gen_topo_input_port_t *input_port_ptr =
                   (gen_topo_input_port_t *)module_ptr->gu.input_port_list_ptr->ip_port_ptr;
                input_port_ptr->common.flags.port_has_threshold = FALSE;
@@ -699,7 +631,8 @@ ar_result_t olc_create_module(gen_topo_t *           topo_ptr,
                // Make sure that the only out port of this module is also an external port.
                VERIFY(result, NULL != module_ptr->gu.output_port_list_ptr->op_port_ptr->ext_out_port_ptr);
 
-               module_ptr->flags.inplace = TRUE;
+               module_ptr->flags.inplace         = TRUE;
+               module_ptr->flags.dynamic_inplace = TRUE;
                gen_topo_output_port_t *output_port_ptr =
                   (gen_topo_output_port_t *)module_ptr->gu.output_port_list_ptr->op_port_ptr;
                output_port_ptr->common.flags.port_has_threshold = FALSE;
@@ -857,3 +790,8 @@ uint32_t olc_aggregate_ext_out_port_delay_topo_cb(gen_topo_t *topo_ptr, gu_ext_o
    return cu_aggregate_ext_out_port_delay(&me_ptr->cu, gu_ext_out_port_ptr);
 }
 
+ar_result_t olc_aggregate_hw_acc_proc_delay(void *cu_ptr, uint32_t *hw_acc_proc_delay_ptr)
+{
+   *hw_acc_proc_delay_ptr = 0;
+   return AR_EOK;
+}

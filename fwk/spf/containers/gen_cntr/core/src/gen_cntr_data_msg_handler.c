@@ -4,7 +4,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -226,6 +226,8 @@ ar_result_t gen_cntr_input_media_format_received(void *                         
    if (ext_in_port_ptr->cu.preserve_prebuffer)
    {
       me_ptr->topo.flags.need_to_handle_frame_done = TRUE;
+
+      THIN_TOPO_SET_EXIT_FLAG((&me_ptr->topo), has_to_preserve_prebuffer, TRUE);
    }
 
    SPF_CRITICAL_SECTION_END(me_ptr->cu.gu_ptr);

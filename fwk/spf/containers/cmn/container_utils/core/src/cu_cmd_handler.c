@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -98,6 +98,12 @@ static ar_result_t cu_set_cntr_params(cu_base_t *base_ptr,
          *error_code_ptr = result;
          break;
       }
+      case CNTR_PARAM_ID_CALIBRATION_OPS_DONE:
+      {
+         result          = cu_set_calibration_ops_done(base_ptr, param_payload_ptr, param_size_ptr);
+         *error_code_ptr = result;
+         break;
+      }
       case CNTR_PARAM_ID_PROC_DURATION:
       {
          if (*param_size_ptr < sizeof(cntr_param_id_proc_duration_t))
@@ -145,6 +151,12 @@ static ar_result_t cu_set_cntr_params(cu_base_t *base_ptr,
       case CNTR_PARAM_ID_DATA_PORT_MEDIA_FORMAT:
       {
          result          = cu_cntr_rtm_dump_data_port_media_fmt(base_ptr, param_payload_ptr, param_size_ptr);
+         *error_code_ptr = result;
+         break;
+      }
+      case CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO:
+      {
+         result          = cu_offload_voice_session_cfg(base_ptr, param_payload_ptr, param_size_ptr);
          *error_code_ptr = result;
          break;
       }
@@ -1292,6 +1304,28 @@ ar_result_t cu_handle_prepare(cu_base_t *base_ptr, spf_msg_cmd_graph_mgmt_t *cmd
 
    // this also takes care of icb
    base_ptr->cntr_vtbl_ptr->port_data_thresh_change(base_ptr);
+
+   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = base_ptr->gu_ptr->ext_in_port_list_ptr;
+           (NULL != ext_in_port_list_ptr);
+           LIST_ADVANCE(ext_in_port_list_ptr))
+   {
+         gu_ext_in_port_t *ext_in_port_ptr = (gu_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
+
+         //If ICB info is sent when downstream container is not in start/prepare state, then it will get rejected.
+         //did_inform_us_of_frame_len_and_var_ip FLAG must be set to FALSE.
+         //So that when prepare is received on external input port it will enter cu_create_send_icb_info_msg_to_upstreams() and sends ICB info to create external buffers
+
+         if (gu_is_port_handle_found_in_spf_array(cmd_gmgmt_ptr->cntr_port_hdl_list.num_ip_port_handle,
+                 cmd_gmgmt_ptr->cntr_port_hdl_list.ip_port_handle_list_pptr,
+                 &ext_in_port_ptr->this_handle))
+         {
+             cu_ext_in_port_t *gu_ext_in_port_ptr =
+            (cu_ext_in_port_t *)(((uint8_t *)ext_in_port_ptr + base_ptr->ext_in_port_cu_offset));
+
+             gu_ext_in_port_ptr->prop_info.did_inform_us_of_frame_len_and_var_ip = FALSE;
+
+         }
+   }
 
    //handle_frame_len_change ensures that the ICB info is sent to upstream.
    //if frame-len is evaluated during threshold propagation then it will be sent inside "port_data_thresh_change"

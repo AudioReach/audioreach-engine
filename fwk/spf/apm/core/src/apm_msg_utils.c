@@ -23,6 +23,7 @@
 #include "apm_runtime_link_hdlr_utils.h"
 #include "apm_cntr_debug_if.h"
 #include "apm_debug_info_cfg.h"
+#include "proxy_cntr_if.h"
 
 #define APM_DEBUG_MSG_UTILS
 
@@ -158,6 +159,26 @@ ar_result_t apm_compute_set_get_cfg_msg_payload_size(apm_cont_cached_cfg_t *cont
                }
             }
             //msg_payload_size += (sizeof(apm_module_param_data_t) + sizeof(cntr_port_mf_param_data_cfg_t));
+            msg_payload_size += cntr_msg_payload_size;
+            break;
+         }
+         case CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO:
+         {
+            if (ext_utils_ptr->set_get_cfg_vtbl_ptr &&
+                ext_utils_ptr->set_get_cfg_vtbl_ptr->apm_compute_cntr_msg_payload_size_fptr)
+            {
+               if (AR_EOK != (result = ext_utils_ptr->set_get_cfg_vtbl_ptr
+                                          ->apm_compute_cntr_msg_payload_size_fptr(param_id, &cntr_msg_payload_size)))
+               {
+                  AR_MSG(DBG_ERROR_PRIO,
+                         "apm_populate_msg_set_get_cfg(): Failed to populate payload for param ID[0x%lx], "
+                         "CONT_ID[0x%lX]",
+                         param_id,
+                         container_id);
+
+                  return result;
+               }
+            }
             msg_payload_size += cntr_msg_payload_size;
             break;
          }
@@ -1975,6 +1996,38 @@ ar_result_t apm_populate_msg_set_get_cfg(apm_cont_cached_cfg_t *cont_cached_cfg_
             break;
          }
          case CNTR_PARAM_ID_DATA_PORT_MEDIA_FORMAT:
+         {
+            param_data_ptr = (apm_module_param_data_t *)cfg_data_start_ptr;
+
+            /** Populate the container params */
+            if (ext_utils_ptr->set_get_cfg_vtbl_ptr &&
+                ext_utils_ptr->set_get_cfg_vtbl_ptr->apm_populate_cntr_param_payload_size_fptr)
+            {
+               if (AR_EOK !=
+                   (result =
+                       ext_utils_ptr->set_get_cfg_vtbl_ptr->apm_populate_cntr_param_payload_size_fptr(container_id,
+                                                                                                    set_get_cfg_hdr_ptr,
+                                                                                                    param_data_ptr)))
+               {
+                  AR_MSG(DBG_ERROR_PRIO,
+                         "apm_populate_msg_set_get_cfg(): Failed to populate payload for param ID[0x%lx], "
+                         "CONT_ID[0x%lX]",
+                         set_get_cfg_hdr_ptr->param_id,
+                         container_id);
+
+                  return result;
+               }
+            }
+
+            /** Populate the array of pointer  */
+            param_data_pptr[arr_idx++] = param_data_ptr;
+
+            /** Increment the message payload pointer to next PID header */
+            cfg_data_start_ptr += (sizeof(apm_module_param_data_t) + param_data_ptr->param_size);
+
+            break;
+         }
+         case CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO:
          {
             param_data_ptr = (apm_module_param_data_t *)cfg_data_start_ptr;
 

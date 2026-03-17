@@ -399,6 +399,12 @@ static inline bool_t audio_dam_driver_is_virtual_writer_mode(audio_dam_stream_re
    return reader_handle->virt_buf_ptr ? TRUE : FALSE;
 }
 
+ar_result_t audio_dam_get_stream_reader_pending_bytes(audio_dam_stream_reader_t *reader_handle, uint32_t *unread_bytes);
+ar_result_t audio_dam_force_set_pending_bytes(audio_dam_stream_reader_t *reader_handle);
+
+/* check if the batching requirement will be met in the current process, if yes trigger Island exit if duty_cycling is enabled */
+bool_t audio_dam_if_batching_req_met(audio_dam_stream_reader_t *reader_handle);
+
 #ifdef __cplusplus
 }
 #endif /*__cplusplus*/

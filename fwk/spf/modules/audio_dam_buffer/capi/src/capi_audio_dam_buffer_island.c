@@ -75,16 +75,21 @@ static capi_err_t capi_audio_dam_handle_and_drop_metadata(capi_audio_dam_t   *me
       }
       else if (MODULE_CMN_MD_ID_EOS == node_ptr->obj_ptr->metadata_id)
       {
-         DAM_MSG_ISLAND(me_ptr->miid, DBG_HIGH_PRIO, "Resetting read position on EOS (drops buffered data)");
+         DAM_MSG_ISLAND(me_ptr->miid, DBG_HIGH_PRIO, "EOS rcvd");
 
          for (uint32_t op_arr_index = 0; op_arr_index < me_ptr->max_output_ports; op_arr_index++)
          {
-            // adjust rd ptr inorder to drop all the data
-            uint32_t read_offset_in_us = 0;
-            audio_dam_stream_read_adjust(me_ptr->out_port_info_arr[op_arr_index].strm_reader_ptr,
-                                         read_offset_in_us,
-                                         NULL,
-                                         FALSE);
+            /** do not reset the circ buffer if gate is open*/
+            if (!me_ptr->out_port_info_arr[op_arr_index].is_gate_opened)
+            {
+
+               // adjust rd ptr inorder to drop all the data
+               uint32_t read_offset_in_us = 0;
+               audio_dam_stream_read_adjust(me_ptr->out_port_info_arr[op_arr_index].strm_reader_ptr,
+                                          read_offset_in_us,
+                                          NULL,
+                                          FALSE);
+            }
          }
       }
 
@@ -217,7 +222,7 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
          {
             // insert eos marker
             bool_t skip_voting_on_eos = me_ptr->out_port_info_arr[arr_idx].is_peer_aad ? TRUE : FALSE;
-            if (CAPI_EOK == (result = capi_dam_insert_flushing_eos_at_out_port(me_ptr, output[port_index], skip_voting_on_eos)))
+            if (CAPI_EOK == (result = capi_dam_insert_flushing_eos_at_out_port(me_ptr, output[port_index], skip_voting_on_eos, FLUSHING_EOS)))
             {
                capi_check_and_close_the_gate(me_ptr, arr_idx, FALSE);
                me_ptr->out_port_info_arr[arr_idx].is_pending_gate_close = FALSE;
@@ -235,6 +240,19 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
          uint32_t output_frame_len_us = 0;
          bool_t   is_timestamp_valid  = FALSE;
 
+         if (me_ptr->out_port_info_arr[arr_idx].is_dcm_duty_cycling_enabled)
+         {
+            bool_t is_batching_req_met = audio_dam_if_batching_req_met(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr);
+            if (is_batching_req_met)
+            {
+               DAM_MSG_ISLAND(me_ptr->miid, DBG_MED_PRIO, "voting for island exit");
+               posal_island_trigger_island_exit();
+               capi_dam_duty_cycling_buf_send_message_to_dcm(me_ptr, (uint32_t)SPF_MSG_CMD_DCM_REQ_FOR_ISLAND_EXIT);
+               me_ptr->out_port_info_arr[arr_idx].ready_for_island_entry = FALSE;
+               DAM_MSG_ISLAND(me_ptr->miid, DBG_MED_PRIO, "voting for island exit done");
+            }
+         }
+
          result = audio_dam_stream_read(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr,
                                         num_output_chs,
                                         output[port_index]->buf_ptr,
@@ -249,6 +267,12 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
          }
          else if (AR_EOK == result) // If read was successful update the current timestamp.
          {
+            if (me_ptr->out_port_info_arr[arr_idx].pending_eos)
+            {
+               posal_island_trigger_island_exit();
+               capi_audio_dam_handle_pending_eos(me_ptr, output, arr_idx, port_index);
+            }
+
             output[port_index]->flags.is_timestamp_valid = is_timestamp_valid;
 
             if (me_ptr->out_port_info_arr[arr_idx].ftrt_unread_data_len_in_us)

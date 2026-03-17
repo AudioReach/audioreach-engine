@@ -27,6 +27,8 @@ INCLUDE FILES FOR MODULE
 #include "spf_msg_util.h"
 #include "spf_list_utils.h"
 #include "spf_lpi_pool_utils.h"
+#include "offload_apm_api.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif //__cplusplus
@@ -43,6 +45,10 @@ extern "C" {
  * of 300ms. This is to avoid external timeout crashes due to internal timeout handling.
  * */
 #define SPF_INTERNAL_CMD_EXEC_TIME_THRESHOLD_US          (500000) /** 500 ms */
+
+#define IS_VOICE_SCENARIO_ID(scenario_id) \
+    ((APM_SUB_GRAPH_SID_VOICE_CALL == (scenario_id)) || \
+     (APM_SUB_GRAPH_SID_SAT_VOICE_CALL == (scenario_id)))
 
 /* =======================================================================
 Static Inline Functions

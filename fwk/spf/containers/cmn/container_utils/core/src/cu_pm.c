@@ -108,7 +108,7 @@ ar_result_t cu_vote_latency(cu_base_t *me_ptr, bool_t is_release, bool_t is_real
       return AR_EOK;
    }
 
-   if (me_ptr->voice_info_ptr)
+   if ((me_ptr->voice_info_ptr) && (FALSE == me_ptr->voice_info_ptr->is_satellite_voice_sid))
    {
       return AR_EOK;
    }
@@ -141,10 +141,15 @@ ar_result_t cu_vote_latency(cu_base_t *me_ptr, bool_t is_release, bool_t is_real
       // Example: For 1 ms frame_len_us latency votes for RT/NRT are 30us and 700us respectively
       new_vote = (tolerance_factor * me_ptr->cntr_proc_duration) / 100;
 
-      // floor min latency to 40ms
-      if (new_vote < LATENCY_VOTE_MIN)
+      // for sub millisecond frame durations (like 83us) the sleep latency tolerance is very low, hence voting 10us if
+      // frame duration is less than 500us to prevent DSP entry into any sleep mode.
+      if (me_ptr->cntr_proc_duration <= 500)
       {
-         new_vote = LATENCY_VOTE_MIN; // Hack to make latency vote 40us
+         new_vote = LATENCY_VOTE_MIN; // voting 10us to prevent entering all sleep modes.
+      }
+      else if (new_vote < LATENCY_VOTE_LOW)  // floor min latency to 40us if proc duration is > 500us
+      {
+         new_vote = LATENCY_VOTE_LOW; // Hack to make latency vote 40us
       }
       CU_MSG(me_ptr->gu_ptr->log_id,
              DBG_HIGH_PRIO,
@@ -221,7 +226,7 @@ ar_result_t cu_handle_clk_vote_change(cu_base_t *       me_ptr,
    ar_result_t result = AR_EOK;
 
    bool_t is_voice_scenario = (NULL != me_ptr->voice_info_ptr);
-   bool_t is_release        = (CU_PM_REQ_KPPS_BW != vote_type);
+   bool_t is_release = (CU_PM_REQ_KPPS_BW != vote_type);
 
    /* Multiply the scale factor and pCPP to the current KPPS value and vote with new floor clock.
    This scale factor is set when an event is raised by the encoder if it needs to process data
@@ -389,8 +394,8 @@ ar_result_t cu_register_with_pm(cu_base_t *me_ptr, bool_t is_duty_cycling_allowe
 
    CU_MSG(me_ptr->gu_ptr->log_id,
           DBG_HIGH_PRIO,
-          " Duty cycling enabled is : %d (0-FALSE, 1-TRUE)",
-          (int)is_duty_cycling_allowed);
+          "Duty cycling enabled is : %d (0-FALSE, 1-TRUE), container IID:0x%x", 
+          (int)is_duty_cycling_allowed, me_ptr->gu_ptr->container_instance_id);
 
    /* *
     * pm_already_registered 	is_duty_cycling_allowed		PM_MODE 		Outcome
@@ -427,7 +432,7 @@ ar_result_t cu_register_with_pm(cu_base_t *me_ptr, bool_t is_duty_cycling_allowe
    return posal_power_mgr_register(me_ptr->pm_info.register_info,
                                    &me_ptr->pm_info.pm_handle_ptr,
                                    me_ptr->gp_signal_ptr,
-                                   me_ptr->gu_ptr->log_id);
+                                   me_ptr->gu_ptr->container_instance_id);
 }
 
 ar_result_t cu_deregister_with_pm(cu_base_t *me_ptr)

@@ -17,7 +17,7 @@ Static Function Definitions
 ========================================================================== */
 
 /* Function to handle the Satellite Graph Open command
- * - Analyze the GK MSG open payload to determine the size of OPEN payload
+ * - Analyze the SPF MSG open payload to determine the size of OPEN payload
  * - and then create the OPEN payload.
  * - Send the Payload to the satellite processor.
  */
@@ -431,6 +431,8 @@ ar_result_t sgm_handle_persistent_cfg(spgm_info_t *                     spgm_ptr
       return result;
    }
    cmd_header_ptr = (apm_cmd_header_t *)spgm_ptr->active_cmd_hndl_ptr->cmd_payload_ptr;
+   spgm_ptr->active_cmd_hndl_ptr->multi_max_resp_cnt = 1;
+   spgm_ptr->active_cmd_hndl_ptr->multi_rsp_cnt = 0;
 
    result = posal_memorymap_get_shmm_handle_and_offset_from_va_offset_map(apm_get_mem_map_client(),
                                                                           (uint32_t)param_data_ptr,
@@ -458,6 +460,105 @@ ar_result_t sgm_handle_persistent_cfg(spgm_info_t *                     spgm_ptr
    {
       sgm_cmd_handling_bail_out(spgm_ptr);
       return result;
+   }
+
+   // Command post-processing
+   spgm_ptr->active_cmd_hndl_ptr->cmd_extn_info.extn_payload_ptr = (void *)cmd_extn_ptr;
+   spgm_ptr->active_cmd_hndl_ptr->is_apm_cmd_rsp                 = TRUE;
+   sgm_cmd_postprocessing(spgm_ptr);
+
+   CATCH(result, OLC_MSG_PREFIX, log_id)
+   {
+   }
+
+   return result;
+}
+
+/* Function to handle the Persistent Calibration command sent to module
+ * - Payload is sent by the client to APM  and APM sends to the Module (i.e., container)
+ */
+ar_result_t sgm_handle_persistent_cfg_v2(spgm_info_t *                     spgm_ptr,
+                                         void **                           param_data_pptr,
+                                         uint32_t                          num_config,
+                                         uint32_t                          payload_size,
+                                         bool_t                            is_inband,
+                                         bool_t                            is_deregister,
+                                         spgm_set_get_cfg_cmd_extn_info_t *cmd_extn_ptr)
+{
+   ar_result_t              result                = AR_EOK;
+   apm_cmd_header_t *       cmd_header_ptr        = NULL;
+   uint32_t                 master_handle         = 0;
+   uint32_t                 offset                = 0;
+   uint32_t                 opcode                = is_deregister ? APM_CMD_DEREGISTER_CFG : APM_CMD_REGISTER_CFG;
+   uint32_t                 log_id                = 0;
+   void *                   param_data_ptr        = NULL;
+   apm_module_param_data_t *module_param_data_ptr = NULL;
+
+   INIT_EXCEPTION_HANDLING
+
+   VERIFY(result, (NULL != spgm_ptr));
+   log_id = spgm_ptr->sgm_id.log_id;
+   VERIFY(result, (NULL != param_data_pptr));
+
+   // Command pre-processing
+   TRY(result, sgm_cmd_preprocessing(spgm_ptr, opcode, is_inband));
+
+   // allocates APM header size payload to send as gpr pkt
+   if (AR_EOK != (result = sgm_alloc_cmd_hndl_resources(spgm_ptr, payload_size, is_inband, TRUE /*is_persistent*/)))
+   {
+      // Failed to create the payload. Handling bailout
+      sgm_cmd_handling_bail_out(spgm_ptr);
+      return result;
+   }
+   cmd_header_ptr = (apm_cmd_header_t *)spgm_ptr->active_cmd_hndl_ptr->cmd_payload_ptr;
+   uint32_t token = posal_atomic_increment(spgm_ptr->token_instance);
+   spgm_ptr->active_cmd_hndl_ptr->multi_max_resp_cnt = num_config;
+   spgm_ptr->active_cmd_hndl_ptr->multi_rsp_cnt = 0;
+
+   uint32_t cmd_cnt = 0;
+   for (cmd_cnt = 0; cmd_cnt < num_config; cmd_cnt++)
+   {
+      param_data_ptr = param_data_pptr[cmd_cnt];
+
+      result = posal_memorymap_get_shmm_handle_and_offset_from_va_offset_map(apm_get_mem_map_client(),
+                                                                             (uint32_t)param_data_ptr,
+                                                                             &master_handle,
+                                                                             &offset);
+      if (AR_EOK != result)
+      {
+         break;
+      }
+
+      cmd_header_ptr->mem_map_handle = apm_offload_get_persistent_sat_handle(spgm_ptr->sgm_id.sat_pd, master_handle);
+
+      if (APM_OFFLOAD_INVALID_VAL == cmd_header_ptr->mem_map_handle)
+      {
+         break;
+      }
+
+      module_param_data_ptr = (apm_module_param_data_t *)param_data_ptr;
+
+      cmd_header_ptr->payload_address_lsw = offset;
+      cmd_header_ptr->payload_address_msw = 0; // offset mode
+      cmd_header_ptr->payload_size        = sizeof(apm_module_param_data_t) + module_param_data_ptr->param_size;
+
+      /* Send the graph management command payload to the satellite process domain */
+      if (AR_EOK != (result = sgm_ipc_send_command_to_dst_with_token(spgm_ptr,
+                                                                     sgm_get_dst_port_id(spgm_ptr),
+                                                                     token))) // send to sat APM
+      {
+         break;
+      }
+   }
+
+   if ((AR_EOK != (result)) && (0 == cmd_cnt)) // send to sat APM
+   {
+      sgm_cmd_handling_bail_out(spgm_ptr);
+      return result;
+   }
+   else if (AR_EOK != (result))
+   {
+      spgm_ptr->active_cmd_hndl_ptr->multi_max_resp_cnt -= (num_config - cmd_cnt);
    }
 
    // Command post-processing
@@ -599,7 +700,7 @@ ar_result_t sgm_handle_register_module_events(spgm_info_t *spgm_ptr,
       return AR_ENOMEMORY;
    }
 
-   token_to_send = posal_atomic_increment(spgm_ptr->token_instance);
+   sgm_get_unique_token(spgm_ptr, &token_to_send);
 
    // populate the event list node
    event_node_ptr->module_iid          = miid;

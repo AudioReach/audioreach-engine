@@ -3,7 +3,7 @@
  * \brief
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -45,10 +45,28 @@ PT_CNTR_STATIC void pt_cntr_propagate_ext_output_buffer_backwards(pt_cntr_t     
                                                                   capi_stream_data_v2_t *sdata_ptr,
                                                                   uint32_t               num_bufs_to_update);
 
+static inline uint32_t __pt_cntr_module_flags_has_attached_module_bitmask()
+{
+   pt_cntr_module_flags_t temp_flag;
+   temp_flag.word                       = 0xFFFFFFFF;
+   temp_flag.has_attached_module = 0;
+   return (~temp_flag.word);
+}
+#define  PT_CNTR_MODULE_FLAGS_HAS_ATTACHED_MODULE_BIT_MASK       (__pt_cntr_module_flags_has_attached_module_bitmask())
+
+static inline uint32_t __pt_cntr_module_flags_has_stopped_port_bitmask()
+{
+   pt_cntr_module_flags_t temp_flag;
+   temp_flag.word                       = 0xFFFFFFFF;
+   temp_flag.has_stopped_port = 0;
+   return (~temp_flag.word);
+}
+#define  PT_CNTR_MODULE_FLAGS_HAS_STOPPED_PORT_BIT_MASK       (__pt_cntr_module_flags_has_stopped_port_bitmask())
+
 static inline bool_t pt_cntr_check_if_output_needs_post_process(pt_cntr_module_t *module_ptr)
 {
-   // todo: optimize the check with preprocess offset macros
-   return module_ptr->flags.has_attached_module || module_ptr->flags.has_stopped_port;
+   return module_ptr->flags.word &
+          (PT_CNTR_MODULE_FLAGS_HAS_ATTACHED_MODULE_BIT_MASK | PT_CNTR_MODULE_FLAGS_HAS_STOPPED_PORT_BIT_MASK);
 }
 
 void pt_cntr_propagate_ext_output_buffer_backwards_non_static(pt_cntr_t             *me_ptr,
@@ -2234,7 +2252,22 @@ ar_result_t pt_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_index
    if (me_ptr->gc.st_module.raised_interrupt_counter > me_ptr->gc.st_module.processed_interrupt_counter)
    {
       // todo: check if anything needs to be done on signal miss ?
-      GEN_CNTR_MSG(me_ptr->gc.topo.gu.log_id, DBG_ERROR_PRIO, "pt_cntr_signal_trigger: Signal Miss");
+      GEN_CNTR_MSG(me_ptr->gc.topo.gu.log_id,
+                   DBG_ERROR_PRIO,
+                   "pt_cntr_signal_trigger: Signal Miss num misses: (Handled IRQs - Unhandled IRQs) %lu - %lu = %lu missed IRQs",
+                   me_ptr->gc.st_module.raised_interrupt_counter,
+                   me_ptr->gc.st_module.processed_interrupt_counter,
+                   me_ptr->gc.st_module.raised_interrupt_counter - me_ptr->gc.st_module.processed_interrupt_counter);
+
+      // signal miss cannot be handled in island, even if signal miss is to be ignored, we will exit island. This
+      // reduces island footprint.
+      // gen_topo_exit_island_temporarily(&me_ptr->gc.topo);
+      // bool_t continue_processing = TRUE;
+      // gen_cntr_check_handle_signal_miss(&me_ptr->gc, FALSE /*is_after_process*/, &continue_processing);
+      // if (!continue_processing)
+      // {
+      //    return result;
+      // }
    }
 
    /*clear the trigger signal */
@@ -2261,6 +2294,12 @@ ar_result_t pt_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_index
     *
     */
 
+   // clear the HW timestamp from the earlier interrupt context
+   if (me_ptr->gc.st_module.st_module_ts_ptr)
+   {
+      me_ptr->gc.st_module.st_module_ts_ptr->is_valid = FALSE;
+   }
+
 #ifdef VERBOSE_DEBUGGING
    int64_t diff = posal_timer_get_time() - proc_ts_before;
    GEN_CNTR_MSG(me_ptr->gc.topo.gu.log_id,
@@ -2279,7 +2318,7 @@ capi_err_t pt_cntr_bypass_module_process(capi_t *_pif, capi_stream_data_t *input
    uint32_t ip_idx = 0;
    uint32_t op_idx = 0;
 
-#ifdef VERBOSE_LOGGING
+#ifdef VERBOSE_DEBUGGING
    if (inputs[ip_idx]->bufs_num != outputs[op_idx]->bufs_num)
    {
       GEN_CNTR_MSG(0,

@@ -728,7 +728,7 @@ static void capi_rat_process_metadata(capi_rat_t *        me_ptr,
 
          // Flushing eos is converted to non flushing
          // DFG is dropped at the input
-         if (in_stream_ptr->flags.marker_eos)
+         if (in_stream_ptr->flags.end_of_frame)
          {
             // go through each MD and mark as non-flushing
             module_cmn_md_list_t *node_ptr = in_stream_ptr->metadata_list_ptr;
@@ -781,14 +781,11 @@ static void capi_rat_process_metadata(capi_rat_t *        me_ptr,
                }
                else if (MODULE_CMN_MD_ID_DFG == md_ptr->metadata_id)
                {
-                  if (node_ptr == in_stream_ptr->metadata_list_ptr)
-                  {
-                     in_stream_ptr->metadata_list_ptr = next_ptr;
-                  }
+
                   me_ptr->metadata_handler.metadata_destroy(me_ptr->metadata_handler.context_ptr,
                                                             node_ptr,
                                                             TRUE /* is dropped*/,
-                                                            &out_stream_ptr->metadata_list_ptr);
+                                                            &in_stream_ptr->metadata_list_ptr);
                }
                node_ptr = next_ptr;
             }

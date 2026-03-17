@@ -37,6 +37,12 @@ extern "C" {
 
 #define MAX_EVENT_CLIENTS 4
 
+/* debug message */
+#define MIID_UNKNOWN 0
+#define PULL_PUSH_MSG_PREFIX "CAPI PM:[%lX] "
+#define PULL_PUSH_MSG(ID, xx_ss_mask, xx_fmt, ...)\
+         AR_MSG(xx_ss_mask, PULL_PUSH_MSG_PREFIX xx_fmt, ID, ##__VA_ARGS__)
+
 /*------------------------------------------------------------------------
  * Structure definitions
  * ----------------------------------------------------------------------*/

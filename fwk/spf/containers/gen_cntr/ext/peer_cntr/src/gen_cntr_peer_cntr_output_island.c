@@ -4,7 +4,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -23,6 +23,7 @@ const gen_cntr_ext_out_vtable_t peer_cntr_ext_out_vtable = {
    .recreate_out_buf = gen_cntr_recreate_out_buf_peer_cntr,
    .prop_media_fmt   = gen_cntr_create_send_media_fmt_to_peer_cntr,
    .write_metadata   = NULL,
+   .setup_topo_buf   = gen_cntr_peer_output_setup_topo_buffer,
 };
 
 ar_result_t gen_cntr_init_peer_cntr_ext_out_port(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr)
@@ -184,12 +185,6 @@ ar_result_t gen_cntr_init_after_popping_peer_cntr_out_buf(gen_cntr_t *me_ptr, ge
          ext_out_port_ptr->num_frames_in_buf = 0;
 
          out_buf_ptr->actual_size = 0;
-
-         // For memory optimization, reuse the peer svc ext output buffer for the internal output port buffer only if,
-         //       1. Output port doesn't have the buffer already && only if the downstream is a peer service container.
-         // for RD EP case, ext-buf is not used for topo processing.
-         gen_cntr_assign_v1_ext_out_buf_to_int_buf(ext_out_port_ptr,
-                                                   (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr);
       }
       else
       {
@@ -210,12 +205,6 @@ ar_result_t gen_cntr_init_after_popping_peer_cntr_out_buf(gen_cntr_t *me_ptr, ge
          }
 
          ext_out_port_ptr->num_frames_in_buf = 0;
-
-         // For memory optimization, reuse the peer svc ext output buffer for the internal output port buffer only if,
-         //       1. Output port doesn't have the buffer already && only if the downstream is a peer service container.
-         // for RD EP case, ext-buf is not used for topo processing.
-         gen_cntr_assign_v2_ext_out_buf_to_int_buf(ext_out_port_ptr,
-                                                   (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr);
       }
    }
 
@@ -271,16 +260,17 @@ static ar_result_t gen_cntr_populate_peer_cntr_out_buf(gen_cntr_t *             
 {
    ar_result_t result = AR_EOK;
 
-   int64_t *              outbuf_timestamp_ptr = NULL;
-   uint32_t *             outbuf_flag_ptr;
+   int64_t               *outbuf_timestamp_ptr = NULL;
+   uint32_t              *outbuf_flag_ptr;
    module_cmn_md_list_t **outbuf_md_list_pptr;
 
-   spf_msg_header_t *header = (spf_msg_header_t *)(ext_out_port_ptr->cu.out_bufmgr_node.buf_ptr);
-   header->rsp_result       = 0;
+   spf_msg_header_t      *header      = (spf_msg_header_t *)(ext_out_port_ptr->cu.out_bufmgr_node.buf_ptr);
+   spf_msg_data_buffer_t *out_buf_ptr = (spf_msg_data_buffer_t *)&header->payload_start;
+
+   header->rsp_result = 0;
 
    if (!gen_cntr_is_ext_out_v2(ext_out_port_ptr))
    {
-      spf_msg_data_buffer_t *out_buf_ptr = (spf_msg_data_buffer_t *)&header->payload_start;
 
       out_buf_ptr->actual_size = ext_out_port_ptr->buf.actual_data_len;
       out_buf_ptr->max_size    = ext_out_port_ptr->cu.buf_max_size;
@@ -292,7 +282,7 @@ static ar_result_t gen_cntr_populate_peer_cntr_out_buf(gen_cntr_t *             
    else
    {
       spf_msg_data_buffer_v2_t *out_buf_ptr  = (spf_msg_data_buffer_v2_t *)&header->payload_start;
-      spf_msg_single_buf_v2_t * data_buf_ptr = (spf_msg_single_buf_v2_t *)(out_buf_ptr + 1);
+      spf_msg_single_buf_v2_t  *data_buf_ptr = (spf_msg_single_buf_v2_t *)(out_buf_ptr + 1);
 
       for (uint32_t b = 0; b < out_buf_ptr->bufs_num; b++)
       {
@@ -327,18 +317,21 @@ static ar_result_t gen_cntr_populate_peer_cntr_out_buf(gen_cntr_t *             
    }
 
    // Populate the timestamp
-   cu_set_bits(outbuf_flag_ptr,
-               ts.valid,
-               DATA_BUFFER_FLAG_TIMESTAMP_VALID_MASK,
-               DATA_BUFFER_FLAG_TIMESTAMP_VALID_SHIFT);
+   if (ts.valid)
+   {
+      cu_set_bits(&out_buf_ptr->flags,
+                  ts.valid,
+                  DATA_BUFFER_FLAG_TIMESTAMP_VALID_MASK,
+                  DATA_BUFFER_FLAG_TIMESTAMP_VALID_SHIFT);
 
-   // Populate the timestamp continue
-   cu_set_bits(outbuf_flag_ptr,
-               ts.ts_continue,
-               DATA_BUFFER_FLAG_TIMESTAMP_CONTINUE_MASK,
-               DATA_BUFFER_FLAG_TIMESTAMP_CONTINUE_SHIFT);
+      // Populate the timestamp continue
+      cu_set_bits(&out_buf_ptr->flags,
+                  ts.ts_continue,
+                  DATA_BUFFER_FLAG_TIMESTAMP_CONTINUE_MASK,
+                  DATA_BUFFER_FLAG_TIMESTAMP_CONTINUE_SHIFT);
 
-   *outbuf_timestamp_ptr = ts.value;
+      out_buf_ptr->timestamp = ts.value;
+   }
 
    if (NULL != ext_out_port_ptr->md_list_ptr)
    {
@@ -406,10 +399,11 @@ ar_result_t gen_cntr_return_back_out_buf(gen_cntr_t *me_ptr, gen_cntr_ext_out_po
                       out_port_ptr->common.bufs_ptr[0].data_ptr,
                       out_port_ptr->common.bufs_ptr[0].actual_data_len);
       }
-      out_port_ptr->common.bufs_ptr[0].data_ptr     = NULL;
-      out_port_ptr->common.bufs_ptr[0].max_data_len = 0;
-      out_port_ptr->common.flags.buf_origin         = GEN_TOPO_BUF_ORIGIN_INVALID;
-      gen_topo_set_all_bufs_len_to_zero(&out_port_ptr->common);
+
+      // usually ext buffer gets cleared during the post process. but if the mf was raised, post process will not be
+      // called, and old buffer needs to be released here. Also if internal ports in nblc are borrowing ext buffer free
+      // it here.
+      gen_cntr_clear_borrowed_ext_out_buffer_from_int_ports(me_ptr, ext_port_ptr, out_port_ptr);
    }
 
    spf_msg_header_t *header = (spf_msg_header_t *)(ext_port_ptr->cu.out_bufmgr_node.buf_ptr);
@@ -544,7 +538,7 @@ static ar_result_t gen_cntr_send_peer_cntr_out_buffers(gen_cntr_t *             
       spf_msg_header_t *     header      = (spf_msg_header_t *)(ext_out_port_ptr->cu.out_bufmgr_node.buf_ptr);
       spf_msg_data_buffer_t *out_buf_ptr = (spf_msg_data_buffer_t *)&header->payload_start;
       topo_port_state_t      ds_downgraded_state =
-         cu_get_external_output_ds_downgraded_port_state(&me_ptr->cu, &ext_out_port_ptr->gu);
+         cu_get_external_output_ds_downgraded_port_state(&ext_out_port_ptr->cu);
 
       // can happen during overrun in GEN_CNTR or if we force process at DFG or if any downstream is stopped.
       if ((NULL == header) || (TOPO_PORT_STATE_STARTED != ds_downgraded_state))
@@ -616,29 +610,8 @@ static ar_result_t gen_cntr_send_peer_cntr_out_buffers(gen_cntr_t *             
          }
       }
 
-      if (!ext_out_port_ptr->cu.icb_info.is_prebuffer_sent)
-      {
-         // Exit and handle prebuffers only if port has requirement
-         if (cu_check_if_port_requires_prebuffers(&ext_out_port_ptr->cu))
-         {
-            gen_topo_exit_island_temporarily(&me_ptr->topo);
-            cu_handle_prebuffer(&me_ptr->cu,
-                                &ext_out_port_ptr->gu,
-                                out_buf_ptr,
-                                ext_out_port_ptr->cu.buf_max_size -
-                                   (ext_out_port_ptr->cu.media_fmt.pcm.num_channels * gen_topo_compute_if_output_needs_addtional_bytes_for_dm(&(me_ptr->topo),
-                                                                                            (gen_topo_output_port_t *)
-                                                                                               ext_out_port_ptr->gu
-                                                                                                  .int_out_port_ptr)));
-         }
-         else
-         {
-            // if port didnt have prebuf requirement at data flow start, then we can mark sent= TRUE,
-            // If prebuf requriement changes after data flow start, no need to insert prebuffer since its going cause
-            // a glitch, if we need to handle scenario there we need to consider if media format changed
-            ext_out_port_ptr->cu.icb_info.is_prebuffer_sent = TRUE;
-         }
-      }
+      // send if the prebuffer is not yet been sent
+      gen_cntr_check_and_send_prebuffers(me_ptr, ext_out_port_ptr, out_buf_ptr);
 
       result = gen_cntr_send_data_to_downstream_peer_cntr(me_ptr, ext_out_port_ptr, header);
    }
@@ -684,7 +657,7 @@ static ar_result_t gen_cntr_send_peer_cntr_out_buffers(gen_cntr_t *             
       GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                           DBG_HIGH_PRIO,
                           "Output of miid 0x%lx defer_voting_on_dfs_change:%lu",
-                          out_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                          ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->module_instance_id,
                           me_ptr->topo.flags.defer_voting_on_dfs_change);
    }
 
@@ -820,6 +793,30 @@ static ar_result_t gen_cntr_check_realloc_ext_buffer(gen_cntr_t *me_ptr, gen_cnt
             GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, " Buffer recreate failed %d", result);
          }
       }
+   }
+
+   return result;
+}
+
+ar_result_t gen_cntr_peer_output_setup_topo_buffer(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr)
+{
+   ar_result_t             result       = AR_EOK;
+   gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
+
+   if ((NULL == ext_out_port_ptr->buf.data_ptr) || (NULL != out_port_ptr->common.bufs_ptr[0].data_ptr))
+   {
+      // In case of signal triggered containers, if ext buffer is not available, topo buffer will be assigned to
+      // internal output during process
+      return result;
+   }
+
+   if (!gen_cntr_is_ext_out_v2(ext_out_port_ptr))
+   {
+      gen_cntr_assign_v1_ext_out_buf_to_int_buf(ext_out_port_ptr, out_port_ptr);
+   }
+   else
+   {
+      gen_cntr_assign_v2_ext_out_buf_to_int_buf(ext_out_port_ptr, out_port_ptr);
    }
 
    return result;

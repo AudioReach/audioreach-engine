@@ -38,30 +38,14 @@ static ar_result_t audio_dam_stream_get_cur_wr_position(audio_dam_stream_reader_
 }
 
 static ar_result_t audio_dam_stream_read_check_virt_buf_overrun(audio_dam_stream_reader_t *reader_handle,
+                                                                virt_wr_position_info_t    wr_pos,
                                                                 uint32_t                  *bytes_to_read_per_ch_ptr,
-                                                                uint32_t                  *data_to_read_in_us_ptr)
+                                                                uint32_t                  *data_to_read_in_us_ptr,
+                                                                int64_t                   *unread_len_in_us_ptr)
 {
    ar_result_t                                 result              = AR_EOK;
    audio_dam_stream_reader_virtual_buf_info_t *virt_buf_ptr        = reader_handle->virt_buf_ptr;
    uint32_t                                    circ_buf_size_in_us = virt_buf_ptr->cfg_ptr->circular_buffer_size_in_us;
-
-   // get th current wr pointer addr, TS
-   virt_wr_position_info_t wr_pos;
-   if (AR_FAILED(result = audio_dam_stream_get_cur_wr_position(virt_buf_ptr, &wr_pos)))
-   {
-      AR_MSG_ISLAND(DBG_HIGH_PRIO,
-                    "DAM_DRIVER: Virt buf reader check overrun, Failed to get the writer position result 0x%lx");
-      return AR_EFAILED;
-   }
-
-#ifdef DEBUG_AUDIO_DAM_DRIVER
-   AR_MSG_ISLAND(DBG_HIGH_PRIO,
-                 "virt_buf_read: CUR WRITE position addr:0x%lx, ts:(valid: %lu, msw 0x%lx, lsw 0x%lx)",
-                 wr_pos.latest_write_addr,
-                 wr_pos.is_ts_valid,
-                 (uint32_t)(wr_pos.latest_write_sample_ts >> 32),
-                 (uint32_t)wr_pos.latest_write_sample_ts);
-#endif
 
    /** if writer position timestmap is invalid it means that writer is not ready/reset/not started writing any data,
     * hence defer reading data until writer is updated. */
@@ -81,23 +65,51 @@ static ar_result_t audio_dam_stream_read_check_virt_buf_overrun(audio_dam_stream
       /** reader cannot have a valid TS without writers timestamp*/
       virt_buf_ptr->is_reader_ts_valid = FALSE;
       virt_buf_ptr->reader_ts          = 0;
+      *unread_len_in_us_ptr            = 0;
       return AR_ENEEDMORE;
    }
+
+   int32_t dist_btwn_in_bytes = wr_pos.latest_write_addr - (uint32_t)virt_buf_ptr->read_ptr;
+   if (dist_btwn_in_bytes < 0)
+   {
+      dist_btwn_in_bytes += virt_buf_ptr->cfg_ptr->circular_buffer_size_in_bytes;
+   }
+   else if (dist_btwn_in_bytes == 0)
+   {
+      // pick timestamps only if is_reader_ts_valid is valid
+      if (virt_buf_ptr->is_reader_ts_valid)
+      {
+         // reader and writer pointer as same place. two conditions possible here
+         // either buffer can be empty or full. identify by using timestamps which condition it is.
+
+         if (wr_pos.latest_write_sample_ts > virt_buf_ptr->reader_ts)
+         {
+            // circular buffer full condition
+            dist_btwn_in_bytes = virt_buf_ptr->cfg_ptr->circular_buffer_size_in_bytes;
+         }
+         else
+         {
+            // circular buff empty condition
+         }
+      }
+   }
+   uint32_t dist_btwn_in_bytes_per_ch = 0x0;
+   if (dist_btwn_in_bytes > 0)
+   {
+      dist_btwn_in_bytes_per_ch = dist_btwn_in_bytes / virt_buf_ptr->cfg_ptr->num_channels;
+   }
+   else
+   {
+      // first pass. dist_btwn_in_bytes_per_ch to be 0x0
+   }
+
+   // convert to us
+   uint32_t dist_btwn_in_us =
+      audio_dam_compute_buffer_size_in_us(reader_handle->driver_ptr, dist_btwn_in_bytes_per_ch, FALSE);
 
    // set reader ts based on the new writer timestamp.
    if (!virt_buf_ptr->is_reader_ts_valid)
    {
-      int32_t dist_btwn_in_bytes = wr_pos.latest_write_addr - (uint32_t)virt_buf_ptr->read_ptr;
-      if (dist_btwn_in_bytes < 0)
-      {
-         dist_btwn_in_bytes += virt_buf_ptr->cfg_ptr->circular_buffer_size_in_bytes;
-      }
-      uint32_t dist_btwn_in_bytes_per_ch = dist_btwn_in_bytes / virt_buf_ptr->cfg_ptr->num_channels;
-
-      // convert to us
-      uint32_t dist_btwn_in_us =
-         audio_dam_compute_buffer_size_in_us(reader_handle->driver_ptr, dist_btwn_in_bytes_per_ch, FALSE);
-
       virt_buf_ptr->is_reader_ts_valid = TRUE;
       virt_buf_ptr->reader_ts          = wr_pos.latest_write_sample_ts - dist_btwn_in_us;
 
@@ -113,8 +125,21 @@ static ar_result_t audio_dam_stream_read_check_virt_buf_overrun(audio_dam_stream
    }
 
    /** calculate read offset relative to the writers timestamp, and check if overflow happened based on the offset*/
-   int64_t unread_len_in_us =
-      ROUND_OFF_TIMESTAMP_TO_MS_BOUNDARY(wr_pos.latest_write_sample_ts - virt_buf_ptr->reader_ts);
+   *unread_len_in_us_ptr = ROUND_OFF_TIMESTAMP_TO_MS_BOUNDARY(wr_pos.latest_write_sample_ts - virt_buf_ptr->reader_ts);
+
+   if ((*unread_len_in_us_ptr) != dist_btwn_in_us)
+   {
+      AR_MSG_ISLAND(DBG_ERROR_PRIO,
+                    "virt_buf_read: Mis-match in unread_len_in_us_ptr (msw 0x%lx, lsw 0x%lx) Vs dist_btwn_in_us: "
+                    "(%luus), "
+                    "updating with unread_len_in_us_ptr with Min of two values",
+                    (uint32_t)(*unread_len_in_us_ptr >> 32),
+                    (uint32_t)*unread_len_in_us_ptr,
+                    (uint32_t)dist_btwn_in_us);
+
+      // make unread_len_in_us_ptr as min(unread_len_in_us_ptr, dist_btwn_in_us)
+      *unread_len_in_us_ptr = MIN(*unread_len_in_us_ptr, dist_btwn_in_us);
+   }
 
 #ifdef DEBUG_AUDIO_DAM_DRIVER
    AR_MSG_ISLAND(DBG_HIGH_PRIO,
@@ -124,14 +149,14 @@ static ar_result_t audio_dam_stream_read_check_virt_buf_overrun(audio_dam_stream
                  virt_buf_ptr->is_reader_ts_valid,
                  (uint32_t)(virt_buf_ptr->reader_ts >> 32),
                  (uint32_t)virt_buf_ptr->reader_ts,
-                 (uint32_t)(unread_len_in_us >> 32),
-                 (uint32_t)unread_len_in_us);
+                 (uint32_t)(*unread_len_in_us_ptr >> 32),
+                 (uint32_t)*unread_len_in_us_ptr);
 #endif
 
    // good case
-   if (unread_len_in_us >= 0)
+   if (*unread_len_in_us_ptr >= 0)
    {
-      if (unread_len_in_us > circ_buf_size_in_us) // overflow occured
+      if (*unread_len_in_us_ptr > circ_buf_size_in_us) // overflow occured
       {
          /** if overflow occured, adjust read pointer to the oldest sample in the circular buffer i.e offset by the size
           * of the circular buffer*/
@@ -141,19 +166,20 @@ static ar_result_t audio_dam_stream_read_check_virt_buf_overrun(audio_dam_stream
                        virt_buf_ptr->read_ptr,
                        (uint32_t)(virt_buf_ptr->reader_ts >> 32),
                        (uint32_t)virt_buf_ptr->reader_ts,
-                       (uint32_t)(unread_len_in_us >> 32),
-                       (uint32_t)unread_len_in_us);
+                       (uint32_t)(*unread_len_in_us_ptr >> 32),
+                       (uint32_t)*unread_len_in_us_ptr);
 
          /** Reset reader position to the oldest sample in the circular buffer */
          audio_dam_stream_read_adjust_virt_wr_mode(reader_handle, circ_buf_size_in_us, NULL);
+         *unread_len_in_us_ptr = circ_buf_size_in_us;
          return AR_EOK;
       }
-      else if (unread_len_in_us > *data_to_read_in_us_ptr) // full frame available to read
+      else if (*unread_len_in_us_ptr > *data_to_read_in_us_ptr) // full frame available to read
       {
-         /** distance between read and write is greater than required read len*/
+         /** distance between read and write is greater than required read len, nothing to to*/
          return AR_EOK;
       }
-      else if (0 == unread_len_in_us) // no frame available to read
+      else if (0 == *unread_len_in_us_ptr) // no frame available to read
       {
 #ifdef DEBUG_AUDIO_DAM_DRIVER
          AR_MSG_ISLAND(DBG_HIGH_PRIO,
@@ -167,16 +193,16 @@ static ar_result_t audio_dam_stream_read_check_virt_buf_overrun(audio_dam_stream
 #endif
          return AR_ENEEDMORE;
       }
-      else // (read_offset_ts_us < *data_to_read_in_us_ptr) // partial frame available to read
+      else // (*unread_len_in_us_ptr < *data_to_read_in_us_ptr) // partial frame available to read
       {
          // not enough data present to fill the entire output buffer
-         *data_to_read_in_us_ptr = unread_len_in_us;
+         *data_to_read_in_us_ptr = *unread_len_in_us_ptr;
          *bytes_to_read_per_ch_ptr =
-            audio_dam_compute_buffer_size_in_bytes(reader_handle->driver_ptr, unread_len_in_us);
+            audio_dam_compute_buffer_size_in_bytes(reader_handle->driver_ptr, *unread_len_in_us_ptr);
          return AR_EOK;
       }
    }
-   else // read_offset_ts_us < 0
+   else // *unread_len_in_us_ptr < 0
    {
       /** reader TS cannot be greater than writer TS, invalid */
       AR_MSG_ISLAND(DBG_ERROR_PRIO,
@@ -216,31 +242,53 @@ ar_result_t audio_dam_stream_read_from_virtual_buf(audio_dam_stream_reader_t *re
    uint32_t data_to_read_in_us =
       audio_dam_compute_buffer_size_in_us(reader_handle->driver_ptr, bytes_to_read_per_ch, FALSE);
 
-   // scale it to num channels present in the virtual buffer
-   uint32_t bytes_left_to_read_from_virt_buf = bytes_to_read_per_ch * num_src_channels;
-
-#ifdef DEBUG_AUDIO_DAM_DRIVER
-   AR_MSG_ISLAND(DBG_HIGH_PRIO,
-                 "virt_buf_read: bytes_left_to_read_from_virt_buf=%lu bytes_to_read_per_ch=%lu num_src_chs=%lu "
-                 "num_ds_chs=%lu",
-                 bytes_left_to_read_from_virt_buf,
-                 bytes_to_read_per_ch,
-                 num_src_channels,
-                 num_chs_to_read);
-#endif
-
    /** Checks,
     * 1. if read position and data available to read in the circular buffer.
     * 2. If enough data not avaiable, adjust the data to be read.
     * 3. Handle overflow if occured.
     * 4. Checks santiy of the read/write pointers.
     * */
-   if (AR_FAILED(
-          result =
-             audio_dam_stream_read_check_virt_buf_overrun(reader_handle, &bytes_to_read_per_ch, &data_to_read_in_us)))
+   // get th current wr pointer addr, TS
+   virt_wr_position_info_t wr_pos;
+   if (AR_FAILED(result = audio_dam_stream_get_cur_wr_position(virt_buf_ptr, &wr_pos)))
+   {
+      AR_MSG_ISLAND(DBG_HIGH_PRIO,
+                    "DAM_DRIVER: Virt buf reader check overrun, Failed to get the writer position result 0x%lx");
+      return AR_EFAILED;
+   }
+
+#ifdef DEBUG_AUDIO_DAM_DRIVER
+   AR_MSG_ISLAND(DBG_HIGH_PRIO,
+                 "virt_buf_read: CUR WRITE position addr:0x%lx, ts:(valid: %lu, msw 0x%lx, lsw 0x%lx)",
+                 wr_pos.latest_write_addr,
+                 wr_pos.is_ts_valid,
+                 (uint32_t)(wr_pos.latest_write_sample_ts >> 32),
+                 (uint32_t)wr_pos.latest_write_sample_ts);
+#endif
+
+   int64_t unread_len_in_us = 0;
+   if (AR_FAILED(result = audio_dam_stream_read_check_virt_buf_overrun(reader_handle,
+                                                                       wr_pos,
+                                                                       &bytes_to_read_per_ch,
+                                                                       &data_to_read_in_us,
+                                                                       &unread_len_in_us)))
    {
       return result;
    }
+
+   // scale it to num channels present in the virtual buffer
+   uint32_t bytes_left_to_read_from_virt_buf = bytes_to_read_per_ch * num_src_channels;
+
+#ifdef DEBUG_AUDIO_DAM_DRIVER
+   AR_MSG_ISLAND(DBG_HIGH_PRIO,
+                 "virt_buf_read: unread_len_in_us=%lu, bytes_to_read_per_ch=[requested=%lu vs available=%lu] "
+                 "num_src_chs=%lu num_ds_chs=%lu",
+                 (uint32_t)unread_len_in_us,
+                 output_buf_arr[0].max_data_len,
+                 bytes_to_read_per_ch,
+                 num_src_channels,
+                 num_chs_to_read);
+#endif
 
    // This loop makes handles the circular buffer wrap around logic. Ideally virtual circular buffers are sized based on
    // the integral number of frames, if thats not the case - this loop makes sure that the circ buffer is wrapped around
@@ -327,12 +375,10 @@ ar_result_t audio_dam_stream_read_from_virtual_buf(audio_dam_stream_reader_t *re
                                                      bytes_per_sample,
                                                      num_samp_per_ch)))
       {
-//#ifdef DEBUG_AUDIO_DAM_DRIVER
          AR_MSG_ISLAND(DBG_ERROR_PRIO,
                        "Failed to read deintlvd data from virtual buffer actual len%lu, max len %lu",
                        output_buf_arr[0].actual_data_len,
                        output_buf_arr[0].max_data_len);
-//#endif
          return AR_EFAILED;
       }
 
@@ -362,18 +408,24 @@ ar_result_t audio_dam_stream_read_from_virtual_buf(audio_dam_stream_reader_t *re
    // Return if the output TS is valid
    if (output_buf_ts_is_valid)
    {
-      *output_buf_ts_is_valid = virt_buf_ptr->is_reader_ts_valid ? TRUE : FALSE;
+      *output_buf_ts_is_valid = wr_pos.is_ts_valid ? TRUE : FALSE;
    }
 
    // update read TS to the next unread sample
-   if (virt_buf_ptr->is_reader_ts_valid)
+   if (wr_pos.is_ts_valid)
    {
       if (output_buf_ts)
       {
-         *output_buf_ts = virt_buf_ptr->reader_ts;
+         // TS for the buffer generated in this process cycle
+         *output_buf_ts = (wr_pos.latest_write_sample_ts - unread_len_in_us);
       }
 
-      virt_buf_ptr->reader_ts += data_to_read_in_us;
+      // unread buffer len remaining in the circular buffer
+      unread_len_in_us = unread_len_in_us - data_to_read_in_us;
+
+      // TS for the read position relative to the current write position, read ts must be adjusted w.r.t to write Ts
+      // every to avoid any issues due to drift
+      virt_buf_ptr->reader_ts = wr_pos.latest_write_sample_ts - unread_len_in_us;
    }
 
    return result;

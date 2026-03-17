@@ -4,7 +4,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -87,7 +87,9 @@ static const cu_cntr_vtable_t spl_cntr_cntr_funcs = {
    .initiate_duty_cycle_island_entry         = spl_cntr_initiate_duty_cycle_island_entry,
    .initiate_duty_cycle_island_exit          = spl_cntr_initiate_duty_cycle_island_exit,
 
-   .handle_cntr_period_change                = spl_cntr_handle_cntr_period_change
+   .handle_cntr_period_change                = spl_cntr_handle_cntr_period_change,
+   .handle_cntr_set_calibration_ops_done     = spl_cntr_handle_cntr_set_calibration_ops_done,
+   .handle_cntr_set_offload_voice_session_info = spl_cntr_handle_offload_voice_session_info
 
 };
 // clang-format on
@@ -157,8 +159,9 @@ static const topo_to_cntr_vtable_t topo_to_spl_cntr_vtable = {
    .aggregate_ext_in_port_delay                 = spl_cntr_aggregate_ext_in_port_delay_topo_cb,
    .aggregate_ext_out_port_delay                = spl_cntr_aggregate_ext_out_port_delay_topo_cb,
 
-   .notify_ts_disc_evt                          = NULL,
-   .module_buffer_access_event                  = NULL,
+   .notify_ts_disc_evt                             = NULL,
+   .module_buffer_access_event                     = NULL,
+   .check_if_any_ext_in_has_to_preserve_prebuffer  = NULL,
 };
 // clang-format on
 
@@ -280,6 +283,72 @@ ar_result_t spl_cntr_handle_proc_duration_change(cu_base_t *base_ptr)
 
    spl_cntr_handle_fwk_events(me_ptr, FALSE /*is_data_path*/);
 
+   return AR_EOK;
+}
+
+ar_result_t spl_cntr_handle_cntr_set_calibration_ops_done(cu_base_t *base_ptr)
+{
+   spl_cntr_t *me_ptr   = (spl_cntr_t *)base_ptr;
+   capi_err_t  err_code = CAPI_EOK;
+
+   for (gu_sg_list_t *sg_list_ptr = me_ptr->cu.gu_ptr->sg_list_ptr; (NULL != sg_list_ptr); LIST_ADVANCE(sg_list_ptr))
+   {
+      for (gu_module_list_t *module_list_ptr = sg_list_ptr->sg_ptr->module_list_ptr; (NULL != module_list_ptr);
+           LIST_ADVANCE(module_list_ptr))
+      {
+         spl_topo_module_t *module_ptr = (spl_topo_module_t *)module_list_ptr->module_ptr;
+
+         if (FALSE == module_ptr->t_base.flags.supports_calibration_ops_done) /* TODO - supports_calibration_ops should be set to True on querying in gen_topo_capi_query_intf_extn_support()*/
+         {
+            continue;
+         }
+
+         err_code = gen_topo_capi_set_param(me_ptr->topo.t_base.gu.log_id,
+                                            module_ptr->t_base.capi_ptr,
+                                            INTF_EXTN_CALIBRATION_OPS_DONE,
+                                            NULL, 0);
+
+         if ((err_code != AR_EOK) && (err_code != AR_EUNSUPPORTED))
+         {
+
+            SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                         DBG_ERROR_PRIO,
+                         "Module 0x%lX: setting calibration ops done failed",
+                         module_ptr->t_base.gu.module_instance_id);
+            return err_code;
+         }
+         else
+         {
+            SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                         DBG_LOW_PRIO,
+                         "Module 0x%lX: setting calibration ops done success",
+                         module_ptr->t_base.gu.module_instance_id
+                         );
+         }
+      }
+   }
+   return AR_EOK;
+}
+
+ar_result_t spl_cntr_handle_offload_voice_session_info(cu_base_t *base_ptr,  cntr_param_id_offload_voice_session_info_t* voice_session_info_ptr)
+{
+
+   spl_cntr_t *me_ptr   = (spl_cntr_t *)base_ptr;
+
+   for (gu_sg_list_t *sg_list_ptr = me_ptr->cu.gu_ptr->sg_list_ptr; (NULL != sg_list_ptr); LIST_ADVANCE(sg_list_ptr))
+
+   {
+     if(sg_list_ptr->sg_ptr->id == voice_session_info_ptr->sg_id )
+     {
+        sg_list_ptr->sg_ptr->kpps_scale_factor = voice_session_info_ptr->kpps_sf;
+        sg_list_ptr->sg_ptr->bw_scale_factor = voice_session_info_ptr->bw_sf;
+        SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                         DBG_HIGH_PRIO,
+                         "spl_cntr_handle_offload_voice_session_info: SG_ID 0x%lX, KPPS_SF %d, BW_SF %d",
+                            sg_list_ptr->sg_ptr->id, sg_list_ptr->sg_ptr->kpps_scale_factor, sg_list_ptr->sg_ptr->bw_scale_factor);
+     }
+      
+   }
    return AR_EOK;
 }
 

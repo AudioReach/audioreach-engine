@@ -24,6 +24,45 @@ Static Function Definitions
  * The function would parse the media format in GK format and convert
  * into standard media format that in compliance with the client format
  */
+
+/**
+ * @brief
+ * Handles and translates the input media format for a specified port
+ * in the satellite graph.
+ *
+ * This function is responsible for interpreting the media format received
+ * from the client (in GK format), validating it, and converting it into a
+ * standard format that complies with the expectations of the satellite
+ * graph modules. It supports multiple data formats including PCM (fixed
+ * and floating point) and raw compressed formats. The function allocates
+ * memory for the translated format, populates the appropriate payload
+ * structures, and prepares the data for transmission to the write endpoint
+ * (WR EP) module.
+ *
+ * Depending on whether the format is being applied to the data path or
+ * control path, it constructs the appropriate GPR packet and updates the
+ * active data handler accordingly. It also ensures that the IPC buffer
+ * is allocated for subsequent data transmission.
+ *
+ * Preventive checks are performed to ensure all pointers and parameters
+ * are valid. Memory allocation failures and unsupported formats are
+ * gracefully handled with appropriate error logging.
+ *
+ * @param[in] spgm_ptr         Pointer to the SPGM (Satellite Graph Manager)
+ *                             information structure.
+ * @param[in] media_format_ptr Pointer to the input media format structure
+ *                             received from the client.
+ * @param[in] port_index       Index of the port for which the media format
+ *                             is being updated.
+ * @param[in] is_data_path     Boolean flag indicating whether the update
+ *                             applies to the data path (true) or control
+ *                             path (false).
+ *
+ * @return
+ * AR_EOK on success, or an appropriate error code on failure such as
+ * AR_ENOMEMORY or AR_EUNSUPPORTED.
+ */
+
 ar_result_t spdm_handle_input_media_format_update(spgm_info_t *spgm_ptr,
                                                   void *       media_format_ptr,
                                                   uint32_t     port_index,
@@ -36,6 +75,7 @@ ar_result_t spdm_handle_input_media_format_update(spgm_info_t *spgm_ptr,
    uint32_t wr_client_port_id = 0;
    uint32_t payload_size      = 0;
    uint32_t buffer_size       = 0;
+   uint32_t token             = 0;
 
    uint8_t *               ctrl_path_mf_payload_ptr = NULL;
    uint8_t *               payload_ptr              = NULL;
@@ -46,8 +86,6 @@ ar_result_t spdm_handle_input_media_format_update(spgm_info_t *spgm_ptr,
    VERIFY(result, (NULL != spgm_ptr));
    log_id = spgm_ptr->sgm_id.log_id;
 
-   OLC_SDM_MSG(OLC_SDM_ID, DBG_HIGH_PRIO, "handle input MF, is_data_path %lu", is_data_path);
-
    VERIFY(result, (NULL != media_format_ptr));
    input_media_fmt_ptr = (spf_msg_media_format_t *)media_format_ptr;
 
@@ -57,6 +95,10 @@ ar_result_t spdm_handle_input_media_format_update(spgm_info_t *spgm_ptr,
    wr_ep_port_id = spgm_ptr->process_info.wdp_obj_ptr[port_index]->port_info.ctrl_cfg.rw_ep_miid;
    // Write Client module IID in OLC associated with this port
    wr_client_port_id = spgm_ptr->process_info.wdp_obj_ptr[port_index]->port_info.ctrl_cfg.rw_client_miid;
+
+   (void)sgm_get_unique_token(spgm_ptr, &token);
+
+   OLC_SDM_MSG(OLC_SDM_ID, DBG_HIGH_PRIO, "handle input MF, is_data_path %lu use_token 0x%lx", is_data_path, token);
 
    // Handling for PCM DATA format
    if (SPF_IS_PCM_DATA_FORMAT(input_media_fmt_ptr->df))
@@ -169,7 +211,7 @@ ar_result_t spdm_handle_input_media_format_update(spgm_info_t *spgm_ptr,
       spgm_ptr->process_info.active_data_hndl.src_port     = wr_client_port_id;
       spgm_ptr->process_info.active_data_hndl.dst_port     = wr_ep_port_id;
       spgm_ptr->process_info.active_data_hndl.opcode       = DATA_CMD_WR_SH_MEM_EP_MEDIA_FORMAT;
-      spgm_ptr->process_info.active_data_hndl.token        = 0;
+      spgm_ptr->process_info.active_data_hndl.token        = token;
    }
    else
    {
@@ -205,7 +247,7 @@ ar_result_t spdm_handle_input_media_format_update(spgm_info_t *spgm_ptr,
       spgm_ptr->process_info.active_data_hndl.src_port     = wr_client_port_id;
       spgm_ptr->process_info.active_data_hndl.dst_port     = wr_ep_port_id;
       spgm_ptr->process_info.active_data_hndl.opcode       = APM_CMD_SET_CFG;
-      spgm_ptr->process_info.active_data_hndl.token        = 0;
+      spgm_ptr->process_info.active_data_hndl.token        = token;
    }
 
    // Send the media format to the corresponding WR EP MIID
@@ -214,11 +256,15 @@ ar_result_t spdm_handle_input_media_format_update(spgm_info_t *spgm_ptr,
    // allocate the IPC shared buffer memory
    TRY(result, spdm_alloc_ipc_data_buffers(spgm_ptr, buffer_size, port_index, IPC_WRITE_DATA));
 
-   OLC_SDM_MSG(OLC_SDM_ID, DBG_HIGH_PRIO, "handle input MF completed");
+   OLC_SDM_MSG(OLC_SDM_ID,
+               DBG_HIGH_PRIO,
+               "handle input MF completed "
+               "token 0x%lx, payload size %lu",
+               token,
+               payload_size);
 
    CATCH(result, OLC_MSG_PREFIX, log_id)
    {
-      // OLC_CA : Check if the port needs to be disabled, might need to stop the port ( ??)
    }
 
    if (NULL != payload_ptr)
@@ -233,6 +279,30 @@ ar_result_t spdm_handle_input_media_format_update(spgm_info_t *spgm_ptr,
 
    return result;
 }
+
+/**
+ * @brief
+ * Processes incoming media format events from the GPR packet.
+ *
+ * This function handles the media format events received from the GPR packet,
+ * allocates memory for the payload, and invokes the media format event handler.
+ * It updates the read port state and resets the data buffer.
+ *
+ * Preventive checks are performed to ensure all pointers and parameters
+ * are valid. Memory allocation failures are gracefully handled with
+ * appropriate error logging.
+ *
+ * @param[in] spgm_ptr    Pointer to the SPGM (Satellite Graph Manager)
+ *                        information structure.
+ * @param[in] packet_ptr  Pointer to the GPR packet containing the media format event.
+ * @param[in] port_index  Index of the port for which the media format event is being processed.
+ * @param[in] is_data_path Boolean flag indicating whether the event applies to the data path (true) or control path
+ * (false).
+ *
+ * @return
+ * AR_EOK on success, or an appropriate error code on failure such as
+ * AR_ENOMEMORY or AR_EINVALID.
+ */
 
 ar_result_t spdm_process_media_format_event(spgm_info_t * spgm_ptr,
                                             gpr_packet_t *packet_ptr,
@@ -249,7 +319,7 @@ ar_result_t spdm_process_media_format_event(spgm_info_t * spgm_ptr,
    uint8_t *             payload_ptr     = NULL;
    read_data_port_obj_t *rd_port_obj_ptr = NULL;
 
-   OLC_SDM_MSG(OLC_SDM_ID, DBG_HIGH_PRIO, "process MF event");
+   OLC_SDM_MSG(OLC_SDM_ID, DBG_HIGH_PRIO, "process MF event, is_data_path %lu", is_data_path);
 
    log_id          = spgm_ptr->sgm_id.log_id;
    rd_port_obj_ptr = spgm_ptr->process_info.rdp_obj_ptr[port_index];
@@ -259,6 +329,13 @@ ar_result_t spdm_process_media_format_event(spgm_info_t * spgm_ptr,
    VERIFY(result, (0 != payload_size));
    rsp_ptr = (uint8_t *)GPR_PKT_GET_PAYLOAD(void, packet_ptr);
    VERIFY(result, (NULL != rsp_ptr));
+
+   OLC_SDM_MSG(OLC_SDM_ID,
+               DBG_HIGH_PRIO,
+               "process MF event, sent from 0x%lx to 0x%lx, mf_psize %lu ",
+               rd_port_obj_ptr->port_info.ctrl_cfg.rw_ep_miid,
+               rd_port_obj_ptr->port_info.ctrl_cfg.rw_client_miid,
+               payload_size);
 
    payload_ptr = (uint8_t *)posal_memory_malloc(payload_size, spgm_ptr->cu_ptr->heap_id);
    if (NULL != payload_ptr)

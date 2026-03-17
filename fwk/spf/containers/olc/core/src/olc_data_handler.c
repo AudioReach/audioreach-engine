@@ -143,6 +143,22 @@ static ar_result_t olc_input_data_set_up_peer_cntr(olc_t *me_ptr, olc_ext_in_por
 
    olc_process_eos_md_from_peer_cntr(me_ptr, ext_in_port_ptr, &input_buf_ptr->metadata_list_ptr);
 
+   /**
+    * Upstream container can send buffer only with MD and no data. OLC is dropping the MD (TTR)
+    * and effectively seeing there is no data & MD to propagate DS. Return and release such input
+    * buffer.
+    */
+   if ((0 == ext_in_port_ptr->buf.actual_data_len) && (FALSE == ext_in_port_ptr->input_has_md))
+   {
+      OLC_MSG(me_ptr->topo.gu.log_id,
+              DBG_ERROR_PRIO,
+              "Returning an input buffer whose actual size is 0 "
+              "and doesn't contain valid metadata!");
+      result = AR_EUNSUPPORTED;
+      result |= olc_free_input_data_cmd(me_ptr, ext_in_port_ptr, AR_EBADPARAM, FALSE);
+      return result;
+   }
+
    spf_list_merge_lists((spf_list_node_t **)&ext_in_port_ptr->md_list_ptr,
                         (spf_list_node_t **)&input_buf_ptr->metadata_list_ptr);
 
@@ -173,7 +189,7 @@ ar_result_t olc_get_input_data_cmd(olc_t *me_ptr, olc_ext_in_port_t *ext_in_port
       return result;
    }
 
-   //#ifdef VERBOSE_DEBUGGING
+#ifdef VERBOSE_DEBUGGING
    OLC_MSG(me_ptr->topo.gu.log_id,
            DBG_LOW_PRIO,
            "Popped an input msg buffer 0x%lx with opcode 0x%x "
@@ -182,7 +198,7 @@ ar_result_t olc_get_input_data_cmd(olc_t *me_ptr, olc_ext_in_port_t *ext_in_port
            ext_in_port_ptr->gu.int_in_port_ptr->cmn.id,
            ext_in_port_ptr->cu.input_data_q_msg.payload_ptr,
            ext_in_port_ptr->cu.input_data_q_msg.msg_opcode);
-   //#endif
+#endif
 
    return result;
 }
@@ -1188,6 +1204,7 @@ static ar_result_t olc_process_for_peer_cntr_delivery(olc_t *me_ptr, olc_ext_out
                                              out_actual_media_fmt,
                                              TRUE /*with header*/,
                                              me_ptr->cu.heap_id);
+            out_actual_media_fmt->fmt_id = media_ptr->main.fmt_id;
          }
          else
          {

@@ -3,7 +3,7 @@
  * \brief
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -63,6 +63,7 @@ const cu_cntr_vtable_t pt_cntr_cntr_funcs = {
 
    .dcm_topo_set_param 						   = gen_cntr_dcm_topo_set_param,
    .handle_cntr_period_change 				= gen_cntr_handle_cntr_period_change,
+   .handle_cntr_set_calibration_ops_done     = NULL,
 
    .initiate_duty_cycle_island_entry         = gen_cntr_initiate_duty_cycle_island_entry,
    .initiate_duty_cycle_island_exit          = gen_cntr_initiate_duty_cycle_island_exit,
@@ -101,6 +102,8 @@ const topo_to_cntr_vtable_t topo_to_pt_cntr_vtable = {
 
    .notify_ts_disc_evt                          = gen_cntr_notify_timestamp_discontinuity_event_cb,
    .module_buffer_access_event                  = pt_cntr_handle_module_buffer_access_event,
+
+   .check_if_any_ext_in_has_to_preserve_prebuffer = NULL,
 };
 // clang-format on
 
@@ -453,7 +456,7 @@ ar_result_t pt_cntr_validate_topo_at_open(pt_cntr_t *me_ptr)
 
 /** Checks media format and threshold.
       1. Checks if all the modules raised same threshold. If there are multiple threshold modules, returns error.
-      2. TODO: need to check supported media format for each port as well .*/
+      2. Check supported media format for each port as well .*/
 ar_result_t pt_cntr_validate_media_fmt_thresh(pt_cntr_t *me_ptr)
 {
    ar_result_t result = AR_EOK;

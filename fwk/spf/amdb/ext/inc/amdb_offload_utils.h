@@ -17,6 +17,7 @@
  ****************************************************************************/
 #include "spf_cmn_if.h"
 #include "apm_api.h"
+#include "apm_offload_mem.h"
 
 #include "gpr_api_inline.h"
 #include "amdb_thread_i.h"
@@ -30,13 +31,14 @@ extern "C" {
  ****************************************************************************/
 struct amdb_cmd_ctrl_t
 {
-   uint32_t  token;              /**< Token used to identify the command ctrl obj */
-   uint32_t  cmd_opcode;         /**< Command opcode under process */
-   spf_msg_t cmd_msg;            /**< Command payload GK msg */
-   uint32_t  dst_domain_id;      /**< Destination proc domain id */
-   bool_t    is_out_of_band;     /**< Flag to indicate out of band */
-   void *    loaned_mem_ptr;     /**< Loaned mem ptr associated with the cmd payload. NULL if inband. */
-   void *    master_payload_ptr; /**< Loaned mem ptr associated with the cmd payload. NULL if inband. */
+   uint32_t               token;              /**< Token used to identify the command ctrl obj */
+   uint32_t               cmd_opcode;         /**< Command opcode under process */
+   spf_msg_t              cmd_msg;            /**< Command payload GK msg */
+   uint32_t               dst_domain_id;      /**< Destination proc domain id */
+   bool_t                 is_out_of_band;     /**< Flag to indicate out of band */
+   apm_offload_ret_info_t ret_info;           /**< offload shared memory info*/
+   void *                 loaned_mem_ptr;     /**< Loaned mem ptr associated with the cmd payload. NULL if inband. */
+   void *                 master_payload_ptr; /**< Loaned mem ptr associated with the cmd payload. NULL if inband. */
 };
 
 typedef struct amdb_cmd_ctrl_t amdb_cmd_ctrl_t;

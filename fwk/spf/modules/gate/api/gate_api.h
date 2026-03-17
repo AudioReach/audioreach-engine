@@ -47,6 +47,38 @@
 #define DEADLINE_TIME_INFO_IN AR_NON_GUID(0xC0000001)
 
 /*==============================================================================
+   Parameters
+==============================================================================*/
+ 
+/**
+    ID of the deadline offset parameter, used by the Gate Module
+ */
+ 
+#define PARAM_ID_GATE_DEADLINE_OFFSET 0x08001BA9
+/** @h2xmlp_parameter   {"PARAM_ID_GATE_DEADLINE_OFFSET", PARAM_ID_GATE_DEADLINE_OFFSET}
+    @h2xmlp_description {Structure for PARAM_ID_GATE_DEADLINE_OFFSET parameter.
+                         This parameter provides a value which can be used as an offset into the calcualted
+                         deadline time value. Can be used to tune this to align packet delivery to BT controller
+                         as close as posible to the ISO interval time}
+   @h2xmlp_toolPolicy              {Calibration}                         */
+#include "spf_begin_pack.h"
+/** Payload of the PARAM_ID_GATE_DEADLINE_OFFSET parameter.
+ */
+struct param_id_gate_deadline_offset_t
+{
+   int32_t deadline_offset_us;
+   /**< @h2xmle_description   {Deadline offset value in micro seconds.
+    *                          Positive or negative offset}
+         @h2xmle_default      {0}
+         @h2xmle_range        {-10000..10000}*/
+ 
+}
+#include "spf_end_pack.h"
+;
+/* Structure for PARAM_ID_GATE_DEADLINE_OFFSET parameter. */
+typedef struct param_id_gate_deadline_offset_t param_id_gate_deadline_offset_t;
+ 
+/*==============================================================================
    Module
 ==============================================================================*/
 
@@ -78,6 +110,7 @@
                                  - It doesn't modify data in any way.
                                  - Supports following params:\n
                                  -- PARAM_ID_GATE_EP_TRANSMISSION_DELAY\n
+                                 -- PARAM_ID_GATE_DEADLINE_OFFSET\n
                                  - Supported Input Media Format:\n
                                  -- Data Format         : FIXED_POINT\n
                                  -- fmt_id              : Don't care\n
@@ -99,6 +132,8 @@
     @h2xmlm_stackSize           {GATE_STACK_SIZE}
     @h2xmlm_toolPolicy          {Calibration}
     @{                          <-- Start of the Module -->
+    @h2xml_Select               {"param_id_gate_deadline_offset_t"}
+    @h2xmlm_InsertParameter
     @}                          <-- End of the Module -->
 */
 

@@ -19,6 +19,11 @@
 #include "spf_list_utils.h"
 #include "capi_cmn.h"
 
+// Use to override AR_MSG with AR_MSG_ISLAND. Always include this after ar_msg.h
+#ifdef AR_MSG_IN_ISLAND
+#include "ar_msg_island_override.h"
+#endif
+
 /*==============================================================================
    Macros
 ==============================================================================*/

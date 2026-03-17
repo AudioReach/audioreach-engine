@@ -10,8 +10,8 @@
  * they
  *  can be treated the same way by control code.
  *
- * Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #include "capi_types.h"
@@ -19,6 +19,7 @@
 #include "capi_properties.h"
 #include "capi_intf_extn_metadata.h"
 #include "capi_intf_extn_period.h"
+#include "capi_intf_extn_calibration_ops.h"
 
 typedef struct capi_t capi_t;
 

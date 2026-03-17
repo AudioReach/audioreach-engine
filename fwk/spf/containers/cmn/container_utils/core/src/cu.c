@@ -155,12 +155,19 @@ ar_result_t cu_deinit(cu_base_t *me_ptr)
 {
    cu_operate_on_delay_paths(me_ptr, 0, CU_PATH_DELAY_OP_REMOVE);
 
-   /* Release signal bit in mask */
-   cu_release_bit_in_bit_mask(me_ptr, posal_signal_get_channel_bit(me_ptr->gp_signal_ptr));
+   if (NULL != me_ptr->gp_signal_ptr)
+   {
+      /* Release signal bit in mask */
+      cu_release_bit_in_bit_mask(me_ptr, posal_signal_get_channel_bit(me_ptr->gp_signal_ptr));
 
-   /* Destroy general purpose signal */
-   posal_signal_destroy(&me_ptr->gp_signal_ptr);
-   posal_channel_destroy(&me_ptr->gp_channel_ptr);
+      /* Destroy general purpose signal */
+      posal_signal_destroy(&me_ptr->gp_signal_ptr);
+   }
+   if (NULL != me_ptr->gp_channel_ptr)
+   {
+      /* Destroy general purpose signal */
+      posal_channel_destroy(&me_ptr->gp_channel_ptr);
+   }
 
    return AR_EOK;
 }

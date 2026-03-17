@@ -634,6 +634,81 @@ void capi_spr_check_raise_underrun_event(capi_spr_t *me_ptr, underrun_status_t *
 }
 
 /*------------------------------------------------------------------------------
+  Function name: capi_spr_check_raise_session_time_reset_event
+    Raises the session time reset event to the client if registered.
+* ------------------------------------------------------------------------------*/
+void capi_spr_check_raise_session_time_reset_event(capi_spr_t *me_ptr)
+{
+   if (!me_ptr)
+   {
+      return;
+   }
+
+   param_id_spr_session_time_t event_payload;
+   capi_err_t              result = CAPI_EOK;
+
+   if (0 == me_ptr->session_time_reset_event_info.dest_address)
+   {
+#ifdef DEBUG_SPR_MODULE
+      SPR_MSG_ISLAND(me_ptr->miid, DBG_LOW_PRIO, "No client registered for session time reset event. Returning");
+#endif
+      return;
+   }
+
+   if (!is_spr_avsync_enabled(me_ptr->avsync_ptr))
+   {
+      SPR_MSG_ISLAND(me_ptr->miid, DBG_LOW_PRIO, "AVSync not enabled for session time reset event. Returning");
+      return;
+   }
+
+   param_id_spr_session_time_t *session_time_ptr = &event_payload;
+   memset(session_time_ptr, 0, sizeof(param_id_spr_session_time_t));
+
+   int64_t   session_time, absolute_ts, proc_ts;
+   bool_t    is_ts_valid = FALSE;
+   avsync_t *avsync_ptr  = me_ptr->avsync_ptr;
+   session_time = absolute_ts = proc_ts = 0;
+
+   session_time = avsync_ptr->session_clock_us;
+   absolute_ts  = avsync_ptr->absolute_time_us;
+   proc_ts      = avsync_ptr->proc_timestamp_us;
+   is_ts_valid  = avsync_ptr->flags.is_ts_valid;
+
+   session_time_ptr->absolute_time.value_lsw = (uint32_t)(absolute_ts);
+   session_time_ptr->absolute_time.value_msw = (uint32_t)(absolute_ts >> 32);
+   session_time_ptr->session_time.value_lsw  = (uint32_t)(session_time);
+   session_time_ptr->session_time.value_msw  = (uint32_t)(session_time >> 32);
+   session_time_ptr->timestamp.value_lsw     = (uint32_t)(proc_ts);
+   session_time_ptr->timestamp.value_msw     = (uint32_t)(proc_ts >> 32);
+   session_time_ptr->flags |= ((is_ts_valid) << PARAM_ID_SESSION_TIME_SHIFT_IS_TIMESTAMP_VALID);
+
+   capi_event_info_t event_info;
+   event_info.port_info.is_valid = FALSE;
+
+   capi_event_data_to_dsp_client_v2_t evt = { 0 };
+   evt.event_id                           = EVENT_ID_SPR_SESSION_TIME_RESET;
+   evt.token                              = me_ptr->session_time_reset_event_info.token;
+   evt.dest_address                       = me_ptr->session_time_reset_event_info.dest_address;
+   evt.payload.actual_data_len            = sizeof(param_id_spr_session_time_t);
+   evt.payload.data_ptr                   = (int8_t *)&event_payload;
+   evt.payload.max_data_len               = sizeof(param_id_spr_session_time_t);
+
+   event_info.port_info.is_valid      = FALSE;
+   event_info.payload.actual_data_len = sizeof(capi_event_data_to_dsp_client_v2_t);
+   event_info.payload.data_ptr        = (int8_t *)&evt;
+   event_info.payload.max_data_len    = sizeof(capi_event_data_to_dsp_client_v2_t);
+
+   result = me_ptr->event_cb_info.event_cb(me_ptr->event_cb_info.event_context,
+                                           CAPI_EVENT_DATA_TO_DSP_CLIENT_V2,
+                                           &event_info);
+
+   SPR_MSG_ISLAND(me_ptr->miid,
+           DBG_MED_PRIO,
+           "Raised EVENT_ID_SPR_SESSION_TIME_RESET with result 0x%x",
+           result);
+}
+
+/*------------------------------------------------------------------------------
   Function name: capi_spr_update_frame_duration_in_bytes
     Calculates the frame duration in bytes for the module.
 * ------------------------------------------------------------------------------*/

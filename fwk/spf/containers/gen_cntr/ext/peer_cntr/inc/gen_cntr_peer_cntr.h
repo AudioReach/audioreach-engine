@@ -7,7 +7,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -55,6 +55,15 @@ ar_result_t gen_cntr_copy_peer_or_olc_client_input(gen_cntr_t *            me_pt
                                                    gen_cntr_ext_in_port_t *ext_in_port_ptr,
                                                    uint32_t *              bytes_copied_ptr);
 ar_result_t gen_cntr_init_peer_cntr_ext_in_port(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_port_ptr);
+ar_result_t gen_cntr_peer_output_setup_topo_buffer(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
+
+ar_result_t gen_cntr_copy_peer_cntr_input_to_int_buf(gen_cntr_t *            me_ptr,
+                                                            gen_cntr_ext_in_port_t *ext_in_port_ptr,
+                                                            uint32_t *              bytes_copied_ptr);
+ar_result_t gen_cntr_input_dataQ_trigger_peer_cntr(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
+
+ar_result_t gen_cntr_check_if_any_ext_in_has_to_preserve_prebuffer(gen_topo_t *topo_ptr,
+                                                                   bool_t     *has_to_preserve_prebuffer);
 
 #ifdef __cplusplus
 }

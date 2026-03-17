@@ -40,6 +40,8 @@ include_directories(
                     ../cmn/topologies/gen_topo/ext/pure_st_topo/inc
                     ../cmn/topologies/gen_topo/ext/sync_fwk_ext/inc
                     ../cmn/topologies/gen_topo/ext/global_shmem_msg/inc
+                    ../cmn/topologies/gen_topo/ext/thin_topo/inc
+                    ../cmn/topologies/gen_topo/ext/thin_topo/src
                     ../cmn/topologies/spl_topo/core/inc
                     ../cmn/topologies/spl_topo/ext/dm_fwk_ext/inc
                     ../cmn/topologies/spl_topo/ext/mimo_proc_state_intf_ext/inc
@@ -47,9 +49,19 @@ include_directories(
                     ../cmn/topologies/spl_topo/ext/trigger_policy_fwk_ext/inc
                     ../cmn/topologies/topo_utils/inc
                     ../gen_cntr/core/inc
+                    ../gen_cntr/ext/thin_topo_cntr_utils/inc
                     ../olc/inc
                     ../spl_cntr/inc
                    )
+
+#[[
+   Define USES_THIN_TOPO for:
+   1. Libraries compiled statically and linked later to spf target.
+   2. Modules compiled directly as part of spf target
+      (e.g. wr_sh_mem_ep, rd_sh_mem_ep)
+]]
+add_compile_definitions(USES_THIN_TOPO)
+target_compile_definitions(spf PUBLIC USES_THIN_TOPO)
 
 #Add the sub directories
 add_subdirectory(../cmn/build cmn)

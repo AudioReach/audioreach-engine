@@ -343,6 +343,8 @@ static capi_err_t capi_spr_set_properties(capi_t *capi_ptr, capi_proplist_t *pro
                     "algo reset honored on port_index %d is_input %d",
                     prop_ptr[i].port_info.port_index,
                     prop_ptr[i].port_info.is_input_port);
+
+            capi_spr_check_raise_session_time_reset_event(me_ptr);
             capi_spr_avsync_reset_session_clock_params(me_ptr->avsync_ptr);
             me_ptr->flags.has_rcvd_first_buf     = FALSE;
             me_ptr->flags.has_rendered_first_buf = FALSE;
@@ -901,6 +903,31 @@ static capi_err_t capi_spr_set_param(capi_t *                capi_ptr,
                  DBG_LOW_PRIO,
                  "SPR configured is_cntr_duty_cycling to %lu",
                  me_ptr->flags.is_cntr_duty_cycling);
+         break;
+      }
+      case PARAM_ID_SPR_SESSION_TIME_RESET_INFO:
+      {
+         if (NULL == params_ptr->data_ptr)
+         {
+            SPR_MSG(me_ptr->miid, DBG_ERROR_PRIO, "Set param id 0x%lx, received null buffer", param_id);
+            result |= CAPI_EBADPARAM;
+            break;
+         }
+
+         // Level 1 check
+         if (params_ptr->actual_data_len < sizeof(param_id_spr_session_time_reset_info_t))
+         {
+            SPR_MSG(me_ptr->miid,
+                    DBG_ERROR_PRIO,
+                    "Invalid payload size for reset session time info %d",
+                    params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
+         }
+
+         param_id_spr_session_time_reset_info_t *reset_info_ptr = (param_id_spr_session_time_reset_info_t *)params_ptr->data_ptr;
+         // Update avsync configuration
+         result |= capi_spr_process_session_time_reset_param(me_ptr, reset_info_ptr);
+
          break;
       }
       default:

@@ -35,6 +35,10 @@ extern "C" {
 /* =======================================================================
   Macros
 ========================================================================== */
+#ifndef ALIGN_128_BYTES
+#define ALIGN_128_BYTES(a)   ((a + 127) & (0xFFFFFF80))
+#endif
+
 #ifndef ALIGN_64_BYTES
 #define ALIGN_64_BYTES(a)   ((a + 63) & (0xFFFFFFC0))
 #endif
@@ -385,6 +389,8 @@ typedef struct gu_sg_t
    uint16_t          duty_cycling_clock_scale_factor_q4; /**< Clock scale factor for Duty cycling subgraphs */
    uint16_t          clock_scale_factor_q4;     /**< Clock scale factor for other subgraphs */
    uint16_t          bus_scale_factor_q4;     /**< Bus clock scale factor for other subgraphs */
+   uint32_t          kpps_scale_factor;     /**< Kpps scale factor for Voice Satellite subgraphs */
+   uint32_t          bw_scale_factor;     /**< BW scale factor for Voice Satellite subgraphs */
    gu_module_list_t *module_list_ptr; /**< list of modules. Each node is a gu_module_t. this is primary list of module
                                          tied to num_modules. */
    spf_list_node_t  *resources_ptr;   /**< list of memory pointers used in this sg. these memories are used for modules and ports. */

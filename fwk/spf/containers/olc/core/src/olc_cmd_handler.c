@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -248,7 +248,7 @@ static ar_result_t olc_post_operate_on_connected_input(olc_t *                  
             {
                uint32_t         bytes_across_all_ch = gen_topo_get_total_actual_len(&conn_in_port_ptr->common);
                module_cmn_md_t *out_md_ptr          = NULL;
-               result                               = gen_topo_create_dfg_metadata(me_ptr->topo.gu.log_id,
+               result                               = gen_topo_create_dfg_metadata(&me_ptr->topo,
                                                      &conn_in_port_ptr->common.sdata.metadata_list_ptr,
                                                      me_ptr->cu.heap_id,
                                                      &out_md_ptr,
@@ -547,11 +547,11 @@ ar_result_t olc_operate_on_ext_in_port(void *             base_ptr,
    stop_listen_mask |= ((TOPO_SG_OP_SUSPEND & sg_ops) && is_self_sg);
    if (stop_listen_mask)
    {
-		 cu_stop_listen_to_mask(&me_ptr->cu, ext_in_port_ptr->cu.bit_mask);
-         if (ext_in_port_ptr->wdp_ctrl_cfg_ptr)
-         {
-            cu_stop_listen_to_mask(&me_ptr->cu, ext_in_port_ptr->wdp_ctrl_cfg_ptr->sat_rw_bit_mask);
-         }      
+       cu_stop_listen_to_mask(&me_ptr->cu, ext_in_port_ptr->cu.bit_mask);
+       if (ext_in_port_ptr->wdp_ctrl_cfg_ptr)
+       {
+          cu_stop_listen_to_mask(&me_ptr->cu, ext_in_port_ptr->wdp_ctrl_cfg_ptr->sat_rw_bit_mask);
+       }
    }
 
    if (TOPO_SG_OP_CLOSE == sg_ops)
@@ -622,7 +622,7 @@ ar_result_t olc_post_operate_on_ext_in_port(void *                     base_ptr,
       else if (TOPO_SG_OP_SUSPEND & sg_ops)
       {
          module_cmn_md_t *out_md_ptr = NULL;
-         result                      = gen_topo_create_dfg_metadata(me_ptr->topo.gu.log_id,
+         result                      = gen_topo_create_dfg_metadata(&me_ptr->topo,
                                                &ext_in_port_ptr->md_list_ptr,
                                                me_ptr->cu.heap_id,
                                                &out_md_ptr,
@@ -926,9 +926,22 @@ ar_result_t olc_gpr_cmd(cu_base_t *base_ptr)
 
       case APM_CMD_REGISTER_MODULE_EVENTS:
       {
-         OLC_MSG(me_ptr->topo.gu.log_id, DBG_MED_PRIO, "Register module events received from GPR");
-         TRY(result, olc_register_module_events(me_ptr, packet_ptr));
-         wait_for_response = sgm_get_cmd_rsp_status(&me_ptr->spgm_info, packet_ptr->opcode);
+
+         if ((packet_ptr->dst_port == me_ptr->spgm_info.sgm_id.cont_id) &&
+             (packet_ptr->src_domain_id == me_ptr->host_domain_id))
+         {
+            result = cu_register_module_events(&me_ptr->cu, packet_ptr);
+            if (AR_EOK != result)
+            {
+               OLC_MSG(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, "Failed to register events with container");
+            }
+         }
+         else
+         {
+            OLC_MSG(me_ptr->topo.gu.log_id, DBG_MED_PRIO, "Register module events received from GPR");
+            TRY(result, olc_register_module_events(me_ptr, packet_ptr));
+            wait_for_response = sgm_get_cmd_rsp_status(&me_ptr->spgm_info, packet_ptr->opcode);
+         }
          break;
       }
 
@@ -1830,7 +1843,7 @@ ar_result_t olc_ctrl_path_media_fmt_handler(cu_base_t *base_ptr)
 
    // Media format comes for external input port only
    gu_ext_in_port_ptr  = (gu_ext_in_port_t *)header_ptr->dst_handle_ptr;
-   ext_in_port_ptr     = (cu_ext_in_port_t *)(gu_ext_in_port_ptr + base_ptr->ext_in_port_cu_offset);
+   ext_in_port_ptr     = (cu_ext_in_port_t *)((uint8_t *)gu_ext_in_port_ptr + base_ptr->ext_in_port_cu_offset);
    cnt_ext_in_port_ptr = (olc_ext_in_port_t *)gu_ext_in_port_ptr;
 
    topo_port_state_t port_state;
@@ -1993,20 +2006,30 @@ ar_result_t olc_handle_peer_port_property_update_cmd_to_satellite(cu_base_t *bas
          {
             gu_ext_in_port_t * dst_port_ptr    = (gu_ext_in_port_t *)header_ptr->dst_handle_ptr;
             olc_ext_in_port_t *ext_in_port_ptr = (olc_ext_in_port_t *)(dst_port_ptr);
-            TRY(result,
-                sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
-                                                         ext_in_port_ptr->wdp_ctrl_cfg_ptr->sdm_port_index,
-                                                         cur_ptr));
+
+            if (ext_in_port_ptr->wdp_ctrl_cfg_ptr)
+            {
+                TRY(result,
+                    sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
+                                                             ext_in_port_ptr->wdp_ctrl_cfg_ptr->sdm_port_index,
+                                                             cur_ptr));
+            }
+
             break;
          }
          case PORT_PROPERTY_IS_DOWNSTREAM_RT:
          {
             gu_ext_out_port_t * dst_port_ptr     = (gu_ext_out_port_t *)header_ptr->dst_handle_ptr;
             olc_ext_out_port_t *ext_out_port_ptr = (olc_ext_out_port_t *)(dst_port_ptr);
-            TRY(result,
-                sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
-                                                         ext_out_port_ptr->rdp_ctrl_cfg_ptr->sdm_port_index,
-                                                         cur_ptr));
+
+            if (ext_out_port_ptr->rdp_ctrl_cfg_ptr)
+            {
+                TRY(result,
+                    sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
+                                                             ext_out_port_ptr->rdp_ctrl_cfg_ptr->sdm_port_index,
+                                                             cur_ptr));
+            }
+
             break;
          }
          case PORT_PROPERTY_TOPO_STATE:
@@ -2014,10 +2037,21 @@ ar_result_t olc_handle_peer_port_property_update_cmd_to_satellite(cu_base_t *bas
             // state is always propagated in control path only from downstream to upstream.
             gu_ext_out_port_t * dst_port_ptr     = (gu_ext_out_port_t *)header_ptr->dst_handle_ptr;
             olc_ext_out_port_t *ext_out_port_ptr = (olc_ext_out_port_t *)(dst_port_ptr);
-            TRY(result,
-                sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
-                                                         ext_out_port_ptr->rdp_ctrl_cfg_ptr->sdm_port_index,
-                                                         cur_ptr));
+            topo_port_state_t ds_state = (topo_port_state_t)cur_ptr->property_value;
+
+            if (ext_out_port_ptr->rdp_ctrl_cfg_ptr)
+            {
+                TRY(result,
+                    sdm_handle_peer_port_property_update_cmd(&me_ptr->spgm_info,
+                                                             ext_out_port_ptr->rdp_ctrl_cfg_ptr->sdm_port_index,
+                                                             cur_ptr));
+                // Specifies what to listen on the output. external output or read ipc queue
+                if (TOPO_PORT_STATE_STARTED == ds_state)
+                {
+                   spdm_read_dl_pcd(&me_ptr->spgm_info, ext_out_port_ptr->rdp_ctrl_cfg_ptr->sdm_port_index);               
+                }
+            }
+
             break;
          }
 
@@ -2108,4 +2142,15 @@ ar_result_t olc_handle_upstream_stop_cmd(cu_base_t *base_ptr)
    }
 
    return spf_msg_return_msg(&base_ptr->cmd_msg);
+}
+
+ar_result_t olc_register_events_utils(cu_base_t *       base_ptr,
+                                      gu_module_t *     gu_module_ptr,
+                                      topo_reg_event_t *reg_event_payload_ptr,
+                                      bool_t            is_register,
+                                      bool_t *          capi_supports_v1_event_ptr)
+{
+   ar_result_t result = AR_EOK;
+
+   return result;
 }

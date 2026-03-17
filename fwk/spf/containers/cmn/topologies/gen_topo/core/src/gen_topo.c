@@ -7,7 +7,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -16,6 +16,7 @@
 #include "gen_topo_buf_mgr.h"
 #include "gen_topo_prof.h"
 #include "gen_topo_ctrl_port.h"
+#include "thin_topo_inline.h"
 
 // clang-format off
 static const topo_cu_vtable_t gen_topo_cu_vtable =
@@ -106,7 +107,7 @@ uint32_t gen_topo_get_bufs_num_from_med_fmt(topo_media_fmt_t *med_fmt_ptr)
    return ((0 == bufs_num) ? 1 : bufs_num);
 }
 
-ar_result_t gen_topo_initialize_bufs_sdata(gen_topo_t *            topo_ptr,
+ar_result_t gen_topo_initialize_bufs_sdata(gen_topo_t             *topo_ptr,
                                            gen_topo_common_port_t *cmn_port_ptr,
                                            uint32_t                miid,
                                            uint32_t                port_id)
@@ -166,9 +167,9 @@ ar_result_t gen_topo_initialize_bufs_sdata(gen_topo_t *            topo_ptr,
  * reset_capi_dependent_dont_destroy - remove only the things that depend on CAPI
  *
  */
-ar_result_t gen_topo_destroy_cmn_port(gen_topo_t *            me_ptr,
+ar_result_t gen_topo_destroy_cmn_port(gen_topo_t             *me_ptr,
                                       gen_topo_common_port_t *cmn_port_ptr,
-                                      gu_cmn_port_t *         gu_cmn_port_ptr,
+                                      gu_cmn_port_t          *gu_cmn_port_ptr,
                                       bool_t                  reset_capi_dependent_dont_destroy)
 {
    ar_result_t result = AR_EOK;
@@ -283,9 +284,9 @@ ar_result_t gen_topo_destroy_input_ports(gen_topo_t *topo_ptr)
 // ar_result_t gen_topo_create_ext_in_ports(gen_topo_t *topo_ptr) { return AR_EOK; }
 // ar_result_t gen_topo_destroy_ext_out_ports(gen_topo_t *topo_ptr) { return AR_EOK; }
 
-ar_result_t gen_topo_query_and_create_capi(gen_topo_t *           topo_ptr,
+ar_result_t gen_topo_query_and_create_capi(gen_topo_t            *topo_ptr,
                                            gen_topo_graph_init_t *graph_init_ptr,
-                                           gen_topo_module_t *    module_ptr)
+                                           gen_topo_module_t     *module_ptr)
 {
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
@@ -310,9 +311,9 @@ ar_result_t gen_topo_query_and_create_capi(gen_topo_t *           topo_ptr,
    return result;
 }
 
-static ar_result_t gen_topo_create_virtual_stub(gen_topo_t *           topo_ptr,
+static ar_result_t gen_topo_create_virtual_stub(gen_topo_t            *topo_ptr,
                                                 gen_topo_graph_init_t *graph_init_ptr,
-                                                gen_topo_module_t *    module_ptr)
+                                                gen_topo_module_t     *module_ptr)
 {
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
@@ -327,7 +328,8 @@ static ar_result_t gen_topo_create_virtual_stub(gen_topo_t *           topo_ptr,
 
    TRY(result, gen_topo_check_create_bypass_module(topo_ptr, module_ptr));
 
-   module_ptr->flags.inplace = TRUE;
+   module_ptr->flags.inplace         = TRUE;
+   module_ptr->flags.dynamic_inplace = TRUE;
 
    // stack size for bypass is not high: graph_init_ptr->max_stack_size = MAX(graph_init_ptr->max_stack_size, 0);
    // port_has_threshold, requires_data_buffering -> default value of 0 works.
@@ -344,9 +346,9 @@ static ar_result_t gen_topo_create_virtual_stub(gen_topo_t *           topo_ptr,
    return result;
 }
 
-static ar_result_t gen_topo_create_module(gen_topo_t *           topo_ptr,
+static ar_result_t gen_topo_create_module(gen_topo_t            *topo_ptr,
                                           gen_topo_graph_init_t *graph_init_ptr,
-                                          gen_topo_module_t *    module_ptr)
+                                          gen_topo_module_t     *module_ptr)
 {
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
@@ -398,8 +400,8 @@ static ar_result_t gen_topo_create_module(gen_topo_t *           topo_ptr,
    return result;
 }
 
-ar_result_t gen_topo_init_set_get_data_port_properties(gen_topo_module_t *    module_ptr,
-                                                       gen_topo_t *           topo_ptr,
+ar_result_t gen_topo_init_set_get_data_port_properties(gen_topo_module_t     *module_ptr,
+                                                       gen_topo_t            *topo_ptr,
                                                        bool_t                 is_placeholder_replaced,
                                                        gen_topo_graph_init_t *graph_init_ptr)
 {
@@ -462,7 +464,9 @@ ar_result_t gen_topo_init_set_get_data_port_properties(gen_topo_module_t *    mo
                // But for inplace the buf belongs to output after process. Hence in this case, the inplace buffer may
                // have both input and output data, which results in corruption. To avoid this complication we don't
                // support inplace for port with thresholds. <Same logic applies to the output port context as well.>
-               module_ptr->flags.inplace            = FALSE;
+               module_ptr->flags.inplace         = FALSE;
+               module_ptr->flags.dynamic_inplace = FALSE;
+
                in_port_ptr->common.threshold_raised = threshold_bytes;
             }
             else
@@ -549,6 +553,7 @@ ar_result_t gen_topo_init_set_get_data_port_properties(gen_topo_module_t *    mo
                // <Refer input port context comment to understand the reason to make it non-inplace.>
 
                module_ptr->flags.inplace             = FALSE;
+               module_ptr->flags.dynamic_inplace     = FALSE;
                out_port_ptr->common.threshold_raised = threshold_bytes;
             }
             else
@@ -730,8 +735,8 @@ ar_result_t gen_topo_check_n_realloc_scratch_memory(gen_topo_t *topo_ptr, bool_t
    // Validate the max ports and num channels before proeceeding with allocations
    VERIFY(result, (CAPI_MAX_CHANNELS_V2 >= max_num_channels) && (0 < max_num_channels));
 
-   int8_t *                          in_port_scratch_ptr      = NULL;
-   int8_t *                          out_port_scratch_ptr     = NULL;
+   int8_t                           *in_port_scratch_ptr      = NULL;
+   int8_t                           *out_port_scratch_ptr     = NULL;
    gen_topo_ext_port_scratch_data_t *ext_in_port_scratch_ptr  = NULL;
    gen_topo_ext_port_scratch_data_t *ext_out_port_scratch_ptr = NULL;
 
@@ -865,7 +870,7 @@ ar_result_t gen_topo_check_n_realloc_scratch_memory(gen_topo_t *topo_ptr, bool_t
  * reset_capi_dependent_dont_destroy - for placeholder module reset we want to only reset capi stuff and not destroy
  * everything
  */
-void gen_topo_destroy_module(gen_topo_t *       topo_ptr,
+void gen_topo_destroy_module(gen_topo_t        *topo_ptr,
                              gen_topo_module_t *module_ptr,
                              bool_t             reset_capi_dependent_dont_destroy)
 {
@@ -975,6 +980,9 @@ ar_result_t gen_topo_destroy_topo(gen_topo_t *topo_ptr)
 
    // free the started sorted module list if not done yet
    spf_list_delete_list((spf_list_node_t **)&topo_ptr->started_sorted_module_list_ptr, TRUE);
+
+   thin_topo_destroy(topo_ptr);
+
    return AR_EOK;
 }
 
@@ -995,7 +1003,7 @@ uint32_t gen_topo_get_curr_port_threshold(gen_topo_common_port_t *port_ptr)
 uint32_t gen_topo_get_curr_port_bufs_num_v2(gen_topo_common_port_t *port_ptr)
 {
    uint32_t bufs_num_v2 = 0;
-   if(SPF_DEINTERLEAVED_RAW_COMPRESSED == port_ptr->media_fmt_ptr->data_format)
+   if (SPF_DEINTERLEAVED_RAW_COMPRESSED == port_ptr->media_fmt_ptr->data_format)
    {
       bufs_num_v2 = port_ptr->media_fmt_ptr->deint_raw.bufs_num;
    }
@@ -1024,6 +1032,19 @@ void gen_topo_set_med_fmt_to_attached_module(gen_topo_t *topo_ptr, gen_topo_outp
       ((gen_topo_input_port_t *)attached_module_ptr->gu.output_port_list_ptr)
          ? (gen_topo_input_port_t *)attached_module_ptr->gu.output_port_list_ptr->op_port_ptr
          : NULL;
+
+   topo_media_fmt_t *dst_mf = attached_input_port_ptr ? attached_input_port_ptr->common.media_fmt_ptr : NULL;
+   topo_media_fmt_t *src_mf = out_port_ptr->common.media_fmt_ptr;
+
+   if (!dst_mf || !src_mf || !tu_has_media_format_changed(dst_mf, src_mf))
+   {
+      TOPO_MSG(topo_ptr->gu.log_id,
+               DBG_HIGH_PRIO,
+               "Skipping MF propagation, no change (MIID 0x%lx)",
+               attached_module_ptr->gu.module_instance_id);
+
+      return;
+   }
 
    TOPO_PRINT_MEDIA_FMT(topo_ptr->gu.log_id,
                         attached_module_ptr,
@@ -1095,9 +1116,9 @@ void gen_topo_set_med_fmt_to_attached_module(gen_topo_t *topo_ptr, gen_topo_outp
    }
 }
 
-static ar_result_t gen_topo_prop_med_fmt_from_prev_out_to_next_in(gen_topo_t *                topo_ptr,
-                                                                  gen_topo_module_t *         module_ptr,
-                                                                  gen_topo_input_port_t *     in_port_ptr,
+static ar_result_t gen_topo_prop_med_fmt_from_prev_out_to_next_in(gen_topo_t                 *topo_ptr,
+                                                                  gen_topo_module_t          *module_ptr,
+                                                                  gen_topo_input_port_t      *in_port_ptr,
                                                                   bool_t                      is_data_path,
                                                                   gen_topo_capi_event_flag_t *capi_event_flag_ptr)
 {
@@ -1269,6 +1290,12 @@ static ar_result_t gen_topo_prop_med_fmt_from_prev_out_to_next_in(gen_topo_t *  
 
    if (prev_out_ptr && prev_out_ptr->common.flags.media_fmt_event)
    {
+      // Check and set media format on attached modules if needed.
+      if (prev_out_ptr && prev_out_ptr->gu.attached_module_ptr)
+      {
+         gen_topo_set_med_fmt_to_attached_module(topo_ptr, prev_out_ptr);
+      }
+
       // for raw fmt, ptr created in capi callback is passed to next input, which is free'd in
       // gen_topo_capi_set_media_fmt or at port destroy
       if (SPF_IS_PCM_DATA_FORMAT(prev_out_ptr->common.media_fmt_ptr->data_format) &&
@@ -1308,6 +1335,12 @@ static ar_result_t gen_topo_prop_med_fmt_from_prev_out_to_next_in(gen_topo_t *  
    {
       // If media format is updated then update port threshold as well.
       capi_event_flag_ptr->port_thresh = TRUE;
+
+      if (in_port_ptr->common.media_fmt_ptr &&
+          (SPF_DEINTERLEAVED_RAW_COMPRESSED == in_port_ptr->common.media_fmt_ptr->data_format))
+      {
+         THIN_TOPO_SET_EXIT_FLAG(topo_ptr, has_unsupported_mf, TRUE);
+      }
 
       // Even if module is being bypassed, we need to set media fmt as setting media fmt may enable module.
       if (module_ptr->capi_ptr)
@@ -1454,12 +1487,12 @@ ar_result_t gen_topo_propagate_media_fmt(void *cxt_ptr, bool_t is_data_path)
  * framework extension callback allows different topo implementations to call this function and have
  * different framework extension handling.
  */
-ar_result_t gen_topo_propagate_media_fmt_from_module(void *            cxt_ptr,
+ar_result_t gen_topo_propagate_media_fmt_from_module(void             *cxt_ptr,
                                                      bool_t            is_data_path,
                                                      gu_module_list_t *start_module_list_ptr)
 {
    ar_result_t                 result              = AR_EOK;
-   gen_topo_t *                topo_ptr            = (gen_topo_t *)cxt_ptr;
+   gen_topo_t                 *topo_ptr            = (gen_topo_t *)cxt_ptr;
    gen_topo_capi_event_flag_t *capi_event_flag_ptr = NULL;
 
    TOPO_MSG(topo_ptr->gu.log_id,
@@ -1538,7 +1571,7 @@ ar_result_t gen_topo_propagate_media_fmt_from_module(void *            cxt_ptr,
                      module_ptr->gu.module_instance_id);
             continue;
          }
-         gen_topo_input_port_t * in_port_ptr = (gen_topo_input_port_t *)module_ptr->gu.input_port_list_ptr->ip_port_ptr;
+         gen_topo_input_port_t  *in_port_ptr = (gen_topo_input_port_t *)module_ptr->gu.input_port_list_ptr->ip_port_ptr;
          gen_topo_output_port_t *out_port_ptr =
             (gen_topo_output_port_t *)module_ptr->gu.output_port_list_ptr->op_port_ptr;
 
@@ -1579,7 +1612,7 @@ ar_result_t gen_topo_propagate_media_fmt_from_module(void *            cxt_ptr,
 void gen_topo_find_cached_set_event_prop(uint32_t         log_id,
                                          spf_list_node_t *event_list_ptr,
                                          uint32_t         event_id,
-                                         void **          cached_node)
+                                         void           **cached_node)
 {
    *cached_node = NULL;
    for (spf_list_node_t *list_ptr = event_list_ptr; (NULL != list_ptr); LIST_ADVANCE(list_ptr))
@@ -1661,11 +1694,11 @@ inline bool_t gen_topo_is_port_at_nblc_end(gu_module_t *gu_module_ptr, gen_topo_
  *    however, nblc end on output side can be any module.
  *    This is the reason why extra argument is in input func (nblc_start_pptr)
  */
-static ar_result_t gen_topo_assign_nblc_input_recursive(gen_topo_t *            topo_ptr,
-                                                        gen_topo_input_port_t * in_port_ptr,
-                                                        gen_topo_input_port_t * nblc_end_ptr,
+static ar_result_t gen_topo_assign_nblc_input_recursive(gen_topo_t             *topo_ptr,
+                                                        gen_topo_input_port_t  *in_port_ptr,
+                                                        gen_topo_input_port_t  *nblc_end_ptr,
                                                         gen_topo_input_port_t **nblc_start_pptr,
-                                                        uint32_t *              recurse_depth_ptr)
+                                                        uint32_t               *recurse_depth_ptr)
 {
    ar_result_t             result            = AR_EOK;
    gen_topo_output_port_t *prev_out_port_ptr = (gen_topo_output_port_t *)in_port_ptr->gu.conn_out_port_ptr;
@@ -1689,8 +1722,8 @@ static ar_result_t gen_topo_assign_nblc_input_recursive(gen_topo_t *            
    {
       gen_topo_input_port_t *prev_in_port_ptr     = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
       in_port_ptr->nblc_end_ptr                   = NULL;
-      gen_topo_input_port_t * new_nblc_end_ptr    = nblc_end_ptr;
-      gen_topo_input_port_t * new_nblc_start_ptr  = NULL;
+      gen_topo_input_port_t  *new_nblc_end_ptr    = nblc_end_ptr;
+      gen_topo_input_port_t  *new_nblc_start_ptr  = NULL;
       gen_topo_input_port_t **new_nblc_start_pptr = nblc_start_pptr; // one location per nblc
 
       if (topo_ptr->gen_topo_vtable_ptr->is_port_at_nblc_end(&prev_module_ptr->gu, &prev_in_port_ptr->common))
@@ -1742,10 +1775,10 @@ static ar_result_t gen_topo_assign_nblc_input_recursive(gen_topo_t *            
    [nblc_start] -> .... <nblc_chain> ... -> [cur mod]-[out_port_ptr] ->
      -> [next_in_port_ptr]-[next_module_ptr]-[next_out_port_ptr]
  */
-static ar_result_t gen_topo_assign_nblc_output_recursive(gen_topo_t *            topo_ptr,
+static ar_result_t gen_topo_assign_nblc_output_recursive(gen_topo_t             *topo_ptr,
                                                          gen_topo_output_port_t *out_port_ptr,
                                                          gen_topo_output_port_t *nblc_start_ptr,
-                                                         uint32_t *              recurse_depth_ptr)
+                                                         uint32_t               *recurse_depth_ptr)
 {
    ar_result_t result = AR_EOK;
 
@@ -1765,7 +1798,7 @@ static ar_result_t gen_topo_assign_nblc_output_recursive(gen_topo_t *           
    // if the next modules is buffering or MIMO or Sink module nblc start ptr propagation stops here.
    // And a new nblc start ptr is propagated from the next module's output ports.
    gen_topo_input_port_t *next_in_port_ptr = (gen_topo_input_port_t *)out_port_ptr->gu.conn_in_port_ptr;
-   gen_topo_module_t *    next_module_ptr  = (gen_topo_module_t *)next_in_port_ptr->gu.cmn.module_ptr;
+   gen_topo_module_t     *next_module_ptr  = (gen_topo_module_t *)next_in_port_ptr->gu.cmn.module_ptr;
    if ((next_module_ptr->gu.num_output_ports == 0) ||
        topo_ptr->gen_topo_vtable_ptr->is_port_at_nblc_end(&next_module_ptr->gu, &next_in_port_ptr->common))
    {
@@ -1961,7 +1994,7 @@ capi_err_t gen_topo_check_and_update_dynamic_inplace(gen_topo_module_t *module_p
    }
 
    // check ip/op mf
-   gen_topo_input_port_t * in_port_ptr  = (gen_topo_input_port_t *)module_ptr->gu.input_port_list_ptr->ip_port_ptr;
+   gen_topo_input_port_t  *in_port_ptr  = (gen_topo_input_port_t *)module_ptr->gu.input_port_list_ptr->ip_port_ptr;
    gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)module_ptr->gu.output_port_list_ptr->op_port_ptr;
    if (tu_has_media_format_changed(in_port_ptr->common.media_fmt_ptr, out_port_ptr->common.media_fmt_ptr))
    {
@@ -2198,7 +2231,7 @@ topo_interleaving_t gen_topo_convert_capi_interleaving_to_gen_topo_interleaving(
    return gen_topo_int;
 }
 
-ar_result_t gen_topo_handle_pending_dynamic_inplace_change(gen_topo_t *                topo_ptr,
+ar_result_t gen_topo_handle_pending_dynamic_inplace_change(gen_topo_t                 *topo_ptr,
                                                            gen_topo_capi_event_flag_t *capi_event_flag_ptr)
 {
    if (capi_event_flag_ptr->dynamic_inplace_change)
@@ -2237,7 +2270,7 @@ ar_result_t gen_topo_handle_pending_dynamic_inplace_change(gen_topo_t *         
 
 ar_result_t gen_topo_aggregate_hw_acc_proc_delay(gen_topo_t *topo_ptr,
                                                  bool_t      only_aggregate,
-                                                 uint32_t *  aggregate_hw_acc_proc_delay_ptr)
+                                                 uint32_t   *aggregate_hw_acc_proc_delay_ptr)
 {
    uint32_t aggregate_hw_acc_proc_delay = 0;
    bool_t   need_to_ignore_state        = only_aggregate;

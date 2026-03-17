@@ -169,7 +169,7 @@ ar_result_t spdm_flush_read_meta_data(spgm_info_t *                             
 #endif
    md_payload_size = read_done_ptr->md_size;
    rd_md_ptr       = (uint8_t *)db_node_ptr->ipc_data_buf.shm_mem_ptr;
-   rd_md_ptr       = rd_md_ptr + (ALIGN_64_BYTES(db_node_ptr->data_buf_size)) + 2 * GAURD_PROTECTION_BYTES;
+   rd_md_ptr       = rd_md_ptr + (ALIGN_128_BYTES(db_node_ptr->data_buf_size)) + 2 * GAURD_PROTECTION_BYTES;
 
    if (0 < md_payload_size)
    {

@@ -276,7 +276,7 @@ capi_err_t capi_mux_demux_handle_metadata(capi_mux_demux_t *  me_ptr,
          if (DATA_PORT_STATE_STARTED != me_ptr->output_port_info_ptr[out_port_arr_index].port_state ||
              NULL == output[out_port_index] || FALSE == output_stream_ptr->flags.marker_eos || // already non-flushing
              0 == output_stream_ptr->buf_ptr[0].actual_data_len ||                             // no output generated
-			 NULL == output[out_port_index]->buf_ptr[0].data_ptr ||
+             NULL == output[out_port_index]->buf_ptr[0].data_ptr ||
              FALSE == me_ptr->input_port_info_ptr[in_port_index].is_output_connected[out_port_arr_index])
          {
             continue;
@@ -615,19 +615,15 @@ capi_err_t capi_mux_demux_process(capi_t *_pif, capi_stream_data_t *input[], cap
    {
       uint32_t out_port_index = me_ptr->output_port_info_ptr[out_port_arr_index].port_index;
       if (DATA_PORT_STATE_STARTED != me_ptr->output_port_info_ptr[out_port_arr_index].port_state ||
-          NULL == output[out_port_index])
+          NULL == output[out_port_index] || NULL == output[out_port_index]->buf_ptr[0].data_ptr)
       {
          continue;
       }
-#ifdef SIM
-      if (NULL == output[out_port_index]->buf_ptr[0].data_ptr)
-      {
-         continue;
-      }
-#endif
 
       // maximum number of bytes copied from an input buffer to an output buffer for this output port
       uint32_t maximum_bytes_copied_from_input_port_bufs = 0;
+
+      output[out_port_index]->flags.is_timestamp_valid = FALSE;
 
       for (uint32_t out_buf_index = 0; out_buf_index < output[out_port_index]->bufs_num; out_buf_index++)
       {
@@ -693,6 +689,13 @@ capi_err_t capi_mux_demux_process(capi_t *_pif, capi_stream_data_t *input[], cap
                      max_of_two(maximum_bytes_copied_from_input_port_bufs,
                                 samples_to_bytes(num_samples,
                                                  me_ptr->output_port_info_ptr[out_port_arr_index].fmt.bits_per_sample));
+
+                  if (TRUE == me_ptr->enable_ts_propagation && input[input_port_index]->flags.is_timestamp_valid &&
+                      !output[out_port_index]->flags.is_timestamp_valid)
+                  {
+                     output[out_port_index]->timestamp                = input[input_port_index]->timestamp;
+                     output[out_port_index]->flags.is_timestamp_valid = TRUE;
+                  }
                }
             }
          }

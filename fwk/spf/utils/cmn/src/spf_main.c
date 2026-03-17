@@ -25,6 +25,9 @@ INCLUDE FILES FOR MODULE
 #include "dls.h"
 #include "irm.h"
 #include "posal_tgt_util.h"
+#ifdef ENABLE_MINIDUMP_RODATA_TEXT_REMOVAL
+#include "adspservices_qdi_client.h"
+#endif
 
 /* =======================================================================
 **                          Macro definitions
@@ -48,6 +51,21 @@ extern void apm_print_mem_req();
 ar_result_t spf_framework_pre_init(void)
 {
    ar_result_t result_spf_mem_init, result = AR_EOK;
+
+#ifdef ENABLE_MINIDUMP_RODATA_TEXT_REMOVAL
+   #ifdef MINIDUMP_AUDIOPD_REMOVAL
+      unsigned int audiopd_size =  (unsigned int )&audiopd_eaddr - (unsigned int )&audiopd_saddr;
+      unsigned int  audiopd_saddrpg = (unsigned int )qurt_lookup_physaddr((unsigned int )&audiopd_saddr);
+      md_update_aperture_entry(audiopd_saddrpg,audiopd_size);
+   #else
+      unsigned int audiopd_rodata_size =  (unsigned int )&audiopd_rodata_eaddr - (unsigned int )&audiopd_rodata_saddr;
+      unsigned int  audiopd_rodata_saddrpg = (unsigned int )qurt_lookup_physaddr((unsigned int )&audiopd_rodata_saddr);
+      md_update_aperture_entry(audiopd_rodata_saddrpg,audiopd_rodata_size);
+      unsigned int audiopd_text_size =  (unsigned int )&audiopd_text_eaddr - (unsigned int )&audiopd_text_saddr;
+      unsigned int  audiopd_text_saddrpg = (unsigned int )qurt_lookup_physaddr((unsigned int )&audiopd_text_saddr);
+      md_update_aperture_entry(audiopd_text_saddrpg,audiopd_text_size);
+   #endif
+#endif
 
    spf_list_buf_pool_init(POSAL_HEAP_DEFAULT, REGULAR_LIST_BUF_POOL_NUM_ARRAYS, REGULAR_LIST_BUF_POOL_NODES_PER_ARR);
 #ifdef USES_AUDIO_IN_ISLAND

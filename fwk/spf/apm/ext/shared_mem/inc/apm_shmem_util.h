@@ -9,7 +9,7 @@
  *  
  * 
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -30,7 +30,7 @@ extern "C" {
 
 typedef struct apm_shmem_utils_vtable
 {
-   ar_result_t (*apm_shmem_cmd_handler_fptr)(uint32_t memory_map_client, spf_msg_t *msg_ptr);
+   ar_result_t (*apm_shmem_cmd_handler_fptr)(apm_t *apm_info_ptr, spf_msg_t *msg_ptr);
 
    bool_t (*apm_shmem_is_supported_mem_pool_fptr)(uint16_t mem_pool_id);
 

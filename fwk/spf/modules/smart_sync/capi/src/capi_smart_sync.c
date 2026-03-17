@@ -403,9 +403,9 @@ static capi_err_t capi_smart_sync_process(capi_t *_pif, capi_stream_data_t *inpu
                          pri_data_len);
                }
 #endif
-               //If it is not a first frame of VFR then need to avoid overflow in circular buffer.
-               //Syncing  happened in the first frame so now can't add discontinuity
-               if (!is_first_frame)
+               // If zeros are padded then sync is already done for primary port,
+               // should not drop data and add discontinuity.
+               if (me_ptr->primary_in_port_info.zeros_were_padded)
                {
                   uint32_t in_index = me_ptr->primary_in_port_info.cmn.index;
                   if (is_primary_valid && input && input[in_index] && input[in_index]->buf_ptr)

@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -352,7 +352,9 @@ ar_result_t spl_cntr_prepare_to_launch_thread(spl_cntr_t      *me_ptr,
                                          uint32_t              name_length);
 ar_result_t spl_cntr_parse_container_cfg(spl_cntr_t *me_ptr, apm_container_cfg_t *container_cfg_ptr);
 ar_result_t spl_cntr_handle_proc_duration_change(cu_base_t *base_ptr);
+ar_result_t spl_cntr_handle_cntr_set_calibration_ops_done(cu_base_t *base_ptr);
 ar_result_t spl_cntr_handle_cntr_period_change(cu_base_t *base_ptr);
+ar_result_t spl_cntr_handle_offload_voice_session_info(cu_base_t *base_ptr,  cntr_param_id_offload_voice_session_info_t* voice_session_info_ptr);
 
 void spl_cntr_set_thread_priority(spl_cntr_t *me_ptr);
 ar_result_t spl_cntr_set_cntr_frame_len_us(spl_cntr_t *me_ptr, icb_frame_length_t *fm_ptr);

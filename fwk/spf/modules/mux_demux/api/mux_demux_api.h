@@ -44,7 +44,7 @@
     param_id_mux_demux_config_t \n
     @indent{12pt} mux_demux_connection_config_t
 */
-#define PARAM_ID_MUX_DEMUX_CONFIG     0x080011BD
+#define PARAM_ID_MUX_DEMUX_CONFIG 0x080011BD
 
 /*==============================================================================
    Param structure definitions
@@ -93,7 +93,6 @@ struct mux_demux_connection_config_t
 ;
 typedef struct mux_demux_connection_config_t mux_demux_connection_config_t;
 
-
 /*# @h2xmlp_parameter   {"PARAM_ID_MUX_DEMUX_CONFIG",PARAM_ID_MUX_DEMUX_CONFIG}
     @h2xmlp_description {ID for the parameter that configures mux and demux at
                          the channel level across input-to-output streams.}
@@ -140,7 +139,7 @@ typedef struct param_id_mux_demux_config_t param_id_mux_demux_config_t;
     param_id_mux_demux_out_format_t \n
     @indent{12pt} mux_demux_out_format_t
 */
-#define PARAM_ID_MUX_DEMUX_OUT_FORMAT     0x080011BE
+#define PARAM_ID_MUX_DEMUX_OUT_FORMAT 0x080011BE
 
 /*==============================================================================
    Param structure defintions
@@ -247,6 +246,37 @@ struct param_id_mux_demux_out_format_t
 ;
 typedef struct param_id_mux_demux_out_format_t param_id_mux_demux_out_format_t;
 
+/* ID of the TS Propagation parameter used by MODULE_ID_MUX_DEMUX. */
+#define PARAM_ID_MUX_DEMUX_TS_PROPAGATION 0x08001AE4
+
+/** @h2xmlp_parameter   {"PARAM_ID_MUX_DEMUX_TS_PROPAGATION", PARAM_ID_MUX_DEMUX_TS_PROPAGATION}
+    @h2xmlp_description {Enable/disable TimeStamp propagation}
+    @h2xmlp_toolPolicy  {Calibration}*/
+
+/* Payload of the PARAM_ID_MUX_DEMUX_TS_PROPAGATION parameter used
+ by the Mux Demux module */
+/* Structure for the TS propagation parameter for Mux-Demux module. */
+#include "spf_begin_pack.h"
+struct param_id_mux_demux_ts_propagation_t
+{
+   uint32_t enable_ts_propagation;
+   /**< @h2xmle_description  {Enable or disable TS propagation from input to output data buffer.\n
+                              The first active input port's Timestamp is propagated to all of its connected output ports.\n
+                              Discontinuity in timestamp can happen if connected input port's state changes.\n
+                              In case of the first active input port goes into inactive state then then next active
+                              connected input port's timestamp is propagated.\n
+                              Active port means it is in started state and data is flow is going on \n}
+
+         @h2xmle_rangeList    {"Enable"=1;
+                              "Disable"=0}
+         @h2xmle_default      {0} */
+}
+#include "spf_end_pack.h"
+;
+
+/* Structure type def for above payload. */
+typedef struct param_id_mux_demux_ts_propagation_t param_id_mux_demux_ts_propagation_t;
+
 /*------------------------------------------------------------------------------
    Module
 ------------------------------------------------------------------------------*/
@@ -262,6 +292,7 @@ typedef struct param_id_mux_demux_out_format_t param_id_mux_demux_out_format_t;
     @subhead4{Supported parameter IDs}
     - #PARAM_ID_MUX_DEMUX_CONFIG @lstsp1
     - #PARAM_ID_MUX_DEMUX_OUT_FORMAT
+    - #PARAM_ID_MUX_DEMUX_TS_PROPAGATION
 
     @subhead4{Supported input media format ID}
     - Data format       : #DATA_FORMAT_FIXED_POINT @lstsp1
@@ -274,7 +305,7 @@ typedef struct param_id_mux_demux_out_format_t param_id_mux_demux_out_format_t;
     - Interleaving      : De-interleaved unpacked @lstsp1
     - Signed/unsigned   : Signed
 */
-#define MODULE_ID_MUX_DEMUX     0x07001098
+#define MODULE_ID_MUX_DEMUX 0x07001098
 
 /*# @h2xmlm_module             {"MODULE_ID_MUX_DEMUX", MODULE_ID_MUX_DEMUX}
     @h2xmlm_displayName        {"Muxing and Demuxing"}
@@ -299,7 +330,8 @@ typedef struct param_id_mux_demux_out_format_t param_id_mux_demux_out_format_t;
     @h2xmlm_InsertParameter
     @h2xml_Select           {param_id_mux_demux_out_format_t}
     @h2xmlm_InsertParameter
+    @h2xml_Select           {param_id_mux_demux_ts_propagation_t}
+    @h2xmlm_InsertParameter
     @}                      <-- End of the Module --> */
-
 
 #endif // MUX_DEMUX_H_

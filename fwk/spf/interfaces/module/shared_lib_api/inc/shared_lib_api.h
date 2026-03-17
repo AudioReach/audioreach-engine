@@ -7,7 +7,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -72,6 +72,7 @@
 #include "capi_intf_extn_duty_cycling_island_mode.h"
 #include "capi_intf_extn_metadata.h"
 #include "capi_intf_extn_period.h"
+#include "capi_intf_extn_calibration_ops.h"
 #include "capi_intf_extn_stm_ts.h"
 #include "capi_lib_capi_process_thread.h"
 #include "capi_lib_get_capi_module.h"

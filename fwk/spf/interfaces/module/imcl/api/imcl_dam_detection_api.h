@@ -86,6 +86,29 @@ struct param_id_audio_dam_buffer_resize_t
 #include "spf_end_pack.h"
 ;
 
+/*parmeter used by the IMC client to trigger island entry exit based on the client processing time.
+client will send this param and enable DAM to control the island entry on the IMCL messages*/
+#define PARAM_ID_AUDIO_DAM_ALLOW_DCM_ISLAND_ENTRY 0x08001AE0
+
+/* Structure definition for Parameter */
+typedef struct param_id_audio_dam_allow_dcm_island_entry_t param_id_audio_dam_allow_dcm_island_entry_t;
+
+/** @h2xmlp_parameter   {"PARAM_ID_AUDIO_DAM_ALLOW_DCM_ISLAND_ENTRY",
+                         PARAM_ID_AUDIO_DAM_ALLOW_DCM_ISLAND_ENTRY}
+    @h2xmlp_description {Enables DAM module to be able to raise votes for island entry.}
+    @h2xmlp_toolPolicy  {Calibration} */
+
+#include "spf_begin_pack.h"
+struct param_id_audio_dam_allow_dcm_island_entry_t
+{
+   uint32_t process_done;
+   /**< @h2xmle_description {set the flag to indicate if island entry should be triggered.}
+        @h2xmle_range       {0..1}
+        @h2xmle_default     {0} */
+}
+#include "spf_end_pack.h"
+;
+
 /*==============================================================================
    Constants
 ==============================================================================*/
@@ -282,6 +305,14 @@ typedef enum
     * The history size should be mentioned as read_offset_in_us
     * for this case. No flow occurs if reqd data is not present
     * in the buffer */
+
+   AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING = 4,
+   /* Open gate for corresponding gate and send out data in batches
+    * i.e. only after batch amount of data is accumulated in the dam
+    * buffer - repeatedly till gate close is requested. The batch
+    * size should be mentioned as read_offset_in_us for this case, DAM
+    * will exit island when the buffer is full, enter when the DAM is buffering
+    * and Downstream module is done processing, wait for PARAM_ID_AUDIO_DAM_ALLOW_DCM_ISLAND_ENTRY */
 
    AUDIO_DAM_BATCH_INVALID = 0xFFFFFFFF
    /* Invalid option for gate_open */

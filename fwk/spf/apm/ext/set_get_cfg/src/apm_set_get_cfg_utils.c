@@ -20,6 +20,8 @@
 #include "apm_debug_info.h"
 #include "apm_set_get_cfg_utils.h"
 #include "apm_cntr_debug_if.h"
+#include "proxy_cntr_if.h"
+#include "apm_private_api.h"
 
 /**==============================================================================
    Function Declaration
@@ -62,6 +64,23 @@ ar_result_t apm_populate_cntr_param_payload_size(uint32_t                    con
          result = apm_populate_port_mf_cntr_param_payload_size(container_id, set_get_cfg_hdr_ptr, param_ptr);
          break;
       }
+      case CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO:
+      {
+         apm_offload_voice_session_info_t *cont_cached_cfg_ptr;
+         cont_cached_cfg_ptr = (apm_offload_voice_session_info_t *)set_get_cfg_hdr_ptr;
+         
+         apm_update_cont_param_set_cfg_msg_hdr(container_id,
+                                               CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO,
+                                               sizeof(cntr_param_id_offload_voice_session_info_t),
+                                               param_ptr);
+         
+         /** populate the payload for container ptr */
+         cntr_param_id_offload_voice_session_info_t *param_data_cfg_ptr = (cntr_param_id_offload_voice_session_info_t *)(param_ptr + 1);
+         param_data_cfg_ptr->sg_id = cont_cached_cfg_ptr->sg_id;
+         param_data_cfg_ptr->kpps_sf                        = cont_cached_cfg_ptr->kpps_sf;
+         param_data_cfg_ptr->bw_sf                        = cont_cached_cfg_ptr->bw_sf;
+         break;
+      }
       default:
       {
          AR_MSG(DBG_ERROR_PRIO,
@@ -84,6 +103,11 @@ ar_result_t apm_compute_cntr_msg_payload_size(uint32_t param_id , uint32_t *cntr
          {
             result = apm_compute_port_mf_cntr_msg_payload_size(cntr_msg_payload_size_ptr);
             break;
+         }
+         case CNTR_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO:
+         {
+           *cntr_msg_payload_size_ptr += (sizeof(apm_module_param_data_t) + sizeof(cntr_param_id_offload_voice_session_info_t));
+           break;
          }
          default:
          {
@@ -191,6 +215,17 @@ ar_result_t apm_parse_fwk_set_cfg_params(apm_t *apm_info_ptr, apm_module_param_d
 
          break;
       }
+      case APM_PARAM_ID_OFFLOAD_VOICE_SESSION_INFO:
+      {
+         /** Get the pointer to ext utils vtbl   */
+         apm_ext_utils_t *ext_utils_ptr = &apm_info_ptr->ext_utils;
+
+         if (ext_utils_ptr->offload_vtbl_ptr && ext_utils_ptr->offload_vtbl_ptr->apm_offload_handle_pd_info_fptr)
+         {
+            result = ext_utils_ptr->offload_vtbl_ptr->apm_offload_handle_scale_factor_info_fptr(apm_info_ptr, mod_data_ptr);
+         }
+      }
+      break;
       case APM_PARAM_ID_PORT_MEDIA_FMT_REPORT_CFG:
       case APM_PARAM_ID_SG_STATE_REPORT_CFG:
       {

@@ -6,9 +6,9 @@
  *  	 This file contains media format IDs and definitions
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
- * 
+ *
  * Not a contribution.
 
  * Portions copied from The Apple Lossless Audio Codec (ALAC) ALACMagicCookieDescription.txt, under Apache-2.0 license.
@@ -1623,6 +1623,63 @@ struct payload_media_fmt_opus_t
    /**< @h2xmle_description {Clients must set this field to 0.}
           @h2xmle_rangeList {"0"=0}
           @h2xmle_visibility   {hide} */
+
+}
+#include "spf_end_pack.h"
+;
+
+/*************************************************** ASR Media Format ************************************************/
+/**
+ * Media format ID for ASR text output
+ */
+#define MEDIA_FMT_ID_ASR                 0x0900103A
+
+/** Enumeration for Language code en_US. */
+#define LANG_CODE_en_US               0
+
+/** Enumeration for Language code zh_CN. */
+#define LANG_CODE_zh_CN               1
+
+/** Enumeration for Language code hi_IN. */
+#define LANG_CODE_hi_IN               2
+
+/** Enumeration for Language code es_US. */
+#define LANG_CODE_es_US               3
+
+/** Enumeration for Language code ko_KR. */
+#define LANG_CODE_ko_KR               4
+
+/** Enumeration for Language code ja_JP. */
+#define LANG_CODE_ja_JP               5
+
+typedef struct payload_media_fmt_asr_t payload_media_fmt_asr_t;
+
+/** @h2xmlp_subStruct
+    @h2xmlp_description {Payload of the ASR text format structure parameters in the
+                         MEDIA_FMT_ID_ASR media format..\n }
+    @h2xmlp_toolPolicy  {Calibration} */
+
+/* if the media mf type MEDIA_FMT_ID_ASR, the expected data is in the form of capi_asr_data_out_port_t */
+
+#include "spf_begin_pack.h"
+struct payload_media_fmt_asr_t
+{
+   uint32_t        max_text_output_size;
+   /**< @h2xmle_description {ASR output text stream max chunk size}
+        @h2xmle_default     {2048}
+        @h2xmle_range       {1024...2048}
+        @h2xmle_policy      {Basic} */
+
+   uint32_t        language_code;
+   /**< @h2xmle_description {langugage code of text output}
+        @h2xmle_rangeList   {"LANG_CODE_en_US"=0,
+        					 "LANG_CODE_zh_CN"=1,
+        					 "LANG_CODE_hi_IN"=2,
+        					 "LANG_CODE_es_US"=3,
+        					 "LANG_CODE_ko_KR"=4,
+        					 "LANG_CODE_ja_JP"=5}
+        @h2xmle_default     {0}
+        @h2xmle_policy      {Basic} */
 
 }
 #include "spf_end_pack.h"

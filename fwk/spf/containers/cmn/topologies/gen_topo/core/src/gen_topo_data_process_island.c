@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -1446,19 +1446,14 @@ capi_err_t gen_topo_copy_input_to_output(gen_topo_t *        topo_ptr,
    return result;
 }
 
-void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr)
+void gen_topo_process_attached_module_to_output(gen_topo_t             *topo_ptr,
+                                                gen_topo_module_t      *module_ptr,
+                                                gen_topo_output_port_t *out_port_ptr)
 {
-   /**
-    * Process output side attached point modules.
-    */
    capi_err_t attached_proc_result = CAPI_EOK;
-   for (gu_output_port_list_t *out_port_list_ptr = module_ptr->gu.output_port_list_ptr; out_port_list_ptr;
-        LIST_ADVANCE(out_port_list_ptr))
-   {
-      gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
       if (!out_port_ptr->gu.attached_module_ptr)
       {
-         continue;
+      return;
       }
 
          gen_topo_module_t *out_attached_module_ptr = (gen_topo_module_t *)out_port_ptr->gu.attached_module_ptr;
@@ -1479,8 +1474,7 @@ void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo
              (attached_mod_ip_port_ptr->common.flags.module_rejected_mf))
          {
 #ifdef VERBOSE_DEBUGGING
-            uint32_t mask =
-               ((out_attached_module_ptr->flags.disabled << 2) | (out_port_ptr->common.flags.is_mf_valid << 1) |
+      uint32_t mask = ((out_attached_module_ptr->flags.disabled << 2) | (out_port_ptr->common.flags.is_mf_valid << 1) |
                 attached_mod_ip_port_ptr->common.flags.module_rejected_mf);
             TOPO_MSG(topo_ptr->gu.log_id,
                      DBG_MED_PRIO,
@@ -1498,7 +1492,7 @@ void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo
                         : (0 == out_port_ptr->common.sdata.buf_ptr[0].actual_data_len),
                      (NULL == out_port_ptr->common.sdata.metadata_list_ptr));
 #endif
-            continue;
+      return;
          }
 
          uint32_t out_port_idx = out_port_ptr->gu.cmn.index;
@@ -1538,6 +1532,13 @@ void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo
          // clang-format on
 
 #ifdef VERBOSE_DEBUGGING
+
+         TOPO_MSG(topo_ptr->gu.log_id,DBG_LOW_PRIO,"M_iid 0x%lX output ts_valid - %d , TS[MSW, LSW] - [%d, %d]",
+                 out_attached_module_ptr->gu.module_instance_id,
+                 topo_ptr->proc_context.out_port_sdata_pptr[out_port_idx]->flags.is_timestamp_valid,
+                 (uint32_t )(topo_ptr->proc_context.out_port_sdata_pptr[out_port_idx]->timestamp >>32),
+                 (uint32_t )topo_ptr->proc_context.out_port_sdata_pptr[out_port_idx]->timestamp );
+
          PRINT_PORT_INFO_AT_PROCESS(out_attached_module_ptr->gu.module_instance_id,
                                     out_port_ptr->gu.cmn.id,
                                     out_port_ptr->common,
@@ -1561,6 +1562,19 @@ void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo
          }
 #endif
     }
+
+void gen_topo_process_attached_elementary_modules(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr)
+{
+   /**
+    * Process output side attached point modules.
+    */
+   for (gu_output_port_list_t *out_port_list_ptr = module_ptr->gu.output_port_list_ptr; out_port_list_ptr;
+        LIST_ADVANCE(out_port_list_ptr))
+   {
+      gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
+
+      gen_topo_process_attached_module_to_output(topo_ptr, module_ptr, out_port_ptr);
+   }
 }
 
 /**
@@ -1679,6 +1693,14 @@ GEN_TOPO_STATIC ar_result_t gen_topo_module_process(gen_topo_t *       topo_ptr,
 #endif
 
       pc->in_port_sdata_pptr[ip_idx] = &in_port_ptr->common.sdata;
+
+#ifdef VERBOSE_DEBUGGING
+      TOPO_MSG(topo_ptr->gu.log_id,DBG_LOW_PRIO,"M_iid 0x%lX input ts_valid - %d , TS[MSW, LSW] - [%d, %d]",
+               module_ptr->gu.module_instance_id,
+               pc->in_port_sdata_pptr[ip_idx]->flags.is_timestamp_valid,
+              (uint32_t )(pc->in_port_sdata_pptr[ip_idx]->timestamp >>32),
+              (uint32_t )pc->in_port_sdata_pptr[ip_idx]->timestamp );
+#endif
 
 #ifdef ERROR_CHECK_MODULE_PROCESS
       result = gen_topo_validate_port_sdata(topo_ptr->gu.log_id,
@@ -1853,7 +1875,7 @@ GEN_TOPO_STATIC ar_result_t gen_topo_module_process(gen_topo_t *       topo_ptr,
       // clang-format on
    }
 #ifdef PROC_DELAY_DEBUG
-   if (APM_SUB_GRAPH_SID_VOICE_CALL == module_ptr->gu.sg_ptr->sid)
+   if (IS_VOICE_SCENARIO_ID(module_ptr->gu.sg_ptr->sid))
    {
       TOPO_MSG_ISLAND(topo_ptr->gu.log_id,
                       DBG_HIGH_PRIO,
@@ -1961,6 +1983,12 @@ GEN_TOPO_STATIC ar_result_t gen_topo_module_process(gen_topo_t *       topo_ptr,
       }
 
 #ifdef VERBOSE_DEBUGGING
+
+        TOPO_MSG(topo_ptr->gu.log_id,DBG_LOW_PRIO,"M_iid 0x%lX output ts_valid - %d TS[MSW, LSW] - [%d, %d]",
+                 module_ptr->gu.module_instance_id,
+                 sdata_ptr->flags.is_timestamp_valid,
+                 (uint32_t )(sdata_ptr->timestamp >>32),
+                 (uint32_t )sdata_ptr->timestamp);
       PRINT_PORT_INFO_AT_PROCESS(m_iid, out_port_ptr->gu.cmn.id, out_port_ptr->common, proc_result, "output", "after");
 #endif
 

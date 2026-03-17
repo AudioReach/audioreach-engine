@@ -68,45 +68,19 @@ capi_err_t capi_jitter_buf_destroy_md_list(capi_jitter_buf_t *me_ptr, module_cmn
 }
 
 /* Set size of circular buffer based on the configuration received */
-capi_err_t capi_jitter_buf_set_size(capi_jitter_buf_t *me_ptr, bool_t is_debug)
+capi_err_t capi_jitter_buf_set_size(capi_jitter_buf_t *me_ptr)
 {
    capi_err_t result = CAPI_EOK;
 
    if (me_ptr->driver_hdl.stream_buf)
    {
-      /* If the circular buffer is already configured and initialized to
-       * param values but debug size is received then destroy and reinit
-       * only if this is due to debug param id. Otherwise return. */
-      if (is_debug)
-      {
-         if (AR_EOK != (result = jitter_buf_driver_deinit(me_ptr)))
-         {
-            AR_MSG(DBG_ERROR_PRIO, "jitter_buf: Cannot destroy driver. ");
-            return CAPI_EFAILED;
-         }
-      }
-      else
-      {
-         return result;
-      }
+      return result;
    }
 
    /* If debug value is present that takes precedence */
    if (me_ptr->debug_size_ms)
    {
       me_ptr->jitter_allowance_in_ms = me_ptr->debug_size_ms;
-   }
-
-   /* If previously disabled enable it back if it needs to be */
-   if (is_debug && (!me_ptr->event_config.process_state) && me_ptr->debug_size_ms)
-   {
-      result = capi_cmn_update_process_check_event(&me_ptr->event_cb_info, TRUE);
-      if (result)
-      {
-         AR_MSG(DBG_ERROR_PRIO, "jitter_buf: Cannot enable the module. ");
-         return result;
-      }
-      me_ptr->event_config.process_state = TRUE;
    }
 
    /* If jitter size is zero disable module and return*/
@@ -120,24 +94,11 @@ capi_err_t capi_jitter_buf_set_size(capi_jitter_buf_t *me_ptr, bool_t is_debug)
 
    /* If calibration and media format are set then initialize the driver.
     * we need calibration to create buffers. */
-
-   if (!me_ptr->driver_hdl.stream_buf)
+   result = ar_result_to_capi_err(jitter_buf_driver_init(me_ptr));
+   if (CAPI_EOK != result)
    {
-      ar_result_t result = AR_EOK;
-      if (AR_EOK != (result = jitter_buf_driver_init(me_ptr)))
-      {
-         AR_MSG(DBG_ERROR_PRIO, "jitter_buf: Cannot intialize the driver. ");
-         return CAPI_EFAILED;
-      }
-   }
-   else
-   {
-      /* if driver is already initialized just re-calibrate the driver. */
-       if (CAPI_EOK != (result = ar_result_to_capi_err(jitter_buf_calibrate_driver(me_ptr))))
-       {
-          AR_MSG(DBG_ERROR_PRIO, "jitter_buf: Failed calibrating the driver with error = %lx", result);
-          return result;
-       }
+      AR_MSG(DBG_ERROR_PRIO, "jitter_buf: Cannot intialize the driver. ");
+      return result;
    }
 
    return CAPI_EOK;
@@ -244,45 +205,3 @@ capi_err_t capi_jitter_buf_raise_kpps_bw_event(capi_jitter_buf_t *me_ptr)
    return capi_result;
 }
 
-/* Jitter buffer is by default driven based on output availability. Only if output is read
- * input is written if it is available at that time. If not, the input gets buffered
- * up in congestion buffering module.
- * If input buffering mode is enabled (ICMD) then input is written if it is available.*/
-capi_err_t capi_jitter_buf_change_trigger_policy(capi_jitter_buf_t *me_ptr)
-{
-   capi_err_t result = AR_EOK;
-
-   if (NULL == me_ptr->policy_chg_cb.change_data_trigger_policy_cb_fn)
-   {
-      return result;
-   }
-
-   fwk_extn_port_trigger_affinity_t input_group1  = { FWK_EXTN_PORT_TRIGGER_AFFINITY_NONE };
-   fwk_extn_port_trigger_affinity_t output_group1 = { FWK_EXTN_PORT_TRIGGER_AFFINITY_PRESENT };
-
-   fwk_extn_port_trigger_group_t triggerable_groups[1];
-   triggerable_groups[0].in_port_grp_affinity_ptr  = &input_group1;
-   triggerable_groups[0].out_port_grp_affinity_ptr = &output_group1;
-
-   fwk_extn_port_nontrigger_policy_t input_group2  = { FWK_EXTN_PORT_NON_TRIGGER_OPTIONAL };
-   fwk_extn_port_nontrigger_policy_t output_group2 = { FWK_EXTN_PORT_NON_TRIGGER_INVALID };
-
-   fwk_extn_port_nontrigger_group_t nontriggerable_group[1];
-   nontriggerable_group[0].in_port_grp_policy_ptr  = &input_group2;
-   nontriggerable_group[0].out_port_grp_policy_ptr = &output_group2;
-
-   /* If input buffering is to be done at input trigger then need to mark optional triggerable.*/
-   if (JBM_BUFFER_INPUT_AT_INPUT_TRIGGER == me_ptr->input_buffer_mode)
-   {
-      input_group1 = FWK_EXTN_PORT_TRIGGER_AFFINITY_PRESENT;
-      input_group2 = FWK_EXTN_PORT_NON_TRIGGER_INVALID;
-   }
-
-   // By default set the mode to RT, when the write arrives then make it FTRT.
-   result = me_ptr->policy_chg_cb.change_data_trigger_policy_cb_fn(me_ptr->policy_chg_cb.context_ptr,
-                                                                   nontriggerable_group,
-                                                                   FWK_EXTN_PORT_TRIGGER_POLICY_OPTIONAL,
-                                                                   1,
-                                                                   triggerable_groups);
-   return result;
-}

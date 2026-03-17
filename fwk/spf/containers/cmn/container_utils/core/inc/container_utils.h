@@ -9,7 +9,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -80,7 +80,8 @@ Macros
 #define FRAME_LEN_40000_US       (40000)
 
 
-#define LATENCY_VOTE_MIN         (40) //ms
+#define LATENCY_VOTE_MIN         (10) //us
+#define LATENCY_VOTE_LOW         (40) //us
 #define LATENCY_VOTE_MAX         (0xFFFFFFFF)
 #define LATENCY_VOTE_RT_FACTOR   (3)  // 3% tolerance
 #define LATENCY_VOTE_NRT_FACTOR  (70) // 70% tolerance
@@ -163,6 +164,7 @@ typedef struct cu_voice_info_t
     cu_voice_cntr_event_flags_t event_flags;            /**< Flag bitfields to indicate the change in cntr proc params
                                                             Used to raise events to vcpm */
     uint32_t      safety_margin_us;
+    bool_t        is_satellite_voice_sid;               /** specifies the container is operating in satellite SPF */
 } cu_voice_info_t;
 
 typedef struct cu_offload_info_t
@@ -212,6 +214,7 @@ typedef struct cu_flags_t
    uint32_t        is_cntr_started : 1;              /**< cntr is started if at least one SG is in start state */
    uint32_t        apm_cmd_context : 1;              /**< Indicates if in apm command handling context, this is to ensure that
                                                           any pm_server voting in this context is non-blocking. */
+   uint32_t        is_real_time: 1;                  /**< flag to indicate if any external port of the container is real time or not. */
 } cu_flags_t;
 
 typedef enum
@@ -601,6 +604,10 @@ typedef struct cu_cntr_vtable_t
 
    ar_result_t (*rtm_dump_data_port_media_fmt)(void *vtopo_ptr, uint32_t container_instance_id, uint32_t port_media_fmt_report_enable);
 
+   ar_result_t (*handle_cntr_set_calibration_ops_done)(cu_base_t *me_ptr);
+
+   ar_result_t (*handle_cntr_set_offload_voice_session_info)(cu_base_t *me_ptr,   cntr_param_id_offload_voice_session_info_t* voice_session_info_ptr);
+
 } cu_cntr_vtable_t;
 
 /* =======================================================================
@@ -756,6 +763,8 @@ ar_result_t cu_ext_in_handle_prebuffer(cu_base_t        *me_ptr,
                                        uint32_t          min_num_buffer_to_hold);
 ar_result_t cu_ext_in_requeue_prebuffers(cu_base_t *me_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr);
 ar_result_t cu_ext_in_release_prebuffers(cu_base_t *me_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr);
+bool_t cu_is_realtime(cu_base_t *base_ptr);
+
 /**-------------------------------- cu_pm ---------------------------------*/
 ar_result_t cu_handle_island_vote(cu_base_t *me_ptr, posal_pm_island_vote_t island_vote);
 ar_result_t cu_vote_latency(cu_base_t *me_ptr, bool_t is_release, bool_t is_realtime_usecase);
@@ -772,11 +781,8 @@ ar_result_t cu_deregister_with_pm(cu_base_t *me_ptr);
 /**--------------------------- cu_state_handler ---------------------------*/
 topo_port_state_t topo_sg_state_to_port_state(topo_sg_state_t sg_state);
 
-static inline topo_port_state_t cu_get_external_output_ds_downgraded_port_state(cu_base_t *        me_ptr,
-                                                                                gu_ext_out_port_t *gu_ext_out_port_ptr)
+static inline topo_port_state_t cu_get_external_output_ds_downgraded_port_state(cu_ext_out_port_t *ext_out_port_ptr)
 {
-   uint8_t *          temp_ptr         = (uint8_t *)gu_ext_out_port_ptr;
-   cu_ext_out_port_t *ext_out_port_ptr = (cu_ext_out_port_t *)(temp_ptr + me_ptr->ext_out_port_cu_offset);
    return ext_out_port_ptr->downgraded_port_state;
 }
 

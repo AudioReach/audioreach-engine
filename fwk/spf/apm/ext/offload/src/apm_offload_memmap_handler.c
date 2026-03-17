@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -18,19 +18,19 @@
 #include "apm_ext_cmn.h"
 #include "apm.h"
 
-ar_result_t apm_offload_mem_shared_memory_map_regions_cmd_handler(apm_t *apm_info_ptr, spf_msg_t *msg_ptr)
+static ar_result_t apm_offload_mem_shared_memory_map_regions_cmd_handler(apm_t *apm_info_ptr, spf_msg_t *msg_ptr)
 {
    ar_result_t result = AR_EOK;
    /** Get the pointer to GPR command */
-   gpr_packet_t *                              pkt_ptr            = (gpr_packet_t *)msg_ptr->payload_ptr;
-   gpr_packet_t *                              sh_mem_map_gpr_ptr = NULL;
-   apm_cmd_shared_mem_map_regions_t *          sh_mem_map_cmd_ptr = NULL;
-   void *                                      payload_ptr;
+   gpr_packet_t                               *pkt_ptr            = (gpr_packet_t *)msg_ptr->payload_ptr;
+   gpr_packet_t                               *sh_mem_map_gpr_ptr = NULL;
+   apm_cmd_shared_mem_map_regions_t           *sh_mem_map_cmd_ptr = NULL;
+   void                                       *payload_ptr;
    apm_cmd_shared_satellite_mem_map_regions_t *mdf_mem_map_regions_payload_ptr;
-   apm_shared_map_region_payload_t *           region_ptr;
-   void *                                      sh_mem_map_cmd_regions_ptr = NULL;
+   apm_shared_map_region_payload_t            *region_ptr;
+   void                                       *sh_mem_map_cmd_regions_ptr = NULL;
    bool_t                                      is_offset_map;
-   apm_ext_utils_t *                           ext_utils_ptr;
+   apm_ext_utils_t                            *ext_utils_ptr;
 
    // get MDF_MEM_MAP payload.
    payload_ptr                     = GPR_PKT_GET_PAYLOAD(void, pkt_ptr);
@@ -150,7 +150,7 @@ __bailout_mdf_cmd_hdlr:
    return result;
 }
 
-ar_result_t apm_offload_mem_shared_memory_map_regions_rsp_handler(apm_t *apm_info_ptr, spf_msg_t *msg_ptr)
+static ar_result_t apm_offload_mem_shared_memory_map_regions_rsp_handler(apm_t *apm_info_ptr, spf_msg_t *msg_ptr)
 {
    ar_result_t result = AR_EOK;
    /** Get the pointer to GPR command */
@@ -286,7 +286,7 @@ __bailout_rsp_hdlr_1:
    return result;
 }
 
-ar_result_t apm_offload_mem_shared_memory_unmap_cmd_handler(apm_t *apm_info_ptr, spf_msg_t *msg_ptr)
+static ar_result_t apm_offload_mem_shared_memory_unmap_cmd_handler(apm_t *apm_info_ptr, spf_msg_t *msg_ptr)
 {
    ar_result_t result = AR_EOK;
    /** Get the pointer to GPR command */

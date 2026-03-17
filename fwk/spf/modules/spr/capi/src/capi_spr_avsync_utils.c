@@ -505,6 +505,39 @@ static capi_err_t capi_spr_update_avsync_config(capi_spr_t *me_ptr, param_id_spr
 }
 
 /*------------------------------------------------------------------------------
+  Function name: capi_spr_process_session_time_reset_param
+    Process the client configuration for the session time reset param.
+* ------------------------------------------------------------------------------*/
+capi_err_t capi_spr_process_session_time_reset_param(capi_spr_t *me_ptr, param_id_spr_session_time_reset_info_t *params_ptr)
+{
+   if (NULL == me_ptr || NULL == params_ptr)
+   {
+      AR_MSG(DBG_ERROR_PRIO, "avsync: received bad pointer for SPR session time parameter");
+      return CAPI_EFAILED;
+   }
+
+   // Check if the client is allowed to update the session time reset configuration.
+   // If input port is started, reject any param configuration.
+   if (DATA_PORT_STATE_STARTED & me_ptr->in_port_info_arr[0].port_state)
+   {
+         SPR_MSG(me_ptr->miid,
+                 DBG_ERROR_PRIO,
+                 "avsync: Session Time Reset change not allowed after START");
+         return CAPI_EFAILED;
+   }
+
+   me_ptr->reset_sess_time_info.mode = params_ptr->mode;
+
+   if(is_spr_avsync_enabled(me_ptr->avsync_ptr))
+   {
+      me_ptr->avsync_ptr->av_reset_info.mode = params_ptr->mode;
+      SPR_MSG(me_ptr->miid, DBG_HIGH_PRIO, "avsync: reset session time info %d", params_ptr->mode);
+   }
+
+   return CAPI_EOK;
+}
+
+/*------------------------------------------------------------------------------
   Function name: capi_spr_destroy_hold_buf_list
     Destroy the hold buffer list
 * ------------------------------------------------------------------------------*/

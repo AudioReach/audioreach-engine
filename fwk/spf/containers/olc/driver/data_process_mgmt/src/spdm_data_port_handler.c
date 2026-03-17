@@ -33,7 +33,9 @@ static ar_result_t spgm_rd_data_port_msg_handler(spgm_info_t *spgm_ptr, uint32_t
    log_id = spgm_ptr->sgm_id.log_id;
    VERIFY(result, (SPDM_MAX_IO_PORTS > port_index));
 
+#ifdef SGM_ENABLE_DATA_RSP_LEVEL_MSG
    OLC_SDM_MSG(OLC_SDM_ID, DBG_HIGH_PRIO, "rd_port_msg_h : processing read queue element");
+#endif
 
    // Get the pointer to the queue and the msg
 
@@ -202,7 +204,7 @@ ar_result_t sgm_create_rd_data_queue(cu_base_t *            cu_ptr,
                                      spgm_info_t *          spgm_ptr,
                                      uint32_t               ext_outport_bitmask,
                                      uint32_t               rd_client_miid,
-                                     void*                  dest,
+                                     void *                 dest,
                                      sdm_data_port_info_t **rd_ctrl_cfg_ptr)
 {
    ar_result_t result = AR_EOK;
@@ -256,14 +258,14 @@ ar_result_t sgm_create_rd_data_queue(cu_base_t *            cu_ptr,
 
    // creating the read data port queue
    if (AR_EOK != (result = cu_init_queue(cu_ptr,
-                                           sgm_rd_data_q_name,
-                                           num_elements,
-                                           bit_mask,
-                                           spdm_rd_dataQ_handler,
-                                           cu_ptr->channel_ptr,
-                                           &read_data_ptr->port_info.this_handle.q_ptr,
-                                           dest,
-                                           cu_ptr->heap_id)))
+                                         sgm_rd_data_q_name,
+                                         num_elements,
+                                         bit_mask,
+                                         spdm_rd_dataQ_handler,
+                                         cu_ptr->channel_ptr,
+                                         &read_data_ptr->port_info.this_handle.q_ptr,
+                                         dest,
+                                         cu_ptr->heap_id)))
    {
       OLC_SDM_MSG(OLC_SDM_ID,
                   DBG_ERROR_PRIO,
@@ -284,6 +286,11 @@ ar_result_t sgm_create_rd_data_queue(cu_base_t *            cu_ptr,
    read_data_ptr->port_info.ctrl_cfg.rw_ep_miid            = sat_rd_ep_miid;
    read_data_ptr->port_info.ctrl_cfg.data_link_ps.rd_state = wait_for_ipc_read_data_done_evnt;
 
+   read_data_ptr->db_obj.mem_gaurd_header.rw_client_miid = rd_client_miid;
+   read_data_ptr->db_obj.mem_gaurd_header.rw_ep_miid     = sat_rd_ep_miid;
+   read_data_ptr->db_obj.mem_gaurd_header.sdm_port_index = port_index;
+   read_data_ptr->db_obj.mem_gaurd_header.log_id         = spgm_ptr->sgm_id.log_id;
+
    *rd_ctrl_cfg_ptr = &read_data_ptr->port_info.ctrl_cfg;
 
    OLC_SDM_MSG(OLC_SDM_ID,
@@ -292,8 +299,8 @@ ar_result_t sgm_create_rd_data_queue(cu_base_t *            cu_ptr,
                "rw_client_miid (0x%lx) rw_ep_miid (0x%lx) ",
                ext_outport_bitmask,
                bit_mask,
-			   rd_client_miid,
-			   sat_rd_ep_miid);
+               rd_client_miid,
+               sat_rd_ep_miid);
 
    CATCH(result, OLC_MSG_PREFIX, log_id)
    {
@@ -345,8 +352,8 @@ ar_result_t sgm_destroy_rd_data_port(spgm_info_t *spgm_ptr, uint32_t port_index)
 
    // remove any pending data nodes from the shared data pool
    result |= spdm_remove_all_node_from_data_pool(spgm_ptr,
-                                             &rd_port_obj_ptr->db_obj.buf_pool,
-                                             rd_port_obj_ptr->db_obj.buf_pool.num_data_buf_in_list);
+                                                 &rd_port_obj_ptr->db_obj.buf_pool,
+                                                 rd_port_obj_ptr->db_obj.buf_pool.num_data_buf_in_list);
 
    // Free the read data port object
    posal_memory_free(rd_port_obj_ptr);
@@ -378,7 +385,9 @@ static ar_result_t spdm_wr_data_port_msg_handler(spgm_info_t *spgm_ptr, uint32_t
    log_id = spgm_ptr->sgm_id.log_id;
    VERIFY(result, (SPDM_MAX_IO_PORTS > port_index));
 
-   OLC_SDM_MSG(OLC_SDM_ID, DBG_HIGH_PRIO, "wd_port_msg_h : processing write queue element");
+#if SGM_ENABLE_WRITE_DATA_FLOW_LEVEL_MSG
+   OLC_SDM_MSG(OLC_SDM_ID, DBG_LOW_PRIO, "wd_port_msg_h : processing write queue element");
+#endif
 
    // Get the pointer to the queue and the msg
 
@@ -395,7 +404,7 @@ static ar_result_t spdm_wr_data_port_msg_handler(spgm_info_t *spgm_ptr, uint32_t
    VERIFY(result, (NULL != packet_ptr));
 
    OLC_SDM_MSG(OLC_SDM_ID,
-               DBG_HIGH_PRIO,
+               DBG_MED_PRIO,
                "wd_port_msg_h : processing cmd opcode (%lX) token (%lx), pkt_ptr 0x%lx",
                packet_ptr->opcode,
                packet_ptr->token,
@@ -531,7 +540,7 @@ ar_result_t sgm_create_wr_data_queue(cu_base_t *            cu_ptr,
                                      spgm_info_t *          spgm_ptr,
                                      uint32_t               ext_inport_bitmask,
                                      uint32_t               rw_client_miid,
-                                     void*                  dest,
+                                     void *                 dest,
                                      sdm_data_port_info_t **rw_ctrl_cfg_ptr)
 {
    ar_result_t result = AR_EOK;
@@ -586,14 +595,14 @@ ar_result_t sgm_create_wr_data_queue(cu_base_t *            cu_ptr,
 
    // init the write data port queue
    if (AR_EOK != (result = cu_init_queue(cu_ptr,
-                                           sdm_wr_data_q_name,
-                                           num_elements,
-                                           bit_mask,
-                                           spdm_wr_dataQ_handler,
-                                           cu_ptr->channel_ptr,
-                                           &wd_port_obj_ptr->port_info.this_handle.q_ptr,
-                                           dest,
-                                           cu_ptr->heap_id)))
+                                         sdm_wr_data_q_name,
+                                         num_elements,
+                                         bit_mask,
+                                         spdm_wr_dataQ_handler,
+                                         cu_ptr->channel_ptr,
+                                         &wd_port_obj_ptr->port_info.this_handle.q_ptr,
+                                         dest,
+                                         cu_ptr->heap_id)))
    {
       OLC_SDM_MSG(OLC_SDM_ID,
                   DBG_ERROR_PRIO,
@@ -614,6 +623,11 @@ ar_result_t sgm_create_wr_data_queue(cu_base_t *            cu_ptr,
    wd_port_obj_ptr->port_info.ctrl_cfg.rw_client_miid        = rw_client_miid;
    wd_port_obj_ptr->port_info.ctrl_cfg.rw_ep_miid            = sat_rw_ep_miid;
    wd_port_obj_ptr->port_info.ctrl_cfg.data_link_ps.wr_state = wait_for_ext_in_port_data;
+
+   wd_port_obj_ptr->db_obj.mem_gaurd_header.rw_client_miid = rw_client_miid;
+   wd_port_obj_ptr->db_obj.mem_gaurd_header.rw_ep_miid     = sat_rw_ep_miid;
+   wd_port_obj_ptr->db_obj.mem_gaurd_header.sdm_port_index = port_index;
+   wd_port_obj_ptr->db_obj.mem_gaurd_header.log_id         = spgm_ptr->sgm_id.log_id;
 
    *rw_ctrl_cfg_ptr = &wd_port_obj_ptr->port_info.ctrl_cfg;
 
@@ -674,8 +688,8 @@ ar_result_t sgm_destroy_wr_data_port(spgm_info_t *spgm_ptr, uint32_t port_index)
 
    // remove any pending data nodes from the shared data pool
    result |= spdm_remove_all_node_from_data_pool(spgm_ptr,
-                                             &wd_port_obj_ptr->db_obj.buf_pool,
-                                             wd_port_obj_ptr->db_obj.buf_pool.num_data_buf_in_list);
+                                                 &wd_port_obj_ptr->db_obj.buf_pool,
+                                                 wd_port_obj_ptr->db_obj.buf_pool.num_data_buf_in_list);
 
    // Free the write data port object
    posal_memory_free(wd_port_obj_ptr);

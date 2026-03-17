@@ -8,7 +8,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -50,7 +50,10 @@ ar_result_t gen_cntr_get_set_thread_priority(gen_cntr_t *        me_ptr,
                                              posal_thread_prio_t original_prio);
 ar_result_t gen_cntr_handle_proc_duration_change(cu_base_t *base_ptr);
 ar_result_t gen_cntr_handle_cntr_period_change(cu_base_t *base_ptr);
+ar_result_t gen_cntr_handle_cntr_set_calibration_ops_done(cu_base_t *base_ptr);
 ar_result_t gen_cntr_handle_frame_done(gen_topo_t *gen_topo_ptr, uint8_t path_index);
+ar_result_t gen_cntr_handle_offload_voice_session_info(cu_base_t *base_ptr, cntr_param_id_offload_voice_session_info_t* voice_session_info_ptr);
+
 ar_result_t gen_cntr_ext_out_port_reset(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 ar_result_t gen_cntr_ext_out_port_basic_reset(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 ar_result_t gen_cntr_ext_in_port_reset(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
@@ -118,9 +121,12 @@ ar_result_t gen_cntr_check_process_input_media_fmt_data_cmd(gen_cntr_t *        
                                                             gen_cntr_ext_in_port_t *ext_in_port_ptr);
 /** ------------------------------------------- Signal Trigger -----------------------------------------------------*/
 ar_result_t gen_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_index);
-ar_result_t gen_cntr_st_prepare_output_buffers_per_ext_out_port(gen_cntr_t *             me_ptr,
+ar_result_t gen_cntr_st_prepare_input_buffers(gen_cntr_t *me_ptr);
+ar_result_t gen_cntr_st_prepare_output_buffers(gen_cntr_t *me_ptr);
+ar_result_t gen_cntr_st_prepare_output_buffers_per_ext_out_port(gen_cntr_t              *me_ptr,
                                                                 gen_cntr_ext_out_port_t *ext_out_port_ptr);
-void gen_cntr_st_check_print_overrun(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
+ar_result_t gen_cntr_st_prepare_input_buffers_per_port(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
+void        gen_cntr_st_check_print_overrun(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 void gen_cntr_st_underrun(gen_cntr_t *            me_ptr,
                           gen_cntr_ext_in_port_t *ext_in_port_ptr,
                           uint32_t                bytes_required_per_buf);
@@ -202,7 +208,6 @@ ar_result_t gen_cntr_cache_set_event_prop(gen_cntr_t *       me_ptr,
                                           topo_reg_event_t * event_cfg_payload_ptr,
                                           bool_t             is_register);
 
-bool_t gen_cntr_is_realtime(gen_cntr_t *me_ptr);
 bool_t gen_cntr_is_signal_triggered(gen_cntr_t *me_ptr);
 
 ar_result_t gen_cntr_apply_downgraded_state_on_output_port(cu_base_t *       cu_ptr,
@@ -281,6 +286,7 @@ ar_result_t gen_cntr_update_island_vote(gen_cntr_t *me_ptr, posal_pm_island_vote
 ar_result_t gen_cntr_check_and_vote_for_island_in_data_path_(gen_cntr_t *me_ptr);
 
 /** ------------------ **/
+uint32_t gen_cntr_assign_ext_in_buf_for_int_port(gen_topo_t *topo_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr);
 uint32_t gen_cntr_aggregate_ext_in_port_delay_topo_cb(gen_topo_t *topo_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr);
 uint32_t gen_cntr_aggregate_ext_out_port_delay_topo_cb(gen_topo_t *topo_ptr, gu_ext_out_port_t *gu_ext_out_port_ptr);
 uint32_t gen_cntr_get_additional_ext_in_port_delay_cu_cb(cu_base_t *base_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr);

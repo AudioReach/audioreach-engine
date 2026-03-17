@@ -371,7 +371,7 @@ ar_result_t gen_cntr_perf_vote(gen_cntr_t                 *me_ptr,
       }
       cu_vote_latency(&me_ptr->cu,
                       cntr_activity_stopped,
-                      (gen_cntr_is_signal_triggered(me_ptr) || gen_cntr_is_realtime(me_ptr)));
+                      (gen_cntr_is_signal_triggered(me_ptr) || me_ptr->cu.flags.is_real_time));
    }
 
    return result;

@@ -59,9 +59,11 @@ static ar_result_t spgm_cmd_rsp_handler(cu_base_t *cu_ptr, spgm_info_t *spgm_ptr
 
          OLC_SGM_MSG(OLC_SGM_ID,
                      DBG_HIGH_PRIO,
-                     "cmd_rsp: processing ibasic response with cmd_opcode(0x%lX) token(0x%lX) ",
+                     "cmd_rsp: processing ibasic response with cmd_opcode(0x%lX) "
+                     "token(0x%lX) ptime %lu",
                      rsp_ptr->opcode,
-                     packet_ptr->token);
+                     packet_ptr->token,
+                     spgm_ptr->p_cmd_exec_ts);
 
          switch (rsp_ptr->opcode)
          {
@@ -159,17 +161,38 @@ static ar_result_t spgm_cmd_rsp_handler(cu_base_t *cu_ptr, spgm_info_t *spgm_ptr
             case APM_CMD_DEREGISTER_CFG:
             case APM_CMD_DEREGISTER_SHARED_CFG: //OLC_CA : check the packed
             {
-               if (APM_MODULE_INSTANCE_ID != packet_ptr->src_port)
+               spgm_cmd_hndl_node_t *cmd_hndl_node_ptr = NULL;
+               bool_t                send_response     = TRUE;
+               result = sgm_get_active_cmd_hndl(spgm_ptr, rsp_info->opcode, rsp_info->token, &cmd_hndl_node_ptr);
+               if (cmd_hndl_node_ptr->multi_max_resp_cnt)
                {
-                  // Handling the response to the case where register/de-register
-                  // configuration is sent to the module instance.
-                  TRY(result, spgm_ptr->cmd_rsp_vtbl->graph_set_persistent_rsp_h(cu_ptr, rsp_info));
+                  cmd_hndl_node_ptr->multi_rsp_cnt++;
+                  if (cmd_hndl_node_ptr->multi_rsp_cnt < cmd_hndl_node_ptr->multi_max_resp_cnt)
+                  {
+                     send_response   = FALSE;
+                     free_cmd_handle = FALSE;
+                  }
+				  else
+				  {
+					rsp_info->sec_opcode    = cmd_hndl_node_ptr->sec_opcode;
+					rsp_info->cmd_extn_info = cmd_hndl_node_ptr->cmd_extn_info;					  
+				  }
                }
-               else
+
+               if (TRUE == send_response)
                {
-                  // Handling the response to the case where register/de-register
-                  // configuration is sent to the APM module instance.
-                  TRY(result, spgm_ptr->cmd_rsp_vtbl->graph_set_persistent_packed_rsp_h(cu_ptr, rsp_info));
+                  if (APM_MODULE_INSTANCE_ID != packet_ptr->src_port)
+                  {
+                     // Handling the response to the case where register/de-register
+                     // configuration is sent to the module instance.
+                     TRY(result, spgm_ptr->cmd_rsp_vtbl->graph_set_persistent_rsp_h(cu_ptr, rsp_info));
+                  }
+                  else
+                  {
+                     // Handling the response to the case where register/de-register
+                     // configuration is sent to the APM module instance.
+                     TRY(result, spgm_ptr->cmd_rsp_vtbl->graph_set_persistent_packed_rsp_h(cu_ptr, rsp_info));
+                  }
                }
                break;
             }
@@ -204,6 +227,14 @@ static ar_result_t spgm_cmd_rsp_handler(cu_base_t *cu_ptr, spgm_info_t *spgm_ptr
          rsp_info->opcode     = packet_ptr->opcode;
          rsp_info->token      = packet_ptr->token;
          sgm_get_cache_cmd_msg(spgm_ptr, rsp_info->opcode, rsp_info->token, &rsp_info->cmd_msg);
+
+         OLC_SGM_MSG(OLC_SGM_ID,
+                     DBG_HIGH_PRIO,
+                     "cmd_rsp: processing GET CFG response with "
+                     "cmd_opcode(0x%lX) token(0x%lX) ptime %lu",
+                     rsp_info->opcode,
+                     packet_ptr->token,
+					 spgm_ptr->p_cmd_exec_ts);
 
          if (APM_MODULE_INSTANCE_ID != packet_ptr->src_port)
          {

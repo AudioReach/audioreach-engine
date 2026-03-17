@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -505,6 +505,7 @@ static ar_result_t gen_topo_capi_query_intf_extn_support(void *             amdb
                               { INTF_EXTN_PROP_IS_RT_PORT_PROPERTY,  FALSE, { NULL, 0, 0 } },      \
                               { INTF_EXTN_DUTY_CYCLING_ISLAND_MODE,  FALSE, { NULL, 0, 0 } },      \
                               { INTF_EXTN_PERIOD,                    FALSE, { NULL, 0, 0 } },      \
+                              { INTF_EXTN_CALIBRATION_OPS_DONE,      FALSE, { NULL, 0, 0 } },      \
                               { INTF_EXTN_STM_TS,                    FALSE, { NULL, 0, 0 } },      \
                             }
 
@@ -596,6 +597,11 @@ static ar_result_t gen_topo_capi_query_intf_extn_support(void *             amdb
                case INTF_EXTN_PERIOD:
                {
                   module_ptr->flags.supports_period = TRUE;
+                  break;
+               }
+               case INTF_EXTN_CALIBRATION_OPS_DONE:
+               {
+                  module_ptr->flags.supports_calibration_ops_done = TRUE;
                   break;
                }
                case INTF_EXTN_STM_TS:
@@ -727,6 +733,7 @@ ar_result_t gen_topo_capi_create_from_amdb(gen_topo_module_t *    module_ptr,
    // MIMO modules can't be inplace.
    VERIFY(result, !(inplace && ((module_ptr->gu.num_input_ports > 1) || (module_ptr->gu.num_output_ports > 1))));
    module_ptr->flags.inplace           = inplace;
+   module_ptr->flags.dynamic_inplace   = inplace;
    module_ptr->flags.requires_data_buf = requires_data_buf;
 
    // get required framework extensions
@@ -1428,9 +1435,15 @@ ar_result_t gen_topo_capi_set_param(uint32_t log_id,
 
    VERIFY(result, NULL != capi_ptr);
 
-   // Assume the Set param value would be a 32-bit integer, as is specified in CAPI document.
-   result = capi_ptr->vtbl_ptr->set_param(capi_ptr, param_id, &port_info, &buf);
-
+   if (capi_ptr == NULL)
+   {
+      return result = AR_EUNSUPPORTED;
+   }
+   else
+   {
+      // Assume the Set param value would be a 32-bit integer, as is specified in CAPI document.
+      result = capi_ptr->vtbl_ptr->set_param(capi_ptr, param_id, &port_info, &buf);
+   }
    if (CAPI_FAILED(result))
    {
       TOPO_MSG(log_id, DBG_ERROR_PRIO, "set param for (param id 0x%lx, size %lu) result %d", param_id, size, result);

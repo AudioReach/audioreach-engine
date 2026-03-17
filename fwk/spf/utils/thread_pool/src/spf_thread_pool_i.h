@@ -24,7 +24,13 @@
 #define SPF_THREAD_POOL_MAX_QUEUE_NODES (128)
 
 // number of queue nodes to preallocate
+// Increase in number of pre-allocated nodes is specific to SPF Simulation set-up 
+// and is needed for avoiding false alarms related to memory leaks
+#if defined(SIM)
+#define SPF_THREAD_POOL_PREALLOC_QUEUE_NODES (32)
+#else
 #define SPF_THREAD_POOL_PREALLOC_QUEUE_NODES (16)
+#endif //defined(SIM)
 
 // Minimum stack size for the thread pool's worker threads.
 #define SPF_THREAD_POOL_MIN_STACK_SIZE (1024)

@@ -273,6 +273,8 @@ struct apm_cont_prop_id_proc_domain_t
         @valuesbul
         - #APM_PROC_DOMAIN_ID_MDSP
         - #APM_PROC_DOMAIN_ID_ADSP
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2
         - #APM_PROC_DOMAIN_ID_APPS
         - #APM_PROC_DOMAIN_ID_SDSP
         - #APM_PROC_DOMAIN_ID_CDSP
@@ -284,6 +286,8 @@ struct apm_cont_prop_id_proc_domain_t
    /*#< @h2xmle_rangeList   {"DONT_CARE"=0xFFFFFFFF,
                              "mDSP"=APM_PROC_DOMAIN_ID_MDSP,
                              "aDSP"=APM_PROC_DOMAIN_ID_ADSP,
+                             "aDSP_1"=APM_PROC_DOMAIN_ID_ADSP_1,
+                             "aDSP_2"=APM_PROC_DOMAIN_ID_ADSP_2,
                              "APPS"=APM_PROC_DOMAIN_ID_APPS,
                              "sDSP"=APM_PROC_DOMAIN_ID_SDSP,
                              "cDSP"=APM_PROC_DOMAIN_ID_CDSP,
@@ -548,7 +552,7 @@ struct apm_cont_prop_id_frame_size_time_t
     uint32_t frame_size_us;
     /**< Processing frame size of the container in time (microseconds).*/
 
-    /*#< @h2xmle_range   {1000...100000}
+    /*#< @h2xmle_range   {1...100000}
      @h2xmle_default     {5000}
      @h2xmle_description {Processing frame size of the container in time (microseconds).} */
 }

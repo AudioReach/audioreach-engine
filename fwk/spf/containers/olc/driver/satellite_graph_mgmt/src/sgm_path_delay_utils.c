@@ -443,6 +443,7 @@ ar_result_t sgm_destroy_path(spgm_info_t *spgm_ptr, uint32_t master_path_id)
                found_node = FALSE;
             }
          }
+         cont_node_ptr = cont_node_ptr->next_ptr;
          if (0 == pd_event_reg_node_ptr->num_path_ref)
          {
             // event deregister
@@ -459,7 +460,6 @@ ar_result_t sgm_destroy_path(spgm_info_t *spgm_ptr, uint32_t master_path_id)
             pd_event_reg_node_ptr = NULL;
             // remove event node
          }
-         cont_node_ptr = cont_node_ptr->next_ptr;
       }
    }
 

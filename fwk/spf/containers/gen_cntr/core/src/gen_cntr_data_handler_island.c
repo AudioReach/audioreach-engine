@@ -5,7 +5,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -248,7 +248,7 @@ static bool_t gen_cntr_need_to_process_frames(gen_cntr_t *me_ptr,
 
    // if topo is non real time then break the loop to process command Q.
    // this is to avoid delay in processing command Q during NT mode data processing.
-   if (!me_ptr->topo.flags.is_real_time_topo &&
+   if (!me_ptr->cu.flags.is_real_time &&
        posal_channel_poll_inline(me_ptr->cu.channel_ptr, GEN_CNTR_CMD_BIT_MASK))
    {
       me_ptr->topo.flags.process_pending = TRUE;
@@ -462,27 +462,40 @@ ar_result_t gen_cntr_post_process_ext_out_buffer(gen_cntr_t              *me_ptr
       return AR_EOK;
    }
 
-   // If the external buffer is being reused as the topo buffer then both the buffer pointers are same.
+   // If the external output buffer is being reused as the topo buffer then both the buffer pointers are same.
+   // Note that ext input buffer could have been propagated to ext output as well, hence make sure buffer ptr is
+   // same as ext buffer
    // In this case we don't need to memcpy,
    //   deint-packed from deint-unpacked conversion if required happens in gen_cntr_send_peer_cntr_out_buffers.
+   bool_t skip_copy = FALSE;
    if (GEN_TOPO_BUF_ORIGIN_EXT_BUF == out_port_ptr->common.flags.buf_origin)
    {
       if (gen_cntr_is_ext_out_v2(ext_out_port_ptr))
       {
-         for (uint32_t b = 0; b < ext_out_port_ptr->bufs_num; b++)
+         if ((ext_out_port_ptr->bufs_ptr[0].data_ptr + ext_out_port_ptr->bufs_ptr[0].actual_data_len) ==
+             out_port_ptr->common.bufs_ptr[0].data_ptr)
          {
-            ext_out_port_ptr->bufs_ptr[b].actual_data_len += out_port_ptr->common.flags.is_pcm_unpacked
-                                                                ? out_port_ptr->common.bufs_ptr[0].actual_data_len
-                                                                : out_port_ptr->common.bufs_ptr[b].actual_data_len;
+            for (uint32_t b = 0; b < ext_out_port_ptr->bufs_num; b++)
+            {
+               ext_out_port_ptr->bufs_ptr[b].actual_data_len += out_port_ptr->common.flags.is_pcm_unpacked
+                                                                   ? out_port_ptr->common.bufs_ptr[0].actual_data_len
+                                                                   : out_port_ptr->common.bufs_ptr[b].actual_data_len;
+            }
+            gen_topo_set_all_bufs_len_to_zero(&out_port_ptr->common);
+            skip_copy = TRUE;
          }
       }
-      else
+      else if ((ext_out_port_ptr->buf.data_ptr + ext_out_port_ptr->buf.actual_data_len) ==
+               out_port_ptr->common.bufs_ptr[0].data_ptr)
       {
          ext_out_port_ptr->buf.actual_data_len += total_len;
+         gen_topo_set_all_bufs_len_to_zero(&out_port_ptr->common);
+         skip_copy = TRUE;
       }
-      gen_topo_set_all_bufs_len_to_zero(&out_port_ptr->common);
    }
-   else // copy from topo to ext-out buffer
+
+   // copy from topo to ext-out buffer
+   if (FALSE == skip_copy)
    {
       gen_cntr_move_data_from_topo_to_ext_out_buf(me_ptr, ext_out_port_ptr, total_len, max_empty_space);
    }
@@ -746,18 +759,32 @@ static ar_result_t gen_cntr_data_process_one_frame(gen_cntr_t *me_ptr)
         (NULL != ext_out_port_list_ptr);
         LIST_ADVANCE(ext_out_port_list_ptr), out_port_index++)
    {
-      gen_cntr_ext_out_port_t *temp_ext_out_port_ptr =
+      gen_cntr_ext_out_port_t *ext_out_port_ptr =
          (gen_cntr_ext_out_port_t *)ext_out_port_list_ptr->ext_out_port_ptr;
 
       uint32_t actual_data_len = 0;
-      gen_cntr_get_ext_out_total_actual_max_data_len(temp_ext_out_port_ptr, &actual_data_len, NULL);
+      gen_cntr_get_ext_out_total_actual_max_data_len(ext_out_port_ptr, &actual_data_len, NULL);
 
       pc_ptr->ext_out_port_scratch_ptr[out_port_index].prev_actual_data_len = actual_data_len;
+
+      // assigns ext buffer to topo buffer if possible, else topo buffer will be assigned during module process context
+      // Only peer cntr ext out and Rd shm ep has valid cb. Offload Rd shm ep will not reuse client buffer.
+      gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
+      if (ext_out_port_ptr->vtbl_ptr->setup_topo_buf && (TOPO_PORT_STATE_STARTED == out_port_ptr->common.state))
+      {
+         TRY(result, ext_out_port_ptr->vtbl_ptr->setup_topo_buf(me_ptr, ext_out_port_ptr));
+      }
    }
 
    for (uint8_t i = 0; i < me_ptr->cu.gu_ptr->num_parallel_paths; i++)
    {
       gu_module_list_t *start_module_list_ptr = me_ptr->topo.started_sorted_module_list_ptr;
+
+      // if there was switch from thin topo to gen topo get the module from
+      // which process needs to continue.
+      thin_topo_check_get_gen_topo_next_proc_module(&me_ptr->topo,
+                                                    &start_module_list_ptr);
+
       if (0 == me_ptr->wait_mask_arr[i])
       {
          while (TRUE)
@@ -801,6 +828,19 @@ static ar_result_t gen_cntr_data_process_one_frame(gen_cntr_t *me_ptr)
        * context. refer gen_cntr_deliver_output() */
       result |=
          gen_cntr_post_process_ext_output_port(me_ptr, process_info_ptr, pc_ptr, temp_ext_out_port_ptr, out_port_index);
+   }
+
+   // free ext input if it was propagated from the external input, clear after ext output port post process because
+   // ext input buffer could have been propagated to internal output connected to the ext output. (Eg: cntr with only Wr shm module)
+   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = me_ptr->topo.gu.ext_in_port_list_ptr;
+        (NULL != ext_in_port_list_ptr);
+        LIST_ADVANCE(ext_in_port_list_ptr))
+   {
+      gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
+      gen_topo_input_port_t  *in_port_ptr     = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
+
+      // check if a borrowed buffer is stuck in the NBLC path and relace with a topo buffer.
+      result |= gen_cntr_clear_borrowed_ext_in_buffer_from_int_ports(me_ptr, ext_in_port_ptr, in_port_ptr, FALSE);
    }
 
    CATCH(result, GEN_CNTR_MSG_PREFIX, me_ptr->topo.gu.log_id)
@@ -974,6 +1014,9 @@ ar_result_t gen_cntr_post_process_ext_output_port(gen_cntr_t                 *me
 
    // Return the internal output buffer only if its not using the external output buffer (check inside).
    gen_topo_output_port_return_buf_mgr_buf(&me_ptr->topo, out_port_ptr);
+
+   // clear external buffer ptr from the internal ports
+   result |= gen_cntr_clear_borrowed_ext_out_buffer_from_int_ports(me_ptr, ext_out_port_ptr, out_port_ptr);
 
    // when EOF propagated from the input due to discontinuity, reaches output port, we can release output buffer.
    if (out_port_ptr->common.sdata.flags.end_of_frame)
@@ -1152,7 +1195,7 @@ ar_result_t gen_cntr_data_process_frames(gen_cntr_t *me_ptr)
          break;
       }
 
-      if ((loop_count >= 100))
+      if (loop_count >= 100)
       {
          GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, "Infinite loop alert. Listening to only commands.");
          gen_cntr_listen_to_controls(me_ptr);
@@ -1229,8 +1272,8 @@ ar_result_t gen_cntr_setup_internal_input_port_and_preprocess(gen_cntr_t *      
         (!((GEN_TOPO_DATA_BLOCKED | GEN_TOPO_DATA_NOT_NEEDED) & needs_inp_data))) ||
        force_process)
    {
-      // note this call can return a fresh buf or a buf already at inplace-nblc-end.
-      TRY(result, gen_topo_check_get_in_buf_from_buf_mgr(&me_ptr->topo, in_port_ptr, NULL));
+
+      TRY(result, gen_cntr_ext_input_setup_int_port_buf(me_ptr, ext_in_port_ptr, in_port_ptr));
 
       if (NULL == in_port_ptr->common.bufs_ptr[0].data_ptr)
       {
@@ -1521,10 +1564,22 @@ ar_result_t gen_cntr_free_input_data_cmd(gen_cntr_t *            me_ptr,
    {
       return AR_EOK;
    }
+
+#ifdef VERBOSE_DEBUGGING
+   GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                DBG_LOW_PRIO,
+                "Freed input msg buffer 0x%lx with opcode 0x%x from ext input (miid,port-id) (0x%lX, 0x%lx)",
+                ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->module_instance_id,
+                ext_in_port_ptr->gu.int_in_port_ptr->cmn.id,
+                ext_in_port_ptr->cu.input_data_q_msg.payload_ptr,
+                ext_in_port_ptr->cu.input_data_q_msg.msg_opcode);
+#endif
+
    ext_in_port_ptr->vtbl_ptr->free_input_buf(me_ptr, ext_in_port_ptr, status, is_flush);
 
    // set payload to NULL to indicate we are not holding on to any input data msg
-   ext_in_port_ptr->cu.input_data_q_msg.payload_ptr = NULL;
+   // it must be cleared in the .free_input_buf() itself
+   //ext_in_port_ptr->cu.input_data_q_msg.payload_ptr = NULL;
 
    return result;
 }
@@ -1621,4 +1676,389 @@ ar_result_t gen_cntr_input_dataQ_trigger(cu_base_t *base_ptr, uint32_t channel_b
    me_ptr->topo.proc_context.curr_trigger = GEN_TOPO_INVALID_TRIGGER;
 
    return result;
+}
+
+static ar_result_t gen_cntr_replace_borrowed_buf_with_topo_buf_util_(gen_cntr_t             *me_ptr,
+                                                                     gu_module_t            *module_ptr,
+                                                                     gen_topo_common_port_t *cmn_port_ptr)
+{
+   ar_result_t result = AR_EOK;
+   // get a topo buffer and copy data from ext borrowed buffer to int buffer
+   // assign topo buffer to int port
+   int8_t  *src_ptr       = cmn_port_ptr->bufs_ptr[0].data_ptr;
+   uint32_t bytes_to_copy = cmn_port_ptr->bufs_ptr[0].actual_data_len;
+
+   cmn_port_ptr->bufs_ptr[0].data_ptr = NULL;
+
+   result = gen_topo_buf_mgr_wrapper_get_buf(&me_ptr->topo, cmn_port_ptr);
+
+   TOPO_MEMSCPY_NO_RET(cmn_port_ptr->bufs_ptr[0].data_ptr,
+                       cmn_port_ptr->bufs_ptr[0].max_data_len,
+                       src_ptr,
+                       bytes_to_copy,
+                       me_ptr->topo.gu.log_id,
+                       "miid 0x%lX",
+                       module_ptr->module_instance_id);
+
+#ifdef VERBOSE_DEBUGGING
+   GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                DBG_HIGH_PRIO,
+                "Module 0x%08lX: Replacing ext buf 0x%lx with topo buf 0x%lx len (%lu of %lu)",
+                module_ptr->module_instance_id,
+                src_ptr,
+                cmn_port_ptr->bufs_ptr[0].data_ptr,
+                cmn_port_ptr->bufs_ptr[0].actual_data_len,
+                cmn_port_ptr->bufs_ptr[0].max_data_len);
+#endif
+   return result;
+}
+
+ar_result_t gen_cntr_clear_borrowed_ext_in_buffer_from_int_ports(gen_cntr_t             *me_ptr,
+                                                                 gen_cntr_ext_in_port_t *ext_in_port_ptr,
+                                                                 gen_topo_input_port_t  *in_port_ptr,
+                                                                 bool_t                  IS_FORCE_CLEAR)
+{
+   ar_result_t result = AR_EOK;
+
+   if ((GEN_TOPO_BUF_ORIGIN_EXT_BUF == in_port_ptr->common.flags.buf_origin) &&
+       in_port_ptr->common.bufs_ptr[0].data_ptr &&
+       ((0 == in_port_ptr->common.bufs_ptr[0].actual_data_len) || IS_FORCE_CLEAR))
+   {
+#ifdef VERBOSE_DEBUGGING
+      GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                   DBG_LOW_PRIO,
+                   " Module 0x%lX: Port 0x%lx, Clearing ext input buffer 0x%p from internal port, max_buf_len %lu, "
+                   "buf_origin%u",
+                   in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                   in_port_ptr->gu.cmn.id,
+                   in_port_ptr->common.bufs_ptr[0].data_ptr,
+                   in_port_ptr->common.bufs_ptr[0].max_data_len,
+                   in_port_ptr->common.flags.buf_origin);
+#endif
+
+      // free the ext buffer from internal port
+
+      int8_t *brwd_ext_buf_ptr = in_port_ptr->common.bufs_ptr[0].data_ptr;
+      if (in_port_ptr->common.bufs_ptr[0].actual_data_len)
+      {
+         // it would enter with actual data len only if force clear is set
+         GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                      DBG_ERROR_PRIO,
+                      "Module (0x%08lX, 0x%lx): Unexpected! Freeing unprocessed held ext in buffer 0x%lx len (%lu of "
+                      "%lu).",
+                      in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                      in_port_ptr->gu.cmn.id,
+                      in_port_ptr->common.bufs_ptr[0].data_ptr,
+                      in_port_ptr->common.bufs_ptr[0].actual_data_len,
+                      in_port_ptr->common.bufs_ptr[0].max_data_len);
+
+         result |= gen_cntr_replace_borrowed_buf_with_topo_buf_util_(me_ptr,
+                                                                     in_port_ptr->gu.cmn.module_ptr,
+                                                                     &in_port_ptr->common);
+      }
+      else
+      {
+         in_port_ptr->common.bufs_ptr[0].data_ptr = NULL;
+         in_port_ptr->common.flags.buf_origin     = GEN_TOPO_BUF_ORIGIN_INVALID;
+         gen_topo_set_all_bufs_len_to_zero(&in_port_ptr->common);
+      }
+
+      // Borrowed external buffer (GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED) could be stuck in the NBLC due to any of the
+      // following reasons,
+      // 1. Downstream SG stopped and data is stalled.
+      // 2. NBLC boundary module's trigger policy is blocked and module doesnt consume input.
+      //
+      // Note that if there is requires data buffering module buffer is not propagated, hence
+      gen_topo_input_port_t *nblc_end_ptr    = in_port_ptr->nblc_end_ptr;
+      gen_topo_input_port_t *cur_in_port_ptr = in_port_ptr;
+      while (nblc_end_ptr != cur_in_port_ptr)
+      {
+         gen_topo_module_t *cur_module_ptr = (gen_topo_module_t *)cur_in_port_ptr->gu.cmn.module_ptr;
+
+         // check cur mod output
+         if (!cur_module_ptr->gu.output_port_list_ptr)
+         {
+            break;
+         }
+
+         gen_topo_output_port_t *curr_out_port_ptr =
+            (gen_topo_output_port_t *)cur_module_ptr->gu.output_port_list_ptr->op_port_ptr;
+         // replace GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED with topo buffer in the NBLC
+         // ideally buf would be cleared if there is no pending data at this point.
+         if (brwd_ext_buf_ptr == curr_out_port_ptr->common.bufs_ptr[0].data_ptr)
+         {
+            if (curr_out_port_ptr->common.bufs_ptr[0].actual_data_len)
+            {
+               result |= gen_cntr_replace_borrowed_buf_with_topo_buf_util_(me_ptr,
+                                                                           cur_in_port_ptr->gu.cmn.module_ptr,
+                                                                           &curr_out_port_ptr->common);
+            }
+            else
+            {
+#ifdef VERBOSE_DEBUGGING
+               GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                            DBG_LOW_PRIO,
+                            " Module 0x%lX: Port 0x%lx, Clearing borrowed ext input buffer 0x%p from internal port, "
+                            "max_buf_len %lu, "
+                            "buf_origin%u",
+                            curr_out_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                            curr_out_port_ptr->gu.cmn.id,
+                            curr_out_port_ptr->common.bufs_ptr[0].data_ptr,
+                            curr_out_port_ptr->common.bufs_ptr[0].max_data_len,
+                            curr_out_port_ptr->common.flags.buf_origin);
+#endif
+
+               curr_out_port_ptr->common.bufs_ptr[0].data_ptr = NULL;
+               curr_out_port_ptr->common.flags.buf_origin     = GEN_TOPO_BUF_ORIGIN_INVALID;
+               gen_topo_set_all_bufs_len_to_zero(&curr_out_port_ptr->common);
+            }
+         }
+
+         gen_topo_input_port_t *next_in_port_ptr = (gen_topo_input_port_t *)curr_out_port_ptr->gu.conn_in_port_ptr;
+         if (!next_in_port_ptr)
+         {
+            break;
+         }
+
+         // ideally buf would be cleared if there is no pending data at this point.
+         if (brwd_ext_buf_ptr == next_in_port_ptr->common.bufs_ptr[0].data_ptr)
+         {
+            if (next_in_port_ptr->common.bufs_ptr[0].actual_data_len)
+            {
+               result |= gen_cntr_replace_borrowed_buf_with_topo_buf_util_(me_ptr,
+                                                                           next_in_port_ptr->gu.cmn.module_ptr,
+                                                                           &next_in_port_ptr->common);
+            }
+            else
+            {
+#ifdef VERBOSE_DEBUGGING
+               GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                            DBG_LOW_PRIO,
+                            " Module 0x%lX: Port 0x%lx, Clearing borrowed ext input buffer 0x%p from internal port, "
+                            "max_buf_len %lu, "
+                            "buf_origin%u",
+                            next_in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                            next_in_port_ptr->gu.cmn.id,
+                            next_in_port_ptr->common.bufs_ptr[0].data_ptr,
+                            next_in_port_ptr->common.bufs_ptr[0].max_data_len,
+                            next_in_port_ptr->common.flags.buf_origin);
+#endif
+               next_in_port_ptr->common.bufs_ptr[0].data_ptr = NULL;
+               next_in_port_ptr->common.flags.buf_origin     = GEN_TOPO_BUF_ORIGIN_INVALID;
+               gen_topo_set_all_bufs_len_to_zero(&next_in_port_ptr->common);
+            }
+         }
+
+         // replace GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED with topo buffer in the NBLC
+
+         cur_in_port_ptr = next_in_port_ptr;
+      }
+
+      // free ext buffer only if it is borrowed by internal ports. If its not borrowed, buffer will be free in the
+      // .read_data() context itself.
+      if (0 == ext_in_port_ptr->buf.actual_data_len)
+      {
+         result |= gen_cntr_free_input_data_cmd(me_ptr, ext_in_port_ptr, AR_EOK, FALSE);
+      }
+   }
+
+   return result;
+}
+
+static ar_result_t gen_cntr_ext_out_free_borrowed_buf_in_nblc_util_(gen_cntr_t             *me_ptr,
+                                                                    gen_topo_output_port_t *out_port_ptr,
+                                                                    int8_t                 *brwd_ext_buf_ptr)
+{
+   ar_result_t result = AR_EOK;
+
+   // check cur out_port_ptr
+   if (brwd_ext_buf_ptr == out_port_ptr->common.bufs_ptr[0].data_ptr)
+   {
+      if (out_port_ptr->common.bufs_ptr[0].actual_data_len)
+      {
+         // get a topo buffer and copy data from ext borrowed buffer to int buffer
+         // assign topo buffer to int port
+         result |= gen_cntr_replace_borrowed_buf_with_topo_buf_util_(me_ptr,
+                                                                     out_port_ptr->gu.cmn.module_ptr,
+                                                                     &out_port_ptr->common);
+      }
+      else
+      {
+         out_port_ptr->common.bufs_ptr[0].data_ptr     = NULL;
+         out_port_ptr->common.bufs_ptr[0].max_data_len = 0;
+         out_port_ptr->common.flags.buf_origin         = GEN_TOPO_BUF_ORIGIN_INVALID;
+         gen_topo_set_all_bufs_len_to_zero(&out_port_ptr->common);
+      }
+   }
+
+   // Borrowed external buffer could be stuck in the NBLC path due to any of the following reasons,
+   // 1. upstream SG stopped and data is stalled.
+   // 2. NBLC boundary module's trigger policy is blocked and module doesnt generate any output.
+   gen_topo_output_port_t *nblc_start_ptr   = out_port_ptr->nblc_start_ptr;
+   gen_topo_output_port_t *cur_out_port_ptr = out_port_ptr;
+   while (nblc_start_ptr != cur_out_port_ptr)
+   {
+      gen_topo_module_t *cur_module_ptr = (gen_topo_module_t *)cur_out_port_ptr->gu.cmn.module_ptr;
+
+      // check cur mod input
+      if (!cur_module_ptr->gu.input_port_list_ptr)
+      {
+         break;
+      }
+
+      gen_topo_input_port_t *curr_in_port_ptr =
+         (gen_topo_input_port_t *)cur_module_ptr->gu.input_port_list_ptr->ip_port_ptr;
+      if (brwd_ext_buf_ptr == curr_in_port_ptr->common.bufs_ptr[0].data_ptr)
+      {
+         if (curr_in_port_ptr->common.bufs_ptr[0].actual_data_len)
+         {
+            result |= gen_cntr_replace_borrowed_buf_with_topo_buf_util_(me_ptr,
+                                                                        curr_in_port_ptr->gu.cmn.module_ptr,
+                                                                        &curr_in_port_ptr->common);
+         }
+         else
+         {
+            curr_in_port_ptr->common.bufs_ptr[0].data_ptr     = NULL;
+            curr_in_port_ptr->common.bufs_ptr[0].max_data_len = 0;
+            curr_in_port_ptr->common.flags.buf_origin         = GEN_TOPO_BUF_ORIGIN_INVALID;
+            gen_topo_set_all_bufs_len_to_zero(&curr_in_port_ptr->common);
+         }
+      }
+
+      // check the upstream module's output
+      gen_topo_output_port_t *prev_out_port_ptr = (gen_topo_output_port_t *)curr_in_port_ptr->gu.conn_out_port_ptr;
+      if (NULL == prev_out_port_ptr)
+      {
+         break;
+      }
+
+      if (brwd_ext_buf_ptr == prev_out_port_ptr->common.bufs_ptr[0].data_ptr)
+      {
+         if (prev_out_port_ptr->common.bufs_ptr[0].actual_data_len)
+         {
+            result |= gen_cntr_replace_borrowed_buf_with_topo_buf_util_(me_ptr,
+                                                                        prev_out_port_ptr->gu.cmn.module_ptr,
+                                                                        &prev_out_port_ptr->common);
+         }
+         else
+         {
+            prev_out_port_ptr->common.bufs_ptr[0].data_ptr     = NULL;
+            prev_out_port_ptr->common.bufs_ptr[0].max_data_len = 0;
+            prev_out_port_ptr->common.flags.buf_origin         = GEN_TOPO_BUF_ORIGIN_INVALID;
+            gen_topo_set_all_bufs_len_to_zero(&prev_out_port_ptr->common);
+         }
+      }
+      cur_out_port_ptr = prev_out_port_ptr;
+   }
+   return result;
+}
+
+/** This function takes care of resetting ext buffer references from the internal ports (buf_origin:
+ * GEN_TOPO_BUF_ORIGIN_EXT_BUF). This function must be called after ext out data is post processed.
+ *
+ * This function also makes sure any references to the ext buffer gets cleared from the NBLC path (buf_origin:
+ * GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED). If any data is stalled in the borrowed buffer due to module's trigger not
+ * being satisfied (like stopped sg boundary), this function replaces the borrowed buffer with a topo buffer, so as to
+ * free the ext out buffer. */
+ar_result_t gen_cntr_clear_borrowed_ext_out_buffer_from_int_ports(gen_cntr_t              *me_ptr,
+                                                                  gen_cntr_ext_out_port_t *ext_out_port_ptr,
+                                                                  gen_topo_output_port_t  *out_port_ptr)
+{
+   ar_result_t result = AR_EOK;
+
+   if (GEN_TOPO_BUF_ORIGIN_EXT_BUF != out_port_ptr->common.flags.buf_origin)
+   {
+      return result;
+   }
+
+#ifdef VERBOSE_DEBUGGING
+   GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                DBG_LOW_PRIO,
+                " Module 0x%lX: Port 0x%lx, Clearing ext output buffer 0x%p from internal port, max_buf_len %lu, "
+                "buf_origin%u",
+                out_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                out_port_ptr->gu.cmn.id,
+                out_port_ptr->common.bufs_ptr[0].data_ptr,
+                out_port_ptr->common.bufs_ptr[0].max_data_len,
+                out_port_ptr->common.flags.buf_origin);
+#endif
+
+   // it's enough to reset first buf, as only first buf is checked for validity
+   int8_t *brwd_ext_buf_ptr                      = out_port_ptr->common.bufs_ptr[0].data_ptr;
+   out_port_ptr->common.bufs_ptr[0].data_ptr     = NULL;
+   out_port_ptr->common.bufs_ptr[0].max_data_len = 0;
+   out_port_ptr->common.flags.buf_origin         = GEN_TOPO_BUF_ORIGIN_INVALID;
+   gen_topo_set_all_bufs_len_to_zero(&out_port_ptr->common);
+
+   // Important: Even though Rd shm is nblc boundary module buffer might be propagated to the NBLC upstream as well.
+   // check gen_topo_check_get_out_buf_from_buf_mgr_util_() how
+   // rd shm buffer is propagated to nblc beyond rd shm module.
+   gen_topo_module_t *cur_module_ptr = (gen_topo_module_t *)out_port_ptr->gu.cmn.module_ptr;
+   if (MODULE_ID_RD_SHARED_MEM_EP == out_port_ptr->gu.cmn.module_ptr->module_id)
+   {
+      // replace GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED with topo buffer
+      gen_topo_input_port_t *curr_in_port_ptr =
+         (gen_topo_input_port_t *)cur_module_ptr->gu.input_port_list_ptr->ip_port_ptr;
+      if (brwd_ext_buf_ptr == curr_in_port_ptr->common.bufs_ptr[0].data_ptr)
+      {
+         // get a topo buffer and copy data from ext borrowed buffer to int buffer
+         // assign topo buffer to int port
+         if (curr_in_port_ptr->common.bufs_ptr[0].actual_data_len)
+         {
+            result |= gen_cntr_replace_borrowed_buf_with_topo_buf_util_(me_ptr,
+                                                                        curr_in_port_ptr->gu.cmn.module_ptr,
+                                                                        &curr_in_port_ptr->common);
+         }
+         else
+         {
+            curr_in_port_ptr->common.bufs_ptr[0].data_ptr     = NULL;
+            curr_in_port_ptr->common.bufs_ptr[0].max_data_len = 0;
+            curr_in_port_ptr->common.flags.buf_origin         = GEN_TOPO_BUF_ORIGIN_INVALID;
+            gen_topo_set_all_bufs_len_to_zero(&curr_in_port_ptr->common);
+         }
+      }
+
+      // free GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED buf in the nblc path before Rd shm module
+      if (curr_in_port_ptr->gu.conn_out_port_ptr)
+      {
+         result |= gen_cntr_ext_out_free_borrowed_buf_in_nblc_util_(me_ptr,
+                                                                    (gen_topo_output_port_t *)
+                                                                       curr_in_port_ptr->gu.conn_out_port_ptr,
+                                                                    brwd_ext_buf_ptr);
+      }
+   }
+   else
+   {
+      // free GEN_TOPO_BUF_ORIGIN_EXT_BUF_BORROWED buf in the nblc path conneced to ext output
+      result |= gen_cntr_ext_out_free_borrowed_buf_in_nblc_util_(me_ptr, out_port_ptr, brwd_ext_buf_ptr);
+   }
+
+   return result;
+}
+
+void gen_cntr_check_and_send_prebuffers_util_(gen_cntr_t              *me_ptr,
+                                              gen_cntr_ext_out_port_t *ext_out_port_ptr,
+                                              spf_msg_data_buffer_t   *out_buf_ptr)
+{
+   // Exit and handle prebuffers only if port has requirement
+   if (cu_check_if_port_requires_prebuffers(&ext_out_port_ptr->cu))
+   {
+      gen_topo_exit_island_temporarily(&me_ptr->topo);
+      cu_handle_prebuffer(&me_ptr->cu,
+                          &ext_out_port_ptr->gu,
+                          out_buf_ptr,
+                          ext_out_port_ptr->cu.buf_max_size -
+                             (gen_topo_compute_if_output_needs_addtional_bytes_for_dm(&(me_ptr->topo),
+                                                                                      (gen_topo_output_port_t *)
+                                                                                         ext_out_port_ptr->gu
+                                                                                            .int_out_port_ptr)));
+   }
+   else
+   {
+      // if port didnt have prebuf requirement at data flow start, then we can mark sent= TRUE,
+      // If prebuf requriement changes after data flow start, no need to insert prebuffer since its going cause
+      // a glitch, if we need to handle scenario there we need to consider if media format changed
+      ext_out_port_ptr->cu.icb_info.is_prebuffer_sent = TRUE;
+   }
+   return;
 }

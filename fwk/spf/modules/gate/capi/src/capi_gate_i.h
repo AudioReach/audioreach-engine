@@ -35,6 +35,7 @@ extern "C" {
 #define CAPI_GATE_KPPS 50
 #define GATE_NUM_FRAMEWORK_EXTENSIONS 1
 #define GATE_NUM_US_PER_MS 1000
+#define GATE_SCHEDULING_JITTER_US 100
 //#define GATE_DBG 1
 /*------------------------------------------------------------------------
  * Type definitions
@@ -90,6 +91,9 @@ typedef struct capi_gate_t
 
    bool_t gate_opened;
    /*Flag to indicate gate is opened */
+
+   int32_t deadline_offset_us;
+   /* Deadline offset in micro seconds */
 } capi_gate_t;
 
 /* clang-format on */

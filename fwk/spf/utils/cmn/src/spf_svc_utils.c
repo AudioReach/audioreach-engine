@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -385,19 +385,11 @@ ar_result_t spf_svc_create_and_push_buffers_to_buf_queue_util(posal_queue_t *buf
                                                               uint32_t       buf_size,
                                                               uint32_t       num_out_bufs,
                                                               spf_handle_t * dst_handle_ptr,
-                                                              bool_t         is_inter_proc_ctrl_link,
                                                               POSAL_HEAP_ID  heap_id,
                                                               uint32_t *     num_bufs_allocated_ptr,
                                                               bool_t         is_control_msg)
 {
    ar_result_t result = AR_EOK;
-
-   // it's okay for the dest_handle ptr to be null if it is a control message and if the link is inter-proc
-   if ((!dst_handle_ptr) && (FALSE == is_inter_proc_ctrl_link))
-   {
-      AR_MSG(DBG_ERROR_PRIO, "destination not connected yet!");
-      return AR_EFAILED;
-   }
 
    // Allocate and queue up the output buffers.
    while (*num_bufs_allocated_ptr < num_out_bufs)
@@ -559,11 +551,17 @@ ar_result_t spf_svc_create_and_push_ctrl_msg_bufs_to_buf_queue(posal_queue_t *bu
                                                                POSAL_HEAP_ID  heap_id,
                                                                uint32_t *     num_bufs_allocated_ptr)
 {
+   // it's okay for the dest_handle ptr to be null if it is a control message and if the link is inter-proc
+   if ((!dst_handle_ptr) && (FALSE == is_inter_proc_link))
+   {
+      AR_MSG(DBG_ERROR_PRIO, "destination not connected yet!");
+      return AR_EFAILED;
+   }
+
    return spf_svc_create_and_push_buffers_to_buf_queue_util(buf_q_ptr,
                                                             buf_size,
                                                             num_out_bufs,
                                                             dst_handle_ptr,
-                                                            is_inter_proc_link,
                                                             heap_id,
                                                             num_bufs_allocated_ptr,
                                                             TRUE /*is_control_msg*/);
@@ -583,7 +581,6 @@ ar_result_t spf_svc_create_and_push_buffers_to_buf_queue(posal_queue_t *buf_q_pt
                                                             buf_size,
                                                             num_out_bufs,
                                                             dst_handle_ptr,
-                                                            FALSE, /*is_inter_proc_ctrl_link*/
                                                             heap_id,
                                                             num_bufs_allocated_ptr,
                                                             FALSE /*is_control_msg*/);

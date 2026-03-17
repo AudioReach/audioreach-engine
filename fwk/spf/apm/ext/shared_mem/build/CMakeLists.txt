@@ -2,17 +2,13 @@
    @file CMakeLists.txt
 
    @brief
-
-   @copyright
-   Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
-   SPDX-License-Identifier: BSD-3-Clause-Clear
-
 ]]
 cmake_minimum_required(VERSION 3.10)
 
 #Add the source files
 set (lib_srcs_list
      ${LIB_ROOT}/src/apm_shmem_util.c
+     ${LIB_ROOT}/src/apm_shmem_util_v2.c
     )
 
 #Call spf_build_static_library to generate the static library

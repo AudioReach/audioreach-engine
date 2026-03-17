@@ -262,12 +262,6 @@ ar_result_t rt_proxy_update_drift_based_on_buffer_fullness(capi_rt_proxy_t *me_p
    ar_result_t        result  = AR_EOK;
    rt_proxy_driver_t *drv_ptr = &me_ptr->driver_hdl;
 
-   // If the peer control port is not connected we don't need to update the drift.
-   if (me_ptr->ctrl_port_info.state != CTRL_PORT_PEER_CONNECTED)
-   {
-      return AR_EOK;
-   }
-
    // get un read bytes from the driver.
    uint32_t unread_bytes = 0;
    spf_circ_buf_get_unread_bytes(drv_ptr->reader_handle, &unread_bytes);
@@ -335,6 +329,12 @@ ar_result_t rt_proxy_update_drift_based_on_buffer_fullness(capi_rt_proxy_t *me_p
 #ifdef DEBUG_RT_PROXY_DRIVER_DRIFT_ADJ
       AR_MSG(DBG_LOW_PRIO, "RT_PROXY_DRIVER: Lower drift threshold met. unread_bytes=%lu", unread_bytes);
 #endif // DEBUG_RT_PROXY_DRIVER_DRIFT_ADJ
+   }
+
+   // If the peer control port is not connected we don't need to update the drift.
+   if (me_ptr->ctrl_port_info.state != CTRL_PORT_PEER_CONNECTED)
+   {
+      return AR_EOK;
    }
 
    // Update the drift

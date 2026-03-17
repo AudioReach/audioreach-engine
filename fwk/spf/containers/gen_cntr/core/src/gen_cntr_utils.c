@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -172,7 +172,7 @@ ar_result_t gen_cntr_get_set_thread_priority(gen_cntr_t         *me_ptr,
       }
       else
       {
-         is_real_time = gen_cntr_is_realtime(me_ptr);
+         is_real_time = me_ptr->cu.flags.is_real_time;
          has_stm      = gen_cntr_is_signal_triggered(me_ptr);
          if (!is_real_time && !has_stm)
          {
@@ -266,6 +266,25 @@ ar_result_t gen_cntr_handle_proc_duration_change(cu_base_t *base_ptr)
    return AR_EOK;
 }
 
+ar_result_t gen_cntr_handle_offload_voice_session_info(cu_base_t *base_ptr,  cntr_param_id_offload_voice_session_info_t* voice_session_info_ptr)
+{
+   gen_cntr_t *me_ptr   = (gen_cntr_t *)base_ptr;
+
+   for (gu_sg_list_t *sg_list_ptr = me_ptr->topo.gu.sg_list_ptr; (NULL != sg_list_ptr); LIST_ADVANCE(sg_list_ptr))
+   {
+     if(sg_list_ptr->sg_ptr->id == voice_session_info_ptr->sg_id )
+     {
+       sg_list_ptr->sg_ptr->kpps_scale_factor = voice_session_info_ptr->kpps_sf;
+       sg_list_ptr->sg_ptr->bw_scale_factor = voice_session_info_ptr->bw_sf;
+        GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                       DBG_HIGH_PRIO,
+                      "gen_cntr_handle_offload_voice_session_info: SG_ID 0x%lX, KPPS_SF %d, BW_SF %d",
+                          sg_list_ptr->sg_ptr->id, sg_list_ptr->sg_ptr->kpps_scale_factor, sg_list_ptr->sg_ptr->bw_scale_factor);
+     }
+      
+   }
+   return AR_EOK;
+}
 ar_result_t gen_cntr_handle_cntr_period_change(cu_base_t *base_ptr)
 {
    gen_cntr_t *me_ptr   = (gen_cntr_t *)base_ptr;
@@ -315,6 +334,50 @@ ar_result_t gen_cntr_handle_cntr_period_change(cu_base_t *base_ptr)
    return AR_EOK;
 }
 
+ar_result_t gen_cntr_handle_cntr_set_calibration_ops_done(cu_base_t *base_ptr)
+{
+   gen_cntr_t *me_ptr   = (gen_cntr_t *)base_ptr;
+   capi_err_t  err_code = CAPI_EOK;
+
+   for (gu_sg_list_t *sg_list_ptr = me_ptr->topo.gu.sg_list_ptr; (NULL != sg_list_ptr); LIST_ADVANCE(sg_list_ptr))
+   {
+      for (gu_module_list_t *module_list_ptr = sg_list_ptr->sg_ptr->module_list_ptr; (NULL != module_list_ptr);
+           LIST_ADVANCE(module_list_ptr))
+      {
+         gen_topo_module_t *module_ptr = (gen_topo_module_t *)module_list_ptr->module_ptr;
+
+         if (FALSE == module_ptr->flags.supports_calibration_ops_done)
+         {
+            continue;
+         }
+
+         err_code = gen_topo_capi_set_param(me_ptr->topo.gu.log_id,
+                                            module_ptr->capi_ptr,
+                                            INTF_EXTN_CALIBRATION_OPS_DONE,
+                                            NULL, 0);
+
+         if ((err_code != AR_EOK) && (err_code != AR_EUNSUPPORTED))
+         {
+
+            GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                         DBG_ERROR_PRIO,
+                         "Module 0x%lX: setting calibration ops done failed",
+                         module_ptr->gu.module_instance_id);
+            return err_code;
+         }
+         else
+         {
+            GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                         DBG_LOW_PRIO,
+                         "Module 0x%lX: setting calibration ops done success",
+                         module_ptr->gu.module_instance_id
+                         );
+         }
+      }
+   }
+   return AR_EOK;
+}
+
 /**
  * keeps Media format and other data messages
  */
@@ -337,6 +400,8 @@ ar_result_t gen_cntr_flush_input_data_queue(gen_cntr_t             *me_ptr,
    // next frame processing.
    ext_in_port_ptr->cu.preserve_prebuffer       = TRUE;
    me_ptr->topo.flags.need_to_handle_frame_done = TRUE;
+
+   THIN_TOPO_SET_EXIT_FLAG((&me_ptr->topo), has_to_preserve_prebuffer, TRUE);
 
    do
    {
@@ -510,77 +575,6 @@ ar_result_t gen_cntr_ext_out_port_reset(gen_cntr_t *me_ptr, gen_cntr_ext_out_por
    return result;
 }
 
-static bool_t gen_cntr_is_ext_out_port_us_or_ds_rt(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr)
-{
-   gen_topo_output_port_t *out_port_ptr           = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
-   uint32_t                is_downstream_realtime = FALSE;
-   uint32_t                is_upstream_realtime   = FALSE;
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_OUTPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_UPSTREAM_RT,
-                              out_port_ptr,
-                              &is_upstream_realtime);
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_OUTPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_DOWNSTREAM_RT,
-                              out_port_ptr,
-                              &is_downstream_realtime);
-
-   return (is_downstream_realtime || is_upstream_realtime);
-}
-
-static bool_t gen_cntr_is_ext_in_port_us_or_ds_rt(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr)
-{
-   gen_topo_input_port_t *in_port_ptr            = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
-   uint32_t               is_downstream_realtime = FALSE;
-   uint32_t               is_upstream_realtime   = FALSE;
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_INPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_UPSTREAM_RT,
-                              in_port_ptr,
-                              &is_upstream_realtime);
-   gen_topo_get_port_property(&me_ptr->topo,
-                              TOPO_DATA_INPUT_PORT_TYPE,
-                              PORT_PROPERTY_IS_DOWNSTREAM_RT,
-                              in_port_ptr,
-                              &is_downstream_realtime);
-
-   return (is_downstream_realtime || is_upstream_realtime);
-}
-
-/**
- * GEN_CNTR is real time if
- * any of its external ports is connected to an RT entity.
- */
-bool_t gen_cntr_is_realtime(gen_cntr_t *me_ptr)
-{
-   me_ptr->topo.flags.is_real_time_topo = FALSE;
-   for (gu_ext_out_port_list_t *ext_out_port_list_ptr = me_ptr->topo.gu.ext_out_port_list_ptr;
-        (NULL != ext_out_port_list_ptr);
-        LIST_ADVANCE(ext_out_port_list_ptr))
-   {
-      gen_cntr_ext_out_port_t *ext_out_port_ptr = (gen_cntr_ext_out_port_t *)ext_out_port_list_ptr->ext_out_port_ptr;
-      if (gen_cntr_is_ext_out_port_us_or_ds_rt(me_ptr, ext_out_port_ptr))
-      {
-         me_ptr->topo.flags.is_real_time_topo = TRUE;
-         return TRUE;
-      }
-   }
-   // AKR TBD: Revisit this logic - OR instead of and  (RT vs NRT)
-   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = me_ptr->topo.gu.ext_in_port_list_ptr;
-        (NULL != ext_in_port_list_ptr);
-        LIST_ADVANCE(ext_in_port_list_ptr))
-   {
-      gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
-      if (gen_cntr_is_ext_in_port_us_or_ds_rt(me_ptr, ext_in_port_ptr))
-      {
-         me_ptr->topo.flags.is_real_time_topo = TRUE;
-         return TRUE;
-      }
-   }
-   return FALSE;
-}
-
 void gen_cntr_set_stm_ts_to_module(gen_cntr_t *me_ptr)
 
 {
@@ -703,9 +697,21 @@ static ar_result_t gen_cntr_stm_fwk_extn_handle_enable(gen_cntr_t *me_ptr, gen_t
             on the container on every DMA interrupt or every time the timer expires */
       bit_mask = GEN_CNTR_TIMER_BIT_MASK;
 
-      /* initialize the signal */
-      TRY(result,
+      /* initialize the signal handler, this function can be called in the signal miss recovery context, hence need to
+       * check if processing with thin topo to switch.*/
+      if (check_if_cntr_is_processing_with_thin_topo(&me_ptr->topo))
+      {
+         TRY(result,
+             cu_init_signal(&me_ptr->cu,
+                            bit_mask,
+                            thin_topo_signal_trigger_handler,
+                            &me_ptr->st_module.trigger_signal_ptr));
+      }
+      else
+      {
+         TRY(result,
              cu_init_signal(&me_ptr->cu, bit_mask, gen_cntr_signal_trigger, &me_ptr->st_module.trigger_signal_ptr));
+      }
 
       /* Initialize interrupt counter */
       me_ptr->st_module.raised_interrupt_counter = 0;
@@ -1802,6 +1808,11 @@ ar_result_t gen_cntr_handle_fwk_events_util_(gen_cntr_t *                me_ptr,
       fwk_event_flag_ptr->rt_ftrt_change = TRUE;
    }
 
+   if (fwk_event_flag_ptr->rt_ftrt_change)
+   {
+      cu_is_realtime(&me_ptr->cu);
+   }
+
    if (capi_event_flag_ptr->dynamic_inplace_change)
    {
       gen_topo_handle_pending_dynamic_inplace_change(&me_ptr->topo, capi_event_flag_ptr);
@@ -1902,6 +1913,10 @@ ar_result_t gen_cntr_handle_fwk_events_util_(gen_cntr_t *                me_ptr,
       }
    }
 #endif
+
+   // if currently processing with thin topo, check if anything needs to be updated in thin topo or needs to switch to
+   // gen topo
+   result |= thin_topo_handle_fwk_events(me_ptr, capi_event_flag_ptr, fwk_event_flag_ptr);
 
    capi_event_flag_ptr->word                     = 0;
    fwk_event_flag_ptr->word                      = 0;

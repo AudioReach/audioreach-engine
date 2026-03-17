@@ -197,19 +197,25 @@ capi_err_t capi_mux_demux_set_param(capi_t *                _pif,
             }
 
             result |=
-               ((CAPI_MAX_CHANNELS_V2 < out_format_ptr->num_channels) ||
-                (BIT_WIDTH_16 != out_format_ptr->bits_per_sample && BIT_WIDTH_32 != out_format_ptr->bits_per_sample) ||
-                (PCM_Q_FACTOR_15 != out_format_ptr->q_factor && PCM_Q_FACTOR_27 != out_format_ptr->q_factor &&
-                 PCM_Q_FACTOR_31 != out_format_ptr->q_factor))
-                  ? CAPI_EBADPARAM
-                  : CAPI_EOK;
+                ((CAPI_MAX_CHANNELS_V2 < out_format_ptr->num_channels) ||
+                 !((out_format_ptr->bits_per_sample == BIT_WIDTH_16 &&
+                    out_format_ptr->q_factor == PCM_Q_FACTOR_15) ||
+                   (out_format_ptr->bits_per_sample == BIT_WIDTH_32 &&
+                    (out_format_ptr->q_factor == PCM_Q_FACTOR_27 ||
+                     out_format_ptr->q_factor == PCM_Q_FACTOR_31))))
+                    ? CAPI_EBADPARAM
+                    : CAPI_EOK;
 
             if (CAPI_FAILED(result))
             {
                AR_MSG(DBG_ERROR_PRIO,
-                      "Invalid media format received for output port array index 0x%x port id 0x%x.",
+                      "Invalid media format received for output port array index 0x%x port id 0x%x. "
+                      "bps=%u, q_factor=%u, num_channels=%u",
                       out_port_arr_index,
-                      out_format_ptr->output_port_id);
+                      out_format_ptr->output_port_id,
+                      out_format_ptr->bits_per_sample,
+                      out_format_ptr->q_factor,
+                      out_format_ptr->num_channels);
                continue;
             }
 
@@ -226,6 +232,20 @@ capi_err_t capi_mux_demux_set_param(capi_t *                _pif,
          }
          break;
       }
+      case PARAM_ID_MUX_DEMUX_TS_PROPAGATION:
+      {
+         if (params_ptr->actual_data_len < sizeof(param_id_mux_demux_ts_propagation_t))
+         {
+            AR_MSG(DBG_ERROR_PRIO, "Insufficient size for mux demux TS Prop param.");
+            return CAPI_ENEEDMORE;
+         }
+         param_id_mux_demux_ts_propagation_t *config_ptr =
+            (param_id_mux_demux_ts_propagation_t *)(params_ptr->data_ptr);
+         me_ptr->enable_ts_propagation = config_ptr->enable_ts_propagation;
+         AR_MSG(DBG_HIGH_PRIO, "Set param for TS Prop - %u", me_ptr->enable_ts_propagation);
+         break;
+      }
+
 #ifdef SIM
       case FWK_EXTN_PARAM_ID_TRIGGER_POLICY_CB_FN:
       {
@@ -403,6 +423,19 @@ capi_err_t capi_mux_demux_get_param(capi_t *                _pif,
 
          break;
       }
+      case PARAM_ID_MUX_DEMUX_TS_PROPAGATION:
+      {
+         if (params_ptr->max_data_len < sizeof(param_id_mux_demux_ts_propagation_t))
+         {
+            AR_MSG(DBG_ERROR_PRIO, "Insufficient size for mux demux TS Prop param.");
+            return CAPI_ENEEDMORE;
+         }
+         param_id_mux_demux_ts_propagation_t *config_ptr =
+            (param_id_mux_demux_ts_propagation_t *)(params_ptr->data_ptr);
+         config_ptr->enable_ts_propagation = me_ptr->enable_ts_propagation;
+         params_ptr->actual_data_len = sizeof(param_id_mux_demux_ts_propagation_t);
+         break;
+      }
       default:
          AR_MSG(DBG_ERROR_PRIO, "Invalid getparam received 0x%lx", param_id);
          result = CAPI_EUNSUPPORTED;
@@ -555,7 +588,7 @@ capi_err_t capi_mux_demux_set_properties(capi_t *_pif, capi_proplist_t *props_pt
                       fmt_ptr->format.sampling_rate,
                       fmt_ptr->format.num_channels,
                       fmt_ptr->format.q_factor,
-					  CAPI_MAX_CHANNELS_V2);
+                      CAPI_MAX_CHANNELS_V2);
 #endif
             }
             capi_mux_demux_update_operating_fmt(me_ptr);

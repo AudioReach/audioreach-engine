@@ -6,8 +6,8 @@
  *   This file contains Audio Processing Manager Commands Data Structures
  * 
  * \copyright
- *    Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
- *    SPDX-License-Identifier: BSD-3-Clause-Clear
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #include "ar_defs.h"
@@ -578,7 +578,7 @@ typedef struct apm_module_event_t apm_module_event_t;
 #define APM_CMD_CLOSE_ALL                       0x01001013
 
 /** @ingroup spf_apm_commands
-    Flushes one or more sub-graph IDs that were configured 
+    Flushes one or more sub-graph IDs that were configured
 
   @gpr_hdr_fields
     Opcode -- APM_CMD_GRAPH_FLUSH
@@ -718,6 +718,18 @@ typedef struct apm_module_event_t apm_module_event_t;
     of APM_CMD_GET_CFG. Each PID data uses the header structure,
     apm_module_param_data_t, followed by the actual parameter ID data.
 */
+
+#define APM_CMD_DB_DEFAULT_SET_CFG 0x0100105E
+/** @ingroup spf_apm_commands
+    Payload for #APM_CMD_DB_DEFAULT_SET_CFG.
+
+    In a multi-client scenario, different clients can override the default/tools
+    calibration/configuration, causing undesired outputs. To avoid this,
+    subgraphs should be marked as calibrated to prevent redundant recalibration.
+    The APM_CMD_DB_DEFAULT_SET_CFG is used for new configurations in
+    multi-client scenarios.
+*/
+
 #include "spf_begin_pack.h"
 struct apm_cmd_rsp_get_cfg_t
 {
@@ -1175,6 +1187,8 @@ struct apm_param_id_satellite_pd_info_t
         @values
         - APM_PROC_DOMAIN_ID_MDSP
         - APM_PROC_DOMAIN_ID_ADSP
+        - APM_PROC_DOMAIN_ID_ADSP_1
+        - APM_PROC_DOMAIN_ID_ADSP_2
         - APM_PROC_DOMAIN_ID_APPS
         - APM_PROC_DOMAIN_ID_SDSP
         - APM_PROC_DOMAIN_ID_CDSP

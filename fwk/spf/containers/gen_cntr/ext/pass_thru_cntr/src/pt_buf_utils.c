@@ -3,7 +3,7 @@
  * \brief
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -205,7 +205,7 @@ PT_CNTR_STATIC ar_result_t pt_cntr_assign_buffer_to_module(pt_cntr_t *me_ptr, pt
       pt_cntr_ext_in_port_t  *nblc_start_ext_in_port_ptr = NULL;
       pt_cntr_ext_out_port_t *nblc_end_ext_out_port_ptr  = NULL;
 
-      // for external input scenarios
+      // Assign sdata for the ports and also set pass_thru_upstream_buffer if pass thru container.
       uint32_t upstream_pcm_frame_len_bytes = 0;
       if (ext_in_port_ptr)
       {
@@ -518,14 +518,17 @@ PT_CNTR_STATIC ar_result_t pt_cntr_assign_buffer_to_module(pt_cntr_t *me_ptr, pt
       out_port_ptr->can_assign_ext_out_buffer = FALSE;
       if (NULL == next_in_port_ptr)
       {
+         // if ext output port can assign ext buffer to cur output port
          out_port_ptr->can_assign_ext_out_buffer = TRUE;
       }
       if (NULL != (nblc_end_ext_out_port_ptr = pt_cntr_is_inplace_from_cur_out_to_ext_out(topo_ptr, out_port_ptr)))
       {
+         //  can assign ext buffer to the cur output if NBLC end is ext output
          out_port_ptr->can_assign_ext_out_buffer = TRUE;
       }
       else if (cur_mod_inplace_in_port_ptr && cur_mod_inplace_in_port_ptr->can_assign_ext_in_buffer)
       {
+         // can assign ext buffer to cur output if cur module is inplace and cur module's input can reuse ext in buffer
          out_port_ptr->can_assign_ext_in_buffer = TRUE;
       }
 
@@ -736,8 +739,8 @@ PT_CNTR_STATIC ar_result_t pt_cntr_free_module_buffer(pt_cntr_t *me_ptr, pt_cntr
       for (uint32_t b = 0; b < in_port_ptr->gc.common.sdata.bufs_num; b++)
       {
          in_port_ptr->gc.common.bufs_ptr[b].data_ptr        = NULL;
-         in_port_ptr->gc.common.bufs_ptr[b].actual_data_len = NULL;
-         in_port_ptr->gc.common.bufs_ptr[b].max_data_len    = NULL;
+         in_port_ptr->gc.common.bufs_ptr[b].actual_data_len = 0;
+         in_port_ptr->gc.common.bufs_ptr[b].max_data_len    = 0;
       }
 
       if (in_port_ptr->gc.common.sdata.metadata_list_ptr)
@@ -757,8 +760,6 @@ PT_CNTR_STATIC ar_result_t pt_cntr_free_module_buffer(pt_cntr_t *me_ptr, pt_cntr
       }
    }
 
-   module_ptr->flags.has_attached_module = FALSE;
-   module_ptr->flags.has_stopped_port    = FALSE;
    for (gu_output_port_list_t *op_list_ptr = module_ptr->gc.topo.gu.output_port_list_ptr; NULL != op_list_ptr;
         LIST_ADVANCE(op_list_ptr))
    {

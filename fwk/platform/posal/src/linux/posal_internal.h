@@ -99,13 +99,6 @@ typedef struct
    /**< Pointer to the thread arguments sent by the client. @newpagetable */
 } posal_interrupt_ist_internal_t;
 
-typedef enum
-{
-   POSAL_HEAP_NON_ISLAND, // non island (DDR) memory
-   POSAL_HEAP_ISLAND_TCM, // island (TCM) memory
-   POSAL_HEAP_LPM         // LPM memory
-} posal_heap_t;
-
 /* Main work loop for IST thread */
 ar_result_t posal_interrupt_workloop(void *arg_ptr);
 

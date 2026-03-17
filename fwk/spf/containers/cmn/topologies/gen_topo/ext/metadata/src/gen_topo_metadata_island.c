@@ -7,13 +7,14 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #include "gen_topo.h"
 #include "gen_topo_capi.h"
 #include "spf_ref_counter.h"
+#include "thin_topo_inline.h"
 
 #define PRINT_MD_PROP_DBG_ISLAND(str1, str2, len_per_ch, str3, ...)                                                    \
    TOPO_MSG_ISLAND(topo_ptr->gu.log_id,                                                                                \
@@ -1226,6 +1227,8 @@ void gen_topo_populate_metadata_for_peer_cntr(gen_topo_t *           gen_topo_pt
 
    *out_md_list_pptr = *md_list_pptr;
    *md_list_pptr     = NULL;
+
+   thin_topo_count_and_decr_active_md_nodes(gen_topo_ptr, *out_md_list_pptr);
 }
 
 /**
@@ -1275,7 +1278,7 @@ bool_t gen_topo_md_list_has_flushing_eos_or_dfg(module_cmn_md_list_t *list_ptr)
 /**
  * Exposed through gen_topo.h. doesn't populate metadata ID
  */
-ar_result_t gen_topo_metadata_create(uint32_t               log_id,
+ar_result_t gen_topo_metadata_create(gen_topo_t            *topo_ptr,
                                      module_cmn_md_list_t **md_list_pptr,
                                      uint32_t               size,
                                      POSAL_HEAP_ID          heap_id,
@@ -1285,6 +1288,7 @@ ar_result_t gen_topo_metadata_create(uint32_t               log_id,
    ar_result_t ar_result = AR_EOK;
    INIT_EXCEPTION_HANDLING
    uint32_t md_size = sizeof(module_cmn_md_t);
+   uint32_t log_id  = topo_ptr->gu.log_id;
 
    if (NULL == md_list_pptr)
    {
@@ -1337,15 +1341,13 @@ ar_result_t gen_topo_metadata_create(uint32_t               log_id,
 
    TRY(ar_result, spf_list_insert_tail((spf_list_node_t **)md_list_pptr, md_ptr, heap_id, TRUE /* use pool */));
 
-#if defined(METADATA_DEBUGGING)
    spf_list_get_tail_node((spf_list_node_t *)*md_list_pptr, &tail_node_ptr);
+#if defined(METADATA_DEBUGGING)
    TOPO_MSG_ISLAND(log_id,
             DBG_MED_PRIO,
             "MD_DBG: Metadata create: spf_list_node_t 0x%p host md_ptr 0x%p",
             tail_node_ptr,
             md_ptr);
-#else
-   (void)tail_node_ptr;
 #endif
 
    md_ptr->metadata_flag.is_out_of_band = is_out_band;
@@ -1361,6 +1363,13 @@ ar_result_t gen_topo_metadata_create(uint32_t               log_id,
    }
 
    *md_pptr = md_ptr;
+
+   // Increment md counter as the last step, so that if there was any error MD counter incremented can be skipped.
+   if (ar_result == AR_EOK)
+   {
+      thin_topo_incr_active_md_nodes(topo_ptr, (module_cmn_md_list_t *)tail_node_ptr);
+   }
+
    return ar_result;
 }
 
@@ -1538,7 +1547,7 @@ capi_err_t gen_topo_capi_metadata_create(void *                 context_ptr,
    gen_topo_t *       topo_ptr   = module_ptr->topo_ptr;
 
    TRY(result,
-       ar_result_to_capi_err(gen_topo_metadata_create(topo_ptr->gu.log_id,
+       ar_result_to_capi_err(gen_topo_metadata_create(topo_ptr,
                                                       md_list_pptr,
                                                       size,
                                                       (POSAL_HEAP_ID)c_heap_id.heap_id,
@@ -1588,6 +1597,9 @@ ar_result_t gen_topo_free_md(gen_topo_t *           topo_ptr,
       }
 
       gen_topo_check_free_md_ptr((void **)&(md_list_ptr->obj_ptr), pool_used);
+
+      thin_topo_decr_active_md_nodes(topo_ptr, md_list_ptr);
+
       spf_list_delete_node_update_head((spf_list_node_t **)&md_list_ptr,
                                        (spf_list_node_t **)head_pptr,
                                        TRUE /* pool_used*/);
@@ -2012,6 +2024,7 @@ ar_result_t gen_topo_clone_md(gen_topo_t *           topo_ptr,
    module_cmn_md_t *new_md_ptr         = NULL;
    bool_t           is_out_band        = FALSE;
    bool_t           is_island_heap     = POSAL_IS_ISLAND_HEAP_ID(heap_id);
+   spf_list_node_t *tail_node_ptr      = NULL;
 
    // generic metadata is assumed to not require deep cloning
    is_out_band          = md_ptr->metadata_flag.is_out_of_band;
@@ -2052,6 +2065,7 @@ ar_result_t gen_topo_clone_md(gen_topo_t *           topo_ptr,
    }
 
    TRY(result, spf_list_insert_tail((spf_list_node_t **)out_md_list_pptr, new_md_ptr, heap_id, TRUE /* use pool */));
+   spf_list_get_tail_node((spf_list_node_t *)*out_md_list_pptr, &tail_node_ptr);
 
    // Copy
    memscpy((void *)new_md_ptr, sizeof(module_cmn_md_t), (void *)md_ptr, sizeof(module_cmn_md_t));
@@ -2098,6 +2112,13 @@ ar_result_t gen_topo_clone_md(gen_topo_t *           topo_ptr,
       }
       gen_topo_check_free_md_ptr((void **)&new_md_ptr, is_island_heap);
    }
+
+   // Increment md counter as the last step, so that if there was any error MD counter incremented can be skipped.
+   if (result == AR_EOK)
+   {
+      thin_topo_incr_active_md_nodes(topo_ptr, (module_cmn_md_list_t *)tail_node_ptr);
+   }
+
    return result;
 }
 
@@ -2525,28 +2546,8 @@ static ar_result_t gen_topo_free_eos(gen_topo_t *           topo_ptr,
     Even for non-flushing EOS below function needs to be called (to remove
     reference to ext in port)*/
    gen_topo_free_eos_cargo(topo_ptr, metadata_ptr, eos_metadata_ptr);
-   bool_t      pool_used = FALSE;
-   if (metadata_ptr)
-   {
-      uint32_t is_out_band = metadata_ptr->metadata_flag.is_out_of_band;
-      if (eos_metadata_ptr)
-      {
-         if (is_out_band)
-         {
-            pool_used = spf_lpi_pool_is_addr_from_md_pool(eos_metadata_ptr);
-            gen_topo_check_free_md_ptr((void**)&(eos_metadata_ptr), pool_used);
-         }
-      }
-   }
 
-   if (eos_node_ptr)
-   {
-      pool_used = spf_lpi_pool_is_addr_from_md_pool(eos_node_ptr->obj_ptr);
-      gen_topo_check_free_md_ptr((void **)&(eos_node_ptr->obj_ptr), pool_used);
-      spf_list_delete_node_update_head((spf_list_node_t **)&eos_node_ptr,
-                                       (spf_list_node_t **)head_pptr,
-                                       TRUE /* pool_used*/);
-   }
+   gen_topo_free_md(topo_ptr, eos_node_ptr, metadata_ptr, head_pptr);
 
    return result;
 }

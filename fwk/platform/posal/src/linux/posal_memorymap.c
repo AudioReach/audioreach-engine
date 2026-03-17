@@ -4,7 +4,7 @@
  *  This file contains a utility for memory mapping and unmapping shared memory, LPM etc.
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -42,8 +42,6 @@ extern void *mdf_mem_base_va_addr;
 #define VFIO_DEV_NAME "soc@0:umd_audio_hlos@1"
 struct plat_vfio g_pvfio;
 #endif /* POSAL_MMAP_VFIO */
-
-static uint32_t pa_key_index;
 
 /* -----------------------------------------------------------------------
  ** Constant / Define Declarations
@@ -119,8 +117,8 @@ typedef struct posal_memorymap_shm_map_hashnode_t
    spf_hash_node_t hash_node;
    /**< Hash node */
 
-   uint32_t fd;
-   /**< Key - fd is used as a key to hashnode */
+   uint32_t unique_shmem_id_24bit;
+   /**< Key - unique_shmem_id_24bit is used as a key to hashnode */
 
    posal_memorymap_node_t *shm_node;
    /**< Value - shm map handle returned to client */
@@ -134,7 +132,7 @@ typedef struct posal_memorymap_internal_t
    /**< Hash table to hold client ID to client token mapping */
 
    spf_hashtable_t shmmap_ht;
-   /**< Hash table to hold fd to shm map handle mapping */
+   /**< Hash table to hold "unique_shmem_id_24bit" to shm map handle mapping */
 } posal_memorymap_internal_t;
 
 posal_memorymap_internal_t          g_posal_memorymap_internal;
@@ -247,7 +245,6 @@ void posal_memorymap_global_init()
       AR_MSG(DBG_ERROR_PRIO, "posal_memorymap: plat_vfio_device_init failed with result : %d", result);
    }
 #endif /* POSAL_MMAP_VFIO */
-   pa_key_index = 1;
 }
 
 void posal_memorymap_global_deinit()
@@ -426,10 +423,57 @@ ar_result_t posal_memorymap_shm_mem_map(uint32_t                      client_tok
                                         uint32_t *                    shm_mem_map_handle_ptr,
                                         POSAL_HEAP_ID                 heap_id)
 {
+   posal_mem_map_v2_input_args_t in_args;
+   in_args.unique_shmem_id_24bit        = 0;
+   in_args.client_token    = client_token;
+   in_args.shm_mem_reg_ptr = shm_mem_reg_ptr;
+   in_args.num_shm_reg     = num_shm_reg;
+   in_args.is_cached       = is_cached;
+   in_args.is_offset_map   = is_offset_map;
+   in_args.pool_id         = pool_id;
+   in_args.heap_id         = heap_id;
+
+   return posal_memorymap_shm_mem_map_v2(&in_args, shm_mem_map_handle_ptr);
+}
+
+ar_result_t posal_memorymap_shm_mem_map_v2(posal_mem_map_v2_input_args_t *in_args, uint32_t *shm_mem_map_handle_ptr)
+{
+   uint32_t                      client_token    = in_args->client_token;
+   posal_memorymap_shm_region_t *shm_mem_reg_ptr = in_args->shm_mem_reg_ptr;
+   uint16_t                      num_shm_reg     = in_args->num_shm_reg;
+   bool_t                        is_cached       = in_args->is_cached;
+   bool_t                        is_offset_map   = in_args->is_offset_map;
+   POSAL_MEMORYPOOLTYPE          pool_id         = in_args->pool_id;
+   POSAL_HEAP_ID                 heap_id         = in_args->heap_id;
+
+   // check if the shmem ID is only 24bit value
+   if (0xFF000000 & in_args->unique_shmem_id_24bit)
+   {
+      AR_MSG(DBG_ERROR_PRIO,
+             "Received invalid unique_shmem_id_24bit: 0x%lX, has to be 24bit.",
+             in_args->unique_shmem_id_24bit);
+      return AR_EFAILED;
+   }
+
+   // check if the unique id is valid & exists,
+   if (in_args->unique_shmem_id_24bit)
+   {
+      uint32_t temp = 0;
+      if (AR_EOK == posal_memorymap_get_mem_map_handle(client_token, in_args->unique_shmem_id_24bit, &temp))
+      {
+         AR_MSG(DBG_ERROR_PRIO,
+                "received invalid unique_shmem_id_24bit: %lu, already exists",
+                in_args->unique_shmem_id_24bit);
+         return AR_EFAILED;
+      }
+   }
+
    if ((num_shm_reg > 1) && is_offset_map)
    {
       AR_MSG(DBG_ERROR_PRIO,
-             "Posal_memory_map: Cant map memory as offset mode is TRUE but num regions to map are greater than 1(num_shm_reg = %lu)",num_shm_reg);
+             "Posal_memory_map: Cant map memory as offset mode is TRUE but num regions to map are greater than "
+             "1(num_shm_reg = %lu)",
+             num_shm_reg);
       return AR_EBADPARAM;
    }
 
@@ -484,6 +528,7 @@ ar_result_t posal_memorymap_shm_mem_map(uint32_t                      client_tok
 
    // Initialize the node
    memset(mem_map_node_ptr, 0, total_node_alloc_size);
+
    mem_map_node_ptr->unNumContPhysReg = num_shm_reg;
    mem_map_node_ptr->MemPool          = pool_id;
    // Bookmark the first phys region:
@@ -502,13 +547,23 @@ ar_result_t posal_memorymap_shm_mem_map(uint32_t                      client_tok
    memset(new_shm_map_hashnode_ptr, 0, sizeof(new_shm_map_hashnode_ptr));
 
 #ifdef POSAL_MMAP_VFIO
-   new_shm_map_hashnode_ptr->hash_node.key_ptr  = &new_shm_map_hashnode_ptr->fd;
-   new_shm_map_hashnode_ptr->hash_node.key_size = sizeof(pa_key_index);
+   new_shm_map_hashnode_ptr->hash_node.key_ptr  = &new_shm_map_hashnode_ptr->unique_shmem_id_24bit;
+   new_shm_map_hashnode_ptr->hash_node.key_size = sizeof(new_shm_map_hashnode_ptr->unique_shmem_id_24bit);
    new_shm_map_hashnode_ptr->hash_node.next_ptr = NULL;
 
-   new_shm_map_hashnode_ptr->fd = pa_key_index;
    new_shm_map_hashnode_ptr->shm_node = mem_map_node_ptr;
-   pa_key_index++;
+
+   // if client has assigned a shmem id that becomes the key for the shm hash node, else the key is
+   if (in_args->unique_shmem_id_24bit)
+   {
+      mem_map_node_ptr->shmem_id                      = in_args->unique_shmem_id_24bit;
+      new_shm_map_hashnode_ptr->unique_shmem_id_24bit = in_args->unique_shmem_id_24bit;
+   }
+   else
+   {
+      mem_map_node_ptr->shmem_id                      = (uint32_t)mem_map_node_ptr;
+      new_shm_map_hashnode_ptr->unique_shmem_id_24bit = (uint32_t)mem_map_node_ptr;
+   }
 
    /* Create records for each region */
    for (int idx = 0; idx < num_shm_reg; ++idx)
@@ -537,12 +592,25 @@ ar_result_t posal_memorymap_shm_mem_map(uint32_t                      client_tok
       }
    }
 #else
-   new_shm_map_hashnode_ptr->hash_node.key_ptr  = &new_shm_map_hashnode_ptr->fd;
-   new_shm_map_hashnode_ptr->hash_node.key_size = sizeof(cont_phys_regions_ptr[0].shm_addr.mem_addr_32b.lsw);
+
+   new_shm_map_hashnode_ptr->hash_node.key_ptr  = &new_shm_map_hashnode_ptr->unique_shmem_id_24bit;
+   new_shm_map_hashnode_ptr->hash_node.key_size = sizeof(new_shm_map_hashnode_ptr->unique_shmem_id_24bit);
    new_shm_map_hashnode_ptr->hash_node.next_ptr = NULL;
 
-   new_shm_map_hashnode_ptr->fd = shm_mem_reg_ptr[0].shm_addr_lsw;
    new_shm_map_hashnode_ptr->shm_node = mem_map_node_ptr;
+
+   // if client has assigned a shmem id that becomes the key for the shm hash node, else the key is "fd" which was
+   // passed in the shm addr lsw field.
+   if (in_args->unique_shmem_id_24bit)
+   {
+      mem_map_node_ptr->shmem_id                      = in_args->unique_shmem_id_24bit;
+      new_shm_map_hashnode_ptr->unique_shmem_id_24bit = in_args->unique_shmem_id_24bit;
+   }
+   else
+   {
+      mem_map_node_ptr->shmem_id                      = (uint32_t)shm_mem_reg_ptr[0].shm_addr_lsw;
+      new_shm_map_hashnode_ptr->unique_shmem_id_24bit = (uint32_t)shm_mem_reg_ptr[0].shm_addr_lsw;
+   }
 
    /* Create records for each region */
    for (int idx = 0; idx < num_shm_reg; ++idx)
@@ -591,7 +659,7 @@ ar_result_t posal_memorymap_shm_mem_map(uint32_t                      client_tok
    spf_hashtable_insert(&g_posal_memorymap_internal_ptr->shmmap_ht, &new_shm_map_hashnode_ptr->hash_node);
 
    /* return mem map handle pointer */
-   *shm_mem_map_handle_ptr = new_shm_map_hashnode_ptr->fd;
+   *shm_mem_map_handle_ptr = new_shm_map_hashnode_ptr->unique_shmem_id_24bit;
 
    /* Set the mapping mode  */
    if (is_offset_map)
@@ -630,6 +698,46 @@ ar_result_t posal_memorymap_virtaddr_mem_map(uint32_t                      clien
                                              uint32_t *                    shm_mem_map_handle_ptr,
                                              POSAL_HEAP_ID                 heap_id)
 {
+   posal_mem_map_v2_input_args_t in_args;
+   in_args.unique_shmem_id_24bit        = 0;
+   in_args.client_token    = client_token;
+   in_args.shm_mem_reg_ptr = shm_mem_reg_ptr;
+   in_args.num_shm_reg     = num_shm_reg;
+   in_args.is_cached       = is_cached;
+   in_args.is_offset_map   = is_offset_map;
+   in_args.pool_id         = pool_id;
+   in_args.heap_id         = heap_id;
+
+   return posal_memorymap_virtaddr_mem_map_v2(&in_args, shm_mem_map_handle_ptr);
+}
+
+ar_result_t posal_memorymap_virtaddr_mem_map_v2(posal_mem_map_v2_input_args_t *in_args, uint32_t *shm_mem_map_handle_ptr)
+{
+   uint32_t                      client_token    = in_args->client_token;
+   posal_memorymap_shm_region_t *shm_mem_reg_ptr = in_args->shm_mem_reg_ptr;
+   uint16_t                      num_shm_reg     = in_args->num_shm_reg;
+   bool_t                        is_offset_map   = in_args->is_offset_map;
+   POSAL_MEMORYPOOLTYPE          pool_id         = in_args->pool_id;
+   POSAL_HEAP_ID                 heap_id         = in_args->heap_id;
+
+   // check if the shmem ID is only 24bit value
+   if (0xFF000000 & in_args->unique_shmem_id_24bit)
+   {
+      AR_MSG(DBG_ERROR_PRIO,
+             "Received invalid unique_shmem_id_24bit: 0x%lX, has to be 24bit.",
+             in_args->unique_shmem_id_24bit);
+      return AR_EFAILED;
+   }
+
+   if (in_args->unique_shmem_id_24bit)
+   {
+      uint32_t temp = 0;
+      if (AR_EOK == posal_memorymap_get_mem_map_handle(client_token, in_args->unique_shmem_id_24bit, &temp))
+      {
+         AR_MSG(DBG_ERROR_PRIO, "received invalid unique_shmem_id_24bit: %lu, already exists", in_args->unique_shmem_id_24bit);
+         return AR_EFAILED;
+      }
+   }
 
    ar_result_t          rc;
    POSAL_MEMORYPOOLTYPE mem_pool_id = pool_id;
@@ -700,13 +808,22 @@ ar_result_t posal_memorymap_virtaddr_mem_map(uint32_t                      clien
    }
    memset(new_shm_map_hashnode_ptr, 0, sizeof(new_shm_map_hashnode_ptr));
 
-   new_shm_map_hashnode_ptr->hash_node.key_ptr  = &new_shm_map_hashnode_ptr->fd;
-   new_shm_map_hashnode_ptr->hash_node.key_size = sizeof(pa_key_index);
+   new_shm_map_hashnode_ptr->hash_node.key_ptr  = &new_shm_map_hashnode_ptr->unique_shmem_id_24bit;
+   new_shm_map_hashnode_ptr->hash_node.key_size = sizeof(new_shm_map_hashnode_ptr->unique_shmem_id_24bit);
    new_shm_map_hashnode_ptr->hash_node.next_ptr = NULL;
 
-   new_shm_map_hashnode_ptr->fd = pa_key_index;
+   if (in_args->unique_shmem_id_24bit)
+   {
+      mem_map_node_ptr->shmem_id                      = in_args->unique_shmem_id_24bit;
+      new_shm_map_hashnode_ptr->unique_shmem_id_24bit = in_args->unique_shmem_id_24bit;
+   }
+   else
+   {
+      mem_map_node_ptr->shmem_id                      = (uint32_t)mem_map_node_ptr;
+      new_shm_map_hashnode_ptr->unique_shmem_id_24bit = (uint32_t)mem_map_node_ptr;
+   }
+
    new_shm_map_hashnode_ptr->shm_node = mem_map_node_ptr;
-   pa_key_index++;
 
    /* Create records for each region */
    for (int idx = 0; idx < num_shm_reg; ++idx)
@@ -721,7 +838,7 @@ ar_result_t posal_memorymap_virtaddr_mem_map(uint32_t                      clien
    spf_hashtable_insert(&g_posal_memorymap_internal_ptr->shmmap_ht, &new_shm_map_hashnode_ptr->hash_node);
 
    /* return mem map handle pointer */
-   *shm_mem_map_handle_ptr = new_shm_map_hashnode_ptr->fd;
+   *shm_mem_map_handle_ptr = new_shm_map_hashnode_ptr->unique_shmem_id_24bit;
 
    /* Set the mapping mode  */
    if (is_offset_map)
@@ -1073,21 +1190,6 @@ ar_result_t posal_memorymap_shm_decr_refcount(uint32_t client_token, uint32_t sh
    return memorymap_util_shm_update_refcount(client_token, shm_mem_map_handle, -1);
 }
 
-ar_result_t posal_memorymap_set_shmem_id(uint32_t client_token, uint32_t shm_mem_map_handle, uint32_t shmem_id)
-{
-   return AR_EUNSUPPORTED;
-}
-
-ar_result_t posal_memorymap_get_shmem_id(uint32_t client_token, uint32_t shm_mem_map_handle, uint32_t *shmem_id_ptr)
-{
-   return AR_EUNSUPPORTED;
-}
-
-ar_result_t posal_memorymap_get_mem_map_handle(uint32_t client_token, uint32_t shmem_id, uint32_t *shm_mem_map_handle_ptr)
-{
-   return AR_EUNSUPPORTED;
-}
-
 static ar_result_t memorymap_util_shm_update_refcount(uint32_t client_token,
                                                       uint32_t shm_mem_map_handle,
                                                       int16_t  count_value)
@@ -1155,14 +1257,16 @@ static ar_result_t memorymap_util_cmd_handler(uint32_t client_token,
    posal_memorymap_node_t *handle_mem_map_node_ptr = NULL;
 
    posal_memorymap_shm_map_hashnode_t *shm_map_hashnode_ptr =
-      (posal_memorymap_shm_map_hashnode_t *)spf_hashtable_find(&g_posal_memorymap_internal_ptr->shmmap_ht, &shm_mem_map_handle, sizeof(shm_mem_map_handle));
+      (posal_memorymap_shm_map_hashnode_t *)spf_hashtable_find(&g_posal_memorymap_internal_ptr->shmmap_ht,
+                                                               &shm_mem_map_handle,
+                                                               sizeof(shm_mem_map_handle));
 
    handle_mem_map_node_ptr = shm_map_hashnode_ptr->shm_node;
 
    /* search and compare with the first physical region record in all the memory mapping nodes of the client. */
    while (mem_map_node_ptr)
    {
-      if (handle_mem_map_node_ptr == mem_map_node_ptr)
+      if (handle_mem_map_node_ptr->shmem_id == mem_map_node_ptr->shmem_id)
       {
          found_mem_map_node_ptr = handle_mem_map_node_ptr;
          break;
@@ -1237,7 +1341,7 @@ static ar_result_t memorymap_util_cmd_handler(uint32_t client_token,
 #endif
          /* Book mark the first (and only) region: */
          posal_memorymap_region_record_t *cont_phy_regions_ptr =
-            (posal_memorymap_region_record_t *)((uint8_t *)mem_map_node_ptr + sizeof(posal_memorymap_node_t));
+            (posal_memorymap_region_record_t *)((uint8_t *)found_mem_map_node_ptr + sizeof(posal_memorymap_node_t));
 
          uint8_t* base_virtual_addr = (uint8_t*) cont_phy_regions_ptr[0].virt_addr_ptr;
 
@@ -1266,7 +1370,7 @@ static ar_result_t memorymap_util_cmd_handler(uint32_t client_token,
 
          /* Book mark the first (and only) region: */
          posal_memorymap_region_record_t *cont_phy_regions_ptr =
-            (posal_memorymap_region_record_t *)((uint8_t *)mem_map_node_ptr + sizeof(posal_memorymap_node_t));
+            (posal_memorymap_region_record_t *)((uint8_t *)found_mem_map_node_ptr + sizeof(posal_memorymap_node_t));
 
          uint8_t* base_virtual_addr = (uint8_t*) cont_phy_regions_ptr[0].virt_addr_ptr;
 
@@ -1391,4 +1495,53 @@ _bailout_1:
    posal_mutex_unlock(client_ptr->mClientMutex);
 
    return rc;
+}
+
+ar_result_t posal_memorymap_get_mem_map_handle(uint32_t  client_token,
+                                               uint32_t  unique_shmem_id_24bit,
+                                               uint32_t *shm_mem_map_handle_ptr)
+{
+   ar_result_t result = AR_EOK;
+   /* no lock to access the Client, since the assumption is ideally client register once and does not unregister.
+    * Even if it unregister, Client must call unregister after ensuring all its dynamic services have exit. */
+   if (AR_EOK != (result = memorymap_util_find_client(client_token)) || (0 == unique_shmem_id_24bit) ||
+       (NULL == shm_mem_map_handle_ptr))
+   {
+      AR_MSG(DBG_HIGH_PRIO, "posal_memorymap_get_mem_map_handle failed. Invalid input params.");
+      return result;
+   }
+
+   posal_memorymap_hashnode_t *memorymap_hashnode_ptr =
+      (posal_memorymap_hashnode_t *)spf_hashtable_find(&g_posal_memorymap_internal_ptr->memmap_ht, &client_token, sizeof(client_token));
+
+   posal_memorymap_client_t *client_ptr = memorymap_hashnode_ptr->client_ptr;
+
+   /* lock the access of the list */
+   posal_mutex_lock(client_ptr->mClientMutex);
+
+   posal_memorymap_node_t *mem_map_node_ptr       = client_ptr->pMemMapListNode;
+   posal_memorymap_node_t *handle_mem_map_node_ptr = NULL;
+
+   posal_memorymap_shm_map_hashnode_t *shm_map_hashnode_ptr =
+      (posal_memorymap_shm_map_hashnode_t *)spf_hashtable_find(&g_posal_memorymap_internal_ptr->shmmap_ht,
+                                                               &unique_shmem_id_24bit,
+                                                               sizeof(unique_shmem_id_24bit));
+
+   handle_mem_map_node_ptr = shm_map_hashnode_ptr->shm_node;
+
+   /* search and compare with the first physical region record in all the memory mapping nodes of the client. */
+   while (mem_map_node_ptr)
+   {
+      if (handle_mem_map_node_ptr->shmem_id == mem_map_node_ptr->shmem_id)
+      {
+         *shm_mem_map_handle_ptr = (uint32_t)handle_mem_map_node_ptr->shmem_id;
+         return result;
+      }
+
+      /*store current as prev and move current to next */
+      mem_map_node_ptr = mem_map_node_ptr->pNext;
+   }
+
+   AR_MSG(DBG_ERROR_PRIO, "posal_memorymap_get_mem_map_handle, mem_mapping is not found!");
+   return AR_EBADPARAM;
 }

@@ -5,7 +5,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -133,7 +133,11 @@ static ar_result_t gen_cntr_handle_events_after_cmds(gen_cntr_t *me_ptr, bool_t 
 #endif
 
    /* Check if any pending buffers needs to be destoryed */
-   topo_buf_manager_destroy_all_unused_buffers(&me_ptr->topo);
+   topo_buf_manager_destroy_all_unused_buffers(&me_ptr->topo, FALSE);
+
+   // if currently processing with thin topo, check if anything needs to be updated in thin topo or needs to switch to
+   // gen topo
+   result |= thin_topo_handle_fwk_events(me_ptr, capi_event_flag_ptr, fwk_event_flag_ptr);
 
    if (process_frames || me_ptr->topo.flags.process_pending || me_ptr->topo.flags.process_us_gap)
    {
@@ -539,6 +543,9 @@ ar_result_t gen_cntr_gpr_cmd(cu_base_t *base_ptr)
    INIT_EXCEPTION_HANDLING
    SPF_MANAGE_CRITICAL_SECTION
    gpr_packet_t *packet_ptr = (gpr_packet_t *)me_ptr->cu.cmd_msg.payload_ptr;
+   posal_pm_island_vote_t cached_island_vote;
+   // set with Exit condition as default
+   cached_island_vote.island_vote_type = PM_ISLAND_VOTE_EXIT;
 
    SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
 
@@ -549,6 +556,14 @@ ar_result_t gen_cntr_gpr_cmd(cu_base_t *base_ptr)
                 packet_ptr->token,
                 cu_is_any_handle_rest_pending(base_ptr));
 
+   // fetch current container island voting status
+   cached_island_vote.island_vote_type = me_ptr->topo.flags.aggregated_island_vote;
+
+   /*vote against island in command context,
+     cntr will vote for island entry later
+     in the process context after processing two frames*/
+   gen_cntr_vote_against_island((void *)&me_ptr->cu);
+   
    switch (packet_ptr->opcode)
    {
       case AR_SPF_MSG_GLOBAL_SH_MEM:
@@ -610,6 +625,17 @@ ar_result_t gen_cntr_gpr_cmd(cu_base_t *base_ptr)
    SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
 
    gen_cntr_handle_events_after_cmds(me_ptr, FALSE, result);
+
+   SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
+   // check if caching was PM_ISLAND_VOTE_DONT_CARE,
+   // apply if current state is still PM_ISLAND_VOTE_EXIT.
+
+   if ((PM_ISLAND_VOTE_DONT_CARE == cached_island_vote.island_vote_type) &&
+       (PM_ISLAND_VOTE_EXIT == me_ptr->topo.flags.aggregated_island_vote))
+   {
+      gen_cntr_update_island_vote(me_ptr, cached_island_vote);
+   }
+   SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
 
    return result;
 }
@@ -2143,7 +2169,7 @@ ar_result_t gen_cntr_post_operate_on_ext_in_port(void *                     base
       {
          module_cmn_md_t *out_md_ptr = NULL;
 
-         result = gen_topo_create_dfg_metadata(me_ptr->topo.gu.log_id,
+         result = gen_topo_create_dfg_metadata(&me_ptr->topo,
                                                &ext_in_port_ptr->md_list_ptr,
                                                me_ptr->cu.heap_id,
                                                &out_md_ptr,
@@ -2252,7 +2278,7 @@ static ar_result_t gen_cntr_post_operate_on_connected_input(gen_cntr_t *        
                module_cmn_md_t *out_md_ptr = NULL;
 
                uint32_t bytes_across_all_ch = gen_topo_get_actual_len_for_md_prop(&conn_in_port_ptr->common);
-               result                       = gen_topo_create_dfg_metadata(me_ptr->topo.gu.log_id,
+               result                       = gen_topo_create_dfg_metadata(&me_ptr->topo,
                                                      &conn_in_port_ptr->common.sdata.metadata_list_ptr,
                                                      me_ptr->cu.heap_id,
                                                      &out_md_ptr,

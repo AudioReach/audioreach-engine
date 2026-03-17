@@ -361,6 +361,8 @@ struct irm_system_capabilities_t
         @valuesbul
         - #APM_PROC_DOMAIN_ID_MDSP
         - #APM_PROC_DOMAIN_ID_ADSP
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2
         - #APM_PROC_DOMAIN_ID_SDSP
         - #APM_PROC_DOMAIN_ID_CDSP
         - #APM_PROP_ID_DONT_CARE (Default) @tablebulletend */
@@ -453,6 +455,8 @@ struct irm_metric_capabilities_t
         @valuesbul
         - #APM_PROC_DOMAIN_ID_MDSP
         - #APM_PROC_DOMAIN_ID_ADSP
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2
         - #APM_PROC_DOMAIN_ID_SDSP
         - #APM_PROC_DOMAIN_ID_CDSP
         - #APM_PROP_ID_DONT_CARE (Default) @tablebulletend */
@@ -519,6 +523,8 @@ struct param_id_irm_profiling_params_t
         @valuesbul
         - #APM_PROC_DOMAIN_ID_MDSP
         - #APM_PROC_DOMAIN_ID_ADSP
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2
         - #APM_PROC_DOMAIN_ID_SDSP
         - #APM_PROC_DOMAIN_ID_CDSP
         - #APM_PROP_ID_DONT_CARE (Default) @tablebulletend */
@@ -576,6 +582,8 @@ struct param_id_enable_disable_metrics_t
         @valuesbul
         - #APM_PROC_DOMAIN_ID_MDSP
         - #APM_PROC_DOMAIN_ID_ADSP
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2
         - #APM_PROC_DOMAIN_ID_SDSP
         - #APM_PROC_DOMAIN_ID_CDSP
         - #APM_PROP_ID_DONT_CARE (Default) @tablebulletend */
@@ -666,6 +674,8 @@ struct param_id_report_metrics_t
         @valuesbul
         - #APM_PROC_DOMAIN_ID_MDSP
         - #APM_PROC_DOMAIN_ID_ADSP
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2
         - #APM_PROC_DOMAIN_ID_SDSP
         - #APM_PROC_DOMAIN_ID_CDSP
         - #APM_PROP_ID_DONT_CARE (Default) @tablebulletend */
@@ -792,6 +802,8 @@ struct param_id_enable_all_t
         @valuesbul
         - #APM_PROC_DOMAIN_ID_MDSP
         - #APM_PROC_DOMAIN_ID_ADSP
+        - #APM_PROC_DOMAIN_ID_ADSP_1
+        - #APM_PROC_DOMAIN_ID_ADSP_2
         - #APM_PROC_DOMAIN_ID_SDSP
         - #APM_PROC_DOMAIN_ID_CDSP
         - #APM_PROP_ID_DONT_CARE (Default) @tablebulletend */

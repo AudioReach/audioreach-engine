@@ -405,20 +405,28 @@ static ar_result_t irm_fill_processor_metric(irm_t *               irm_ptr,
                 per_heap_id_payload_ptr[POSAL_MEM_TYPE_DEFAULT].max_allowed_heap_size);
 #endif
 
-         // Handle Non-default Memory Types
+         // Handle Non-default Memory Types (island memory)
          for (uint32_t i = POSAL_MEM_TYPE_DEFAULT + 1; i < POSAL_MEM_TYPE_NUM_SUPPORTED; i++)
          {
             POSAL_HEAP_ID heap_id = posal_get_heap_id(i);
             if (POSAL_HEAP_DEFAULT == heap_id)
             {
-               break;
+               continue;
+            }
+
+            if (POSAL_MEM_TYPE_LOW_POWER_2 == i)
+            {
+#if IRM_DEBUG
+               AR_MSG(DBG_HIGH_PRIO, "IRM: warning.. heap_type: %lu aggregation not yet supported", i);
+#endif
+               continue;
             }
 
             per_heap_id_payload_ptr[i].heap_id = i;
 #if defined(AVS_USES_ISLAND_MEM_PROF)
-            per_heap_id_payload_ptr[i].current_heap_usage = posal_island_get_current_mem_usage_v2(posal_get_heap_id(i));
+            per_heap_id_payload_ptr[i].current_heap_usage = posal_island_get_current_mem_usage_v2(GET_ACTUAL_HEAP_ID(posal_get_heap_id(i)));
             per_heap_id_payload_ptr[i].max_allowed_heap_size =
-               posal_island_get_max_allowed_mem_usage_v2(posal_get_heap_id(i));
+               posal_island_get_max_allowed_mem_usage_v2(GET_ACTUAL_HEAP_ID(posal_get_heap_id(i)));
 #else
             per_heap_id_payload_ptr[i].current_heap_usage    = posal_globalstate.avs_stats[heap_id].curr_heap;
             per_heap_id_payload_ptr[i].max_allowed_heap_size = posal_globalstate.avs_stats[heap_id].curr_heap;
@@ -443,10 +451,10 @@ static ar_result_t irm_fill_processor_metric(irm_t *               irm_ptr,
 
 #if IRM_DEBUG
          AR_MSG(DBG_HIGH_PRIO,
-                "IRM: packet_count = %lu, current query = %llu, prev query = %llu",
+                "IRM: packet_count = %lu, current query = %lu, prev query = %lu",
                 payload_ptr->packet_count,
                 current_query_ptr->pktcnt,
-                prev_ptr->packet_count);
+                (uint32_t)prev_ptr->packet_count);
 #endif
 
          prev_ptr->packet_count = current_query_ptr->pktcnt;
@@ -493,7 +501,7 @@ static ar_result_t irm_fill_processor_metric(irm_t *               irm_ptr,
          payload_ptr->timestamp_ms_lsw          = 0xFFFFFFFF & ts;
          payload_ptr->timestamp_ms_msw          = 0xFFFFFFFF & ts >> 32;
 #if IRM_DEBUG
-         AR_MSG(DBG_HIGH_PRIO, "IRM: time stamp = %llu", ts);
+         AR_MSG(DBG_HIGH_PRIO, "IRM: time stamp = %lu", (uint32_t)ts);
 #endif
          break;
       }

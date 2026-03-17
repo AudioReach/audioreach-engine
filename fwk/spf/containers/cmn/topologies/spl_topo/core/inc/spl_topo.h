@@ -303,18 +303,18 @@ typedef union spl_topo_simp_topo_event_flags_t
 } spl_topo_simp_topo_event_flags_t;
 
 
-// other flags used within simplified topo process.
-typedef struct simp_topo_flags_t
+// flags used within spl topo process.
+typedef struct spl_topo_flags_t
 {
   uint32_t is_bypass_container :1; //set when all the non-elementary modules are disabled.
-} simp_topo_flags_t;
+  uint32_t is_real_time_topo   :1; //true for device Tx PP and for voice call containers.
+} spl_topo_flags_t;
 
 typedef struct spl_topo_t
 {
    gen_topo_t                    t_base;
    spl_topo_frame_length_t       cntr_frame_len;       /**< Frame length of the container */
    spl_topo_cmd_state_t          cmd_state;
-// spl_topo_flags_t              flags;
    spl_topo_process_info_t       proc_info; /**< Topo2 info used during spl_topo_process(). */
 
    gu_module_list_t  *req_samp_query_start_list_ptr; /* list of module where required-sample queries should start from to calculate
@@ -328,7 +328,7 @@ typedef struct spl_topo_t
    spl_topo_simp_topo_L2_flags_t      simpt2_flags;
    spl_topo_simp_topo_event_flags_t   simpt_event_flags;
 
-   simp_topo_flags_t simpt_flags;
+   spl_topo_flags_t  flags;
    gu_module_list_t  *simpt_sorted_module_list_ptr; /**< sorted module list for simplified topo.
                                                          excluded internal bypass modules. */
 
@@ -607,9 +607,9 @@ ar_result_t spl_topo_operate_on_int_out_port(void *                     topo_ptr
  * Returns scaled sample from one rate to another.
  */
 static inline uint32_t spl_topo_get_scaled_samples(spl_topo_t *topo_ptr,
-						   uint32_t    source_samples,
-						   uint32_t    source_sample_rate,
-						   uint32_t    dest_sample_rate)
+                           uint32_t    source_samples,
+                           uint32_t    source_sample_rate,
+                           uint32_t    dest_sample_rate)
 {
   uint32_t dest_samples = 0;
   if (source_sample_rate == dest_sample_rate)
@@ -631,31 +631,31 @@ static inline bool_t spl_topo_input_port_has_pending_eof(spl_topo_t *topo_ptr, s
 
 static inline spl_topo_module_type_t spl_topo_get_module_port_type(spl_topo_module_t *module_ptr)
 {
-	return (spl_topo_module_type_t)module_ptr->flags.module_type;
+    return (spl_topo_module_type_t)module_ptr->flags.module_type;
 }
 
 /**
  * Checks if a module's port is at nblc end.
  */
 static inline bool_t spl_topo_is_port_at_nblc_end(gu_module_t *gu_module_ptr,
-												  gen_topo_common_port_t *cmn_port_ptr)
+                                                  gen_topo_common_port_t *cmn_port_ptr)
 {
-	spl_topo_module_t* module_ptr = (spl_topo_module_t*)gu_module_ptr;
-	bool_t is_mimo_sink_source =
-			((module_ptr->t_base.gu.num_input_ports != 1) ||
-					(module_ptr->t_base.gu.num_output_ports != 1)) ? TRUE : FALSE;
+    spl_topo_module_t* module_ptr = (spl_topo_module_t*)gu_module_ptr;
+    bool_t is_mimo_sink_source =
+            ((module_ptr->t_base.gu.num_input_ports != 1) ||
+                    (module_ptr->t_base.gu.num_output_ports != 1)) ? TRUE : FALSE;
 
-	return (
-			//mimo, sink and source module breaks the linearity.
-			is_mimo_sink_source ||
+    return (
+            //mimo, sink and source module breaks the linearity.
+            is_mimo_sink_source ||
 
-			//module requires buffering
-			module_ptr->t_base.flags.requires_data_buf ||
-			module_ptr->t_base.flags.need_mp_buf_extn ||
-			module_ptr->threshold_data.is_threshold_module ||
+            //module requires buffering
+            module_ptr->t_base.flags.requires_data_buf ||
+            module_ptr->t_base.flags.need_mp_buf_extn ||
+            module_ptr->threshold_data.is_threshold_module ||
 
-			//trigger policy module breaks the nblc because they may not need data on ports.
-			module_ptr->t_base.flags.need_trigger_policy_extn);
+            //trigger policy module breaks the nblc because they may not need data on ports.
+            module_ptr->t_base.flags.need_trigger_policy_extn);
 }
 
 /**
@@ -672,8 +672,8 @@ static inline bool_t spl_topo_port_has_flushing_eos(spl_topo_t *topo_ptr, gen_to
 static inline bool_t spl_topo_input_port_has_dfg_or_flushing_eos(gen_topo_input_port_t *in_port_ptr)
 {
    return (in_port_ptr->common.sdata.flags.marker_eos ||
-		   (in_port_ptr->common.sdata.metadata_list_ptr &&
-				   gen_topo_md_list_has_flushing_eos_or_dfg(in_port_ptr->common.sdata.metadata_list_ptr)));
+           (in_port_ptr->common.sdata.metadata_list_ptr &&
+                   gen_topo_md_list_has_flushing_eos_or_dfg(in_port_ptr->common.sdata.metadata_list_ptr)));
 }
 
 /**
@@ -769,7 +769,7 @@ static inline void spl_topo_update_check_valid_mf_event_flag(spl_topo_t *   topo
             port_ptr->module_ptr->module_instance_id,
             is_valid_mf,
             topo_ptr->simpt2_flags.all_ports_valid_mf,
-	    topo_ptr->simpt_event_flags.check_valid_mf);
+        topo_ptr->simpt_event_flags.check_valid_mf);
 #endif
 }
 
@@ -802,9 +802,9 @@ static inline void spl_topo_update_check_data_flow_event_flag(spl_topo_t *   top
             "port id = %ld, miid = 0x%lx dfs %ld, all_ports_data_flowing %ld, check_data_flow_state %d.",
             port_ptr->id,
             port_ptr->module_ptr->module_instance_id,
-	    dfs,
+        dfs,
             topo_ptr->simpt2_flags.all_ports_data_flowing,
-	    topo_ptr->simpt_event_flags.check_data_flow_state);
+        topo_ptr->simpt_event_flags.check_data_flow_state);
 #endif
 }
 

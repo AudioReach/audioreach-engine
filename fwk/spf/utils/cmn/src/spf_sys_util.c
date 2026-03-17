@@ -31,7 +31,7 @@ static ar_result_t spf_sys_util_push_close_all(spf_sys_util_handle_t *handle_ptr
                                                bool_t                 set_done_signal,
                                                bool_t                 is_flush_needed,
                                                bool_t                 is_reset_needed);
-                                               
+
 static spf_sys_util_status_t spf_svc_reg_get_state(ar_osal_service_state_type status)
 {
    if (AR_OSAL_SERVICE_STATE_DOWN == status)
@@ -328,27 +328,27 @@ ar_result_t spf_sys_util_ssr_register(spf_sys_util_handle_t *handle_ptr,
 
       cur_reg_info_ptr->proc_domain_id = proc_domain_id_list[i];
 
+      // APPS domain has not yet registered itself to service locator framework. Skip it for now.
+      if ((APM_PROC_DOMAIN_ID_APPS == cur_reg_info_ptr->proc_domain_id) ||
+          (APM_PROC_DOMAIN_ID_APPS_2 == cur_reg_info_ptr->proc_domain_id))
+      {
+         AR_MSG(DBG_HIGH_PRIO, "SYS_UTIL: SSR registration skipped for APPS domain");
+         continue;
+      }
+
       ar_osal_servreg_entry_type domain;
       ar_osal_servreg_entry_type service;
       // get the sev reg obj from id
       spf_svc_get_domain_and_service_string(&domain, &service, cur_reg_info_ptr->proc_domain_id);
 
 #ifndef SIM
-
-      if (cur_reg_info_ptr->proc_domain_id != APM_PROC_DOMAIN_ID_CDSP)
-      {
-          // Register for the service needed to listen along with its domain.
-          cur_reg_info_ptr->sev_reg_handle_ptr = ar_osal_servreg_register(AR_OSAL_CLIENT_LISTENER,
-                                                                          spf_svc_reg_state_change_callback,
-                                                                          (void *)handle_ptr,
-                                                                          &domain,
-                                                                          &service);
-          VERIFY(result, NULL != cur_reg_info_ptr->sev_reg_handle_ptr);
-      }
-      else
-      {
-          AR_MSG(DBG_HIGH_PRIO, "SYS_UTIL: ar_ar_osal_call skipped");
-      }
+      // Register for the service needed to listen along with its domain.
+      cur_reg_info_ptr->sev_reg_handle_ptr = ar_osal_servreg_register(AR_OSAL_CLIENT_LISTENER,
+                                                                      spf_svc_reg_state_change_callback,
+                                                                      (void *)handle_ptr,
+                                                                      &domain,
+                                                                      &service);
+      VERIFY(result, NULL != cur_reg_info_ptr->sev_reg_handle_ptr);
 #endif
    }
    handle_ptr->num_proc_domain_ids = num_proc_domain;
@@ -458,7 +458,7 @@ static ar_result_t spf_sys_util_push_close_all(spf_sys_util_handle_t *handle_ptr
    param_data_ptr->error_code         = AR_EOK;
 
    close_all_ptr = (param_id_sys_util_close_all_t *)(param_data_ptr + 1);
-   
+
    close_all_ptr->set_done_signal = set_done_signal;
    close_all_ptr->is_flush_needed = is_flush_needed;
    close_all_ptr->is_reset_needed = is_reset_needed;

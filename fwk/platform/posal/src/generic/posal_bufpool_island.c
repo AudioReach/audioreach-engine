@@ -46,7 +46,7 @@ ar_result_t validate_handle(uint32_t handle, uint32_t *index)
 
    if (*index >= POSAL_BUFPOOL_MAX_POOLS)
    {
-      AR_MSG(DBG_ERROR_PRIO, "Bufpool error: Invalid pool_index %lu", *index);
+      AR_MSG_ISLAND(DBG_ERROR_PRIO, "Bufpool error: Invalid pool_index %lu", *index);
       return AR_EFAILED;
    }
 
@@ -114,7 +114,7 @@ void *posal_bufpool_get_node(uint32_t pool_handle)
 
    if (AR_DID_FAIL(validate_handle(pool_handle, &pool_index)))
    {
-      AR_MSG(DBG_ERROR_PRIO, "Bufpool error: Invalid handle %lu", pool_handle);
+      AR_MSG_ISLAND(DBG_ERROR_PRIO, "Bufpool error: Invalid handle %lu", pool_handle);
       BUFPOOL_ASSERT();
       return NULL;
    }
@@ -166,7 +166,7 @@ void *posal_bufpool_get_node(uint32_t pool_handle)
       node_ptr->magic          = POSAL_BUFPOOL_NODE_MAGIC;
       node_to_return           = (void *)((int8_t *)node_ptr + sizeof(posal_bufpool_node_header_t));
 #ifdef DEBUG_BUFPOOL_LOW
-      AR_MSG(DBG_MED_PRIO,
+      AR_MSG_ISLAND(DBG_MED_PRIO,
              "Node assigned, pool idx %lu, list_idx: %lu, bit_pos: 0x%lx, pointer: 0x%lx, tid: 0x%lx ",
              pool_index,
              i,
@@ -189,12 +189,12 @@ void posal_bufpool_return_node(void *node_to_return)
    posal_bufpool_node_header_t *node_ptr =
       (posal_bufpool_node_header_t *)((int8_t *)node_to_return - sizeof(posal_bufpool_node_header_t));
 #ifdef DEBUG_BUFPOOL_LOW
-   AR_MSG(DBG_MED_PRIO, "Node being returned, pointer 0x%lx", node_ptr);
+   AR_MSG_ISLAND(DBG_MED_PRIO, "Node being returned, pointer 0x%lx", node_ptr);
 #endif
    uint32_t pool_index = node_ptr->pool_index;
    if ((pool_index >= POSAL_BUFPOOL_MAX_POOLS) || (NULL == all_pools[pool_index]))
    {
-      AR_MSG(DBG_ERROR_PRIO, "Bufpool error: Invalid pool index %lu", pool_index);
+      AR_MSG_ISLAND(DBG_ERROR_PRIO, "Bufpool error: Invalid pool index %lu", pool_index);
       BUFPOOL_ASSERT();
       return;
    }
@@ -205,7 +205,7 @@ void posal_bufpool_return_node(void *node_to_return)
    uint32_t node_index = node_ptr->node_index;
    if (node_ptr->magic != POSAL_BUFPOOL_NODE_MAGIC)
    {
-      AR_MSG(DBG_ERROR_PRIO,
+      AR_MSG_ISLAND(DBG_ERROR_PRIO,
              "Bufpool error: Node address invalid or node corrupted! Pool %lu, list %lu node %lu",
              pool_index,
              list_index,
@@ -217,7 +217,7 @@ void posal_bufpool_return_node(void *node_to_return)
    if (!(pool_ptr->nodes_ptr[list_index].list_bitmask & (1 << node_index)))
    {
       // node was not allocated to begin with
-      AR_MSG(DBG_ERROR_PRIO,
+      AR_MSG_ISLAND(DBG_ERROR_PRIO,
              "Bufpool error: Attempt to free unallocated node pool %lu, list %lu, node %lu",
              pool_index,
              list_index,
@@ -231,7 +231,7 @@ void posal_bufpool_return_node(void *node_to_return)
    toggle_bit_in_list_bitmask_at_idx(pool_ptr, list_index, node_index);
 
 #ifdef DEBUG_BUFPOOL_LOW
-   AR_MSG(DBG_MED_PRIO,
+   AR_MSG_ISLAND(DBG_MED_PRIO,
           "Node freed, pool idx %lu, list_idx: %lu, bit_pos: 0x%lx, pointer: 0x%lx, tid: 0x%lx ",
           pool_index,
           list_index,
@@ -247,7 +247,7 @@ void posal_bufpool_return_node(void *node_to_return)
        (pool_ptr->allocated_nodes - pool_ptr->used_nodes > POSAL_BUFPOOL_FREE_THRESHOLD))
    {
 #ifdef DEBUG_BUFPOOL
-      AR_MSG(DBG_MED_PRIO,
+      AR_MSG_ISLAND(DBG_MED_PRIO,
              "Bufpool: Freeing list pool idx %lu, list_idx: %lu, free nodes %lu ",
              pool_index,
              list_index,
@@ -270,7 +270,7 @@ bool_t posal_bufpool_is_address_in_bufpool(void *ptr, uint32_t pool_handle)
 
    if (AR_DID_FAIL(validate_handle(pool_handle, &pool_index)))
    {
-      AR_MSG(DBG_ERROR_PRIO, "Bufpool error: Invalid handle %lu", pool_handle);
+      AR_MSG_ISLAND(DBG_ERROR_PRIO, "Bufpool error: Invalid handle %lu", pool_handle);
       BUFPOOL_ASSERT();
       return FALSE;
    }

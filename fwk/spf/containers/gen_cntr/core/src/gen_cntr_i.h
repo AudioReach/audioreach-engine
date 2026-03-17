@@ -7,7 +7,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -46,11 +46,13 @@ INCLUDE FILES FOR MODULE
 #include "posal_err_fatal.h"
 
 #include "gen_topo.h"
+#include "thin_topo_inline.h"
 #include "gen_topo_capi.h"
 #include "gen_topo_buf_mgr.h"
 #include "gen_cntr_utils.h"
 #include "gen_cntr_err_check.h"
 #include "gen_cntr_tgt_specific.h"
+#include "thin_topo_cntr_utils.h"
 #define GEN_CNTR_STATIC static
 
 /**
@@ -153,8 +155,8 @@ typedef struct gen_cntr_ext_in_port_flags_t
 
                                                 Important note: TS disc is ignored for signal triggered containers.
                                                 So input_discontinuity can never happen to Signal triggerd containers.  */
-   uint32_t pending_mf: 1;					      /**< when data path media format comes during process then it is marked pending
-   	   	   	   	   	   	   	   	  					   and handled when processing is done.
+   uint32_t pending_mf: 1;                        /**< when data path media format comes during process then it is marked pending
+                                                       and handled when processing is done.
 
                                                        Not applicable to Signal triggerd containers. MF is handled immediately by dropping data and aslo
                                                        input_discontinuity is not applicable for ST containers. */
@@ -163,6 +165,9 @@ typedef struct gen_cntr_ext_in_port_flags_t
 
    uint32_t is_not_reset : 1;                 /**< TRUE indicates port is not in reset state, FALSE indicates port is in reset state*/
 
+#ifdef USES_THIN_TOPO
+   uint32_t pass_thru_upstream_buffer : 1;        /** indicates if the entire topo path is SISO and NBLC starting from this ext-in to the ext-out */
+#endif
 } gen_cntr_ext_in_port_flags_t;
 
 /**
@@ -171,8 +176,8 @@ typedef struct gen_cntr_ext_in_port_flags_t
  */
 typedef struct ext_in_port_client_cfg_t
 {
-	param_id_wr_ep_client_cfg_t cid;  /**< specifies the type and GPR port ID
-	 	 	 	 	 	 	 	 	 	              of the Client sharing the data buffers to the WR EP module */
+    param_id_wr_ep_client_cfg_t cid;  /**< specifies the type and GPR port ID
+                                                      of the Client sharing the data buffers to the WR EP module */
 
 } ext_in_port_client_cfg_t;
 
@@ -183,10 +188,10 @@ typedef struct ext_in_port_client_cfg_t
  */
 typedef struct ext_out_port_client_cfg_t
 {
-	param_id_rd_ep_client_cfg_t cid;     /** specifies the type and GPR port ID sharing the data buffers to the RD EP module */
-	uint32_t                    olc_client_md_buf_size;     /** specifies the metadata buffer size in the client buffer for OLC*/
-	uint32_t                    read_data_buf_size;
-	uint32_t                    pending_internal_eos_event;
+    param_id_rd_ep_client_cfg_t cid;     /** specifies the type and GPR port ID sharing the data buffers to the RD EP module */
+    uint32_t                    olc_client_md_buf_size;     /** specifies the metadata buffer size in the client buffer for OLC*/
+    uint32_t                    read_data_buf_size;
+    uint32_t                    pending_internal_eos_event;
 } ext_out_port_client_cfg_t;
 
 typedef struct gen_cntr_fwk_module_vtable_t
@@ -209,6 +214,7 @@ typedef struct gen_cntr_ext_in_vtable_t
    ar_result_t (*free_input_buf)(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr, ar_result_t status, bool_t is_flush);
    ar_result_t (*process_pending_data_cmd)(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
    ar_result_t (*frame_len_change_notif)(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
+   ar_result_t (*setup_topo_buf)(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_out_port_ptr);
 } gen_cntr_ext_in_vtable_t;
 
 typedef struct gen_cntr_ext_out_vtable_t
@@ -230,6 +236,8 @@ typedef struct gen_cntr_ext_out_vtable_t
    ar_result_t (*prop_media_fmt)(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 
    void  (*write_metadata)(gen_cntr_t * me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr, uint32_t frame_offset_in_ext_buf, bool_t * release_out_buf_ptr);
+
+   ar_result_t (*setup_topo_buf)(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 
 } gen_cntr_ext_out_vtable_t;
 
@@ -366,13 +374,13 @@ typedef struct gen_cntr_stm_t
    int32_t                            processed_interrupt_counter;  /**< Counter incremented in process context of container  */
    stm_latest_trigger_ts_t            *st_module_ts_ptr;         /**< ptr from which we can read timestamp */
    uint32_t                           signal_miss_counter;  /**< Counter to keep track of number of signal miss encountered */
-   void                               *stm_ts_ctxt_ptr;	/**< ptr to the dev handle of different ep-modules */
-   stm_get_ts_fn_ptr_t                update_stm_ts_fptr;	/**< function pointer to get the STM timestamp */
+   void                               *stm_ts_ctxt_ptr; /**< ptr to the dev handle of different ep-modules */
+   stm_get_ts_fn_ptr_t                update_stm_ts_fptr;   /**< function pointer to get the STM timestamp */
 #ifdef ENABLE_SIGNAL_MISS_CRASH
-   int32_t						      steady_state_interrupt_counter; /**< Counter incremented in process context similar to
-																		   processed_interrupt_counter but reset after any command handling.
-																		   used for detecting when signal miss occurs after counter is greater
-																		   than 1000 */
+   int32_t                            steady_state_interrupt_counter; /**< Counter incremented in process context similar to
+                                                                           processed_interrupt_counter but reset after any command handling.
+                                                                           used for detecting when signal miss occurs after counter is greater
+                                                                           than 1000 */
 #endif
 } gen_cntr_stm_t;
 
@@ -669,11 +677,7 @@ static inline ar_result_t gen_cntr_check_and_vote_for_island_in_data_path(gen_cn
        (0 == me_ptr->cu.active_non_island_num_buffers_for_ctrl_port)) // if non-island buffers are active then avoid
                                                                       // island entry
    {
-#ifdef SIM
-      // since sim island entry doesn't rely on pm server aggregated vote therefore it can go in island even when
-      // container has voted against island.
-      posal_island_trigger_island_exit();
-#endif
+
       return gen_cntr_check_and_vote_for_island_in_data_path_(me_ptr);
    }
    return AR_EOK;
@@ -694,15 +698,28 @@ static inline bool_t gen_cntr_is_any_path_ready_to_process(gen_cntr_t *me_ptr)
 
 static inline void gen_cntr_set_data_msg_out_buf_token(spf_msg_token_t *token)
 {
-	uint32_t token_data = (1 << GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_SHIFT) & GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK;
-	token->token_data = (token->token_data & ~GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK) | token_data;
-	return;
+    uint32_t token_data = (1 << GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_SHIFT) & GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK;
+    token->token_data = (token->token_data & ~GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK) | token_data;
+    return;
 }
 
 static inline bool_t gen_cntr_check_data_msg_out_buf_token_is_v2(spf_msg_token_t token)
 {
-	bool_t is_v2_buf = (0 != (token.token_data & GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK));
-	return is_v2_buf;
+    bool_t is_v2_buf = (0 != (token.token_data & GEN_CNTR_DATA_MSG_OUT_BUF_TOKEN_MASK));
+    return is_v2_buf;
+}
+
+static inline ar_result_t gen_cntr_ext_input_setup_int_port_buf(gen_cntr_t             *me_ptr,
+                                                                   gen_cntr_ext_in_port_t *ext_in_port_ptr,
+                                                                   gen_topo_input_port_t  *in_port_ptr)
+{
+   if (ext_in_port_ptr->vtbl_ptr->setup_topo_buf)
+   {
+      return ext_in_port_ptr->vtbl_ptr->setup_topo_buf(me_ptr, ext_in_port_ptr);
+   }
+
+   // note this call can return a fresh buf or a buf already at inplace-nblc-end.
+   return gen_topo_check_get_in_buf_from_buf_mgr(&me_ptr->topo, in_port_ptr, NULL);
 }
 
 void gen_cntr_handle_st_overrun_at_post_process(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
@@ -756,12 +773,20 @@ static inline void gen_cntr_check_and_send_prebuffers(gen_cntr_t *             m
    return gen_cntr_check_and_send_prebuffers_util_(me_ptr, ext_out_port_ptr, out_buf_ptr);
 }
 
-ar_result_t gen_cntr_workloop_async_signal_trigger_handler(cu_base_t* base_ptr, uint32_t bit_mask);
+ar_result_t gen_cntr_workloop_async_signal_trigger_handler(cu_base_t *base_ptr, uint32_t bit_mask);
 ar_result_t gen_cntr_fwk_extn_async_signal_enable(gen_cntr_t *me_ptr, gen_topo_module_t *module_ptr);
 ar_result_t gen_cntr_fwk_extn_async_signal_disable(gen_cntr_t *me_ptr, gen_topo_module_t *module_ptr);
 
-void gen_cntr_set_stm_ts_to_module (gen_cntr_t *me_ptr);
+void gen_cntr_set_stm_ts_to_module(gen_cntr_t *me_ptr);
 
+ar_result_t gen_cntr_clear_borrowed_ext_in_buffer_from_int_ports(gen_cntr_t             *me_ptr,
+                                                                 gen_cntr_ext_in_port_t *ext_in_port_ptr,
+                                                                 gen_topo_input_port_t  *in_port_ptr,
+                                                                 bool_t                  IS_FORCE_CLEAR);
+
+ar_result_t gen_cntr_clear_borrowed_ext_out_buffer_from_int_ports(gen_cntr_t              *me_ptr,
+                                                                  gen_cntr_ext_out_port_t *ext_out_port_ptr,
+                                                                  gen_topo_output_port_t  *out_port_ptr);
 #ifdef __cplusplus
 }
 #endif //__cplusplus

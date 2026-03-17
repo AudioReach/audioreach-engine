@@ -6,7 +6,7 @@
  *
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -329,7 +329,11 @@ ar_result_t spl_cntr_set_get_cfg_util(cu_base_t                         *base_pt
    gen_topo_module_t *module_ptr = (gen_topo_module_t *)mod_ptr;
 
    // Ensure module was found.
-   VERIFY(result, module_ptr && module_ptr->capi_ptr);
+   VERIFY(result, module_ptr);
+   if (module_ptr->capi_ptr == NULL)
+   {
+      return result = AR_EUNSUPPORTED;
+   }
 
    // fwk handling before calling set/get param.
 
@@ -602,7 +606,7 @@ static ar_result_t spl_cntr_handle_rest_of_graph_open(cu_base_t *base_ptr, void 
       spl_cntr_check_sg_cfg_for_frame_size(me_ptr, open_cmd_ptr);
    }
 
-   me_ptr->topo.t_base.flags.is_real_time_topo = FALSE;
+   me_ptr->topo.flags.is_real_time_topo = FALSE;
 
    // Check if RT and set frame size
    for (ext_in_port_list_ptr = me_ptr->topo.t_base.gu.ext_in_port_list_ptr; ext_in_port_list_ptr;
@@ -618,7 +622,7 @@ static ar_result_t spl_cntr_handle_rest_of_graph_open(cu_base_t *base_ptr, void 
       if (((APM_CONT_GRAPH_POS_STREAM != me_ptr->cu.position) && (APM_SUB_GRAPH_DIRECTION_TX == sg_ptr->direction)) || cu_has_voice_sid(&me_ptr->cu))
       {
          ext_in_port_ptr->is_realtime_usecase        = TRUE;
-         me_ptr->topo.t_base.flags.is_real_time_topo = TRUE;
+         me_ptr->topo.flags.is_real_time_topo = TRUE;
       }
 
       SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
@@ -642,7 +646,7 @@ static ar_result_t spl_cntr_handle_rest_of_graph_open(cu_base_t *base_ptr, void 
       if (((APM_CONT_GRAPH_POS_STREAM != me_ptr->cu.position) && (APM_SUB_GRAPH_DIRECTION_TX == sg_ptr->direction)) || cu_has_voice_sid(&me_ptr->cu))
       {
          ext_out_port_ptr->is_realtime_usecase       = TRUE;
-         me_ptr->topo.t_base.flags.is_real_time_topo = TRUE;
+         me_ptr->topo.flags.is_real_time_topo = TRUE;
       }
 
       SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
@@ -1108,7 +1112,7 @@ ar_result_t spl_cntr_post_operate_on_connected_input(spl_cntr_t                *
                   spl_topo_get_in_port_actual_data_len(&(me_ptr->topo), spl_topo_conn_in_port_ptr);
 
                result =
-                  gen_topo_create_dfg_metadata(me_ptr->topo.t_base.gu.log_id,
+                  gen_topo_create_dfg_metadata(&me_ptr->topo.t_base,
                                                &(spl_topo_conn_in_port_ptr->t_base.common.sdata.metadata_list_ptr),
                                                me_ptr->cu.heap_id,
                                                &out_md_ptr,

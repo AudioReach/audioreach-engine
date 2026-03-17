@@ -191,15 +191,36 @@ static void capi_splitter_update_tgp(capi_splitter_t *me_ptr)
                   me_ptr->out_port_state_arr[i].port_id);
       }
    }
+    
+   #ifdef SPLITTER_DBG_LOW
+      if(me_ptr->input_port_state == DATA_PORT_STATE_STARTED)
+      {
+         AR_MSG(DBG_HIGH_PRIO,"capi splitter: Input port is in start state");
+      }
+      else
+      {
+         AR_MSG(DBG_HIGH_PRIO,"capi splitter: Input port is not in start state");
+      }
+   #endif
    
-   // Set to non-default TGP if, there are mix of RT and NRT ports
+   // Set to non-default TGP if,
+   //   a)Input port is in start state then only tgp should be raised again based output ports state
+   //   b)If there are mix of RT and NRT output ports and any of the output port is in start state
    // Set to default TGP if,
-   //   a) if all downstreams are rt or all are nrt then set to default TGP
-   //   b) if all the outputs are stopped/closed, then all ports are neither RT or NRT.
+   //   a) If input port is in stopped/closed state
+   //   b) if all downstreams are rt or all are nrt then set to default TGP
+   //   c) if all the outputs are stopped/closed, then all ports are neither RT or NRT.
    bool_t set_to_default_tgp = TRUE;
-   if (is_any_rt_ds && is_any_nrt_ds)
+   if ((me_ptr->input_port_state == DATA_PORT_STATE_STARTED) && (is_any_rt_ds && is_any_nrt_ds))
    {
-      set_to_default_tgp = FALSE;
+	   for (uint32_t i = 0; i < me_ptr->num_out_ports; i++)
+       {
+           if (DATA_PORT_STATE_STARTED == me_ptr->out_port_state_arr[i].state)
+           {
+               set_to_default_tgp = FALSE;
+			   break;			 
+	       }
+       }
    }
 
    AR_MSG(DBG_HIGH_PRIO,

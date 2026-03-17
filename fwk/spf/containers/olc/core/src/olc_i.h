@@ -126,8 +126,8 @@ typedef struct olc_ext_in_port_flags_t
                                         EOF is called to force-process, and then output is
                                         released when EOF comes out thru ext out ports.
                                         cleared after EOF is set on input port. */
-   uint32_t pending_mf: 1;					/**< when data path media format comes during process then it is marked pending
-   	   	   	   	   	   	   	   	   	   	   	    and handled when processing is done. */
+   uint32_t pending_mf: 1;                  /**< when data path media format comes during process then it is marked pending
+                                                and handled when processing is done. */
 } olc_ext_in_port_flags_t;
 
 /**
@@ -258,7 +258,6 @@ ar_result_t olc_get_thread_stack_size(olc_t *me_ptr, uint32_t *stack_size);
 ar_result_t olc_get_set_thread_priority(olc_t *me_ptr, int32_t *priority_ptr, bool_t should_set);
 void olc_set_thread_priority(olc_t *me_ptr, uint32_t period_in_us);
 ar_result_t olc_ext_in_port_reset(olc_t *me_ptr, olc_ext_in_port_t *ext_in_port_ptr);
-bool_t olc_is_realtime(cu_base_t *base_ptr);
 bool_t olc_is_stm(cu_base_t *base_ptr);
 ar_result_t olc_ext_out_port_reset(olc_t *me_ptr, olc_ext_out_port_t *ext_out_port_ptr);
 ar_result_t olc_ext_out_port_basic_reset(olc_t *me_ptr, olc_ext_out_port_t *ext_out_port_ptr);
@@ -291,6 +290,11 @@ ar_result_t olc_ctrl_path_media_fmt(cu_base_t *base_ptr);
 ar_result_t olc_icb_info_from_downstream(cu_base_t *base_ptr);
 ar_result_t olc_handle_peer_port_property_update_cmd(cu_base_t *me_ptr);
 ar_result_t olc_handle_upstream_stop_cmd(cu_base_t *base_ptr);
+ar_result_t olc_register_events_utils(cu_base_t *       base_ptr,
+                                      gu_module_t *     gu_module_ptr,
+                                      topo_reg_event_t *reg_event_payload_ptr,
+                                      bool_t            is_register,
+                                      bool_t *          capi_supports_v1_event_ptr);
 /**--------------------------- olc_buf_utilities ----------------------------*/
 
 ar_result_t olc_init_ext_in_port(void *base_ptr, gu_ext_in_port_t *gu_ext_port_ptr);
@@ -342,7 +346,7 @@ ar_result_t olc_handle_port_data_thresh_change_event(void *ctx_ptr);
 ar_result_t olc_input_media_format_received(void *            ctx_ptr,
                                             gu_ext_in_port_t *gu_ext_in_port_ptr,
                                             topo_media_fmt_t *media_fmt_ptr,
-											cu_ext_in_port_upstream_frame_length_t *upstream_frame_len_ptr,
+                                            cu_ext_in_port_upstream_frame_length_t *upstream_frame_len_ptr,
                                             bool_t            is_data_path);
 
 ar_result_t olc_operate_on_ext_in_port(void *             base_ptr,
@@ -426,6 +430,8 @@ ar_result_t olc_destroy_module(gen_topo_t *       topo_ptr,
                                bool_t             reset_capi_dependent_dont_destroy);
 
 ar_result_t olc_create_send_eos_md(olc_t *me_ptr, olc_ext_out_port_t *ext_out_port_ptr);
+
+ar_result_t olc_aggregate_hw_acc_proc_delay(void *cu_ptr, uint32_t *hw_acc_proc_delay_ptr);
 
 /**--------------------------- olc calib utils ----------------------------*/
 ar_result_t olc_process_satellite_set_get_cfg(cu_base_t *                       base_ptr,

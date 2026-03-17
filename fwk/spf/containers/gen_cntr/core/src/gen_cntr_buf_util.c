@@ -4,7 +4,7 @@
  *     This file contains utility functions for GEN_CNTR buffer handling
  *
  * \copyright
- *  Copyright (c) Qualcomm Innovation Center, Inc. All Rights Reserved.
+ *  Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -151,8 +151,6 @@ ar_result_t gen_cntr_create_ext_out_bufs(gen_cntr_t *             me_ptr,
    }
 
    // get heap id for ext out buffer allocations.
-   // if the module support MP extension and raises overrun to use default heap id.
-   // TODO: check if need to recreate buffer if the Dam module changes the override flag runtime.
    POSAL_HEAP_ID downgraded_heap_id =
       gu_get_downgraded_heap_id(me_ptr->topo.heap_id, ext_port_ptr->gu.downstream_handle.heap_id);
 
@@ -468,6 +466,8 @@ static uint32_t gen_cntr_set_thresh_value(gen_topo_t *               topo_ptr,
    // modules with num proc loops greater than cannot be supported in Pure ST topology.
    if (module_ptr->num_proc_loops > 1)
    {
+      THIN_TOPO_SET_EXIT_FLAG(topo_ptr, requires_module_looping, TRUE);
+
       topo_ptr->flags.cannot_be_pure_signal_triggered = TRUE;
       GEN_CNTR_MSG(topo_ptr->gu.log_id,
                    DBG_HIGH_PRIO,
@@ -2440,6 +2440,8 @@ ar_result_t gen_cntr_handle_port_data_thresh_change(void *ctx_ptr)
     * if we clear port_thresh event flag, then buffers will never get created.*/
    bool_t thresh_prop_not_complete = FALSE;
 
+   THIN_TOPO_SET_EXIT_FLAG((&me_ptr->topo), thresh_prop_not_complete, FALSE);
+
    GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
                 DBG_MED_PRIO,
                 " in gen_cntr_handle_port_data_thresh_change. thresh event %u, media_fmt_event %u, simple threshold "
@@ -2525,6 +2527,8 @@ ar_result_t gen_cntr_handle_port_data_thresh_change(void *ctx_ptr)
    {
       GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_MED_PRIO, " gen_cntr_handle_port_data_thresh_change not complete");
    }
+
+   THIN_TOPO_SET_EXIT_FLAG((&me_ptr->topo), thresh_prop_not_complete, thresh_prop_not_complete);
 
    // clear anyway as media fmt will call this func again. keeping it on triggers repeated calls from data_process.
    capi_event_flag_ptr->port_thresh = FALSE;
@@ -2933,31 +2937,4 @@ ar_result_t find_lcm(uint32_t a, uint32_t b, uint32_t *lcm_ptr)
    *lcm_ptr = (uint32_t)lcm;
 
    return AR_EOK;
-}
-
-void gen_cntr_check_and_send_prebuffers_util_(gen_cntr_t *             me_ptr,
-                                              gen_cntr_ext_out_port_t *ext_out_port_ptr,
-                                              spf_msg_data_buffer_t *  out_buf_ptr)
-{
-   // Exit and handle prebuffers only if port has requirement
-   if (cu_check_if_port_requires_prebuffers(&ext_out_port_ptr->cu))
-   {
-      gen_topo_exit_island_temporarily(&me_ptr->topo);
-      cu_handle_prebuffer(&me_ptr->cu,
-                          &ext_out_port_ptr->gu,
-                          out_buf_ptr,
-                          ext_out_port_ptr->cu.buf_max_size -
-                             (gen_topo_compute_if_output_needs_addtional_bytes_for_dm(&(me_ptr->topo),
-                                                                                      (gen_topo_output_port_t *)
-                                                                                         ext_out_port_ptr->gu
-                                                                                            .int_out_port_ptr)));
-   }
-   else
-   {
-      // if port didnt have prebuf requirement at data flow start, then we can mark sent= TRUE,
-      // If prebuf requriement changes after data flow start, no need to insert prebuffer since its going cause
-      // a glitch, if we need to handle scenario there we need to consider if media format changed
-      ext_out_port_ptr->cu.icb_info.is_prebuffer_sent = TRUE;
-   }
-   return;
 }

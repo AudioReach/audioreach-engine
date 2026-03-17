@@ -13,6 +13,9 @@
 
 #include "spf_begin_pack.h"
 
+/* Scenario ID reserved and mapped for SAT_VOICE_CALL scenario identification . */
+#define APM_SUB_GRAPH_SID_SAT_VOICE_CALL 4 //APM_SUB_GRAPH_SID_RESERVED_1
+
 struct apm_imcl_peer_domain_info_t
 {
    uint32_t module_iid;
@@ -105,6 +108,8 @@ struct apm_param_id_master_pd_info_t
         @values { "APM_PROC_DOMAIN_ID_INVALID"=0x0,
          "MDSP"=#APM_PROC_DOMAIN_ID_MDSP,
          "ADSP"=#APM_PROC_DOMAIN_ID_ADSP,
+         "ADSP_1"=#APM_PROC_DOMAIN_ID_ADSP_1,
+         "ADSP_2"=#APM_PROC_DOMAIN_ID_ADSP_2,
          "APPS"=#APM_PROC_DOMAIN_ID_APPS,
          "SDSP"=#APM_PROC_DOMAIN_ID_SDSP,
          "CDSP"=#APM_PROC_DOMAIN_ID_CDSP,
