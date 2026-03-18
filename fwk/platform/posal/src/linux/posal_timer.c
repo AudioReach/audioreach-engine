@@ -149,7 +149,7 @@ int32_t posal_timer_create_v2(posal_timer_t *                        pp_timer,
 
    //Allocate timer id
    timer_t *timerId = NULL;
-   if (NULL == (timerId = (posal_timer_info_t *)posal_memory_malloc(sizeof(timer_t), heap_id)))
+   if (NULL == (timerId = (timer_t *)posal_memory_malloc(sizeof(timer_t), heap_id)))
    {
       AR_MSG(DBG_ERROR_PRIO, "Memory allocation failure");
       posal_memory_free(p_timer);
