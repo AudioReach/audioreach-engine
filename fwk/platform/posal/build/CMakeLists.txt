@@ -61,6 +61,12 @@ if(ARSPF_WIN_PORTING) #platform windows
       #${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_timer_timerqueue.c
       #${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_timer_waitable_timers.c
    )
+elseif(CONFIG_ARCH_ZEPHYR)
+   list (APPEND lib_srcs_list
+      ${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_condvar.c
+      ${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_timer.c
+      #posal_rtld is not supported in zephyr.
+   )
 else() # for QNX & LRH
    list (APPEND lib_srcs_list
       ${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_condvar.c
@@ -90,6 +96,10 @@ endif()
 if(ARSPF_WIN_PORTING)
    set (lib_link_libs_list
       winmm.lib
+   )
+elseif(CONFIG_ARCH_ZEPHYR)
+   set (lib_link_libs_list
+      zephyr_interface
    )
 else()
    set (lib_link_libs_list
