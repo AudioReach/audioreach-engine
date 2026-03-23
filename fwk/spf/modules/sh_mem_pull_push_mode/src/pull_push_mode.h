@@ -37,6 +37,11 @@ extern "C" {
 
 #define MAX_EVENT_CLIENTS 4
 
+#define HEADER_TYPE_UTC_TIMESTAMP        0x00000001
+
+#define HEADER_TYPE_RESERVED_BITS        0xFFFFFFFE
+#define BYTE_FOR_HEADER_ALIGNMENT        4
+
 /* debug message */
 #define MIID_UNKNOWN 0
 #define PULL_PUSH_MSG_PREFIX "CAPI PM:[%lX] "
@@ -123,6 +128,20 @@ typedef struct capi_pm_t
    uint32_t frame_dur_us;
 
    bool_t is_cntr_duty_cycle_enabled;
+
+   /*header related parameter*/
+   bool_t     is_header_enabled;
+   bool_t     is_update_header;
+   uint32_t   header_type_flags;
+   uint8_t    *header_buffer_ptr;
+   uint32_t   header_buffer_size;
+
+   uint32_t *pcm_param_actual_size_ptr;
+   uint32_t *pcm_param_padding_size_ptr;
+
+   uint32_t  batch_write_index;
+   uint32_t  pcm_bytes_written;
+   uint32_t  batch_bytes_written;
 
 } capi_pm_t;
 

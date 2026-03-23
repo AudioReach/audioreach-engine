@@ -28,6 +28,7 @@ INCLUDE FILES FOR MODULE
 #else
 #include "test_util.h"
 #endif
+#include "dam_batch_metadata_api.h"
 
 // Important: Disabling code to bump up thread priority whenever position buffer gets updated.
 // Initially priority change was introduced for the thread to be able to update position buffer
@@ -564,6 +565,237 @@ capi_err_t pull_mode_read_input(capi_t *_pif, capi_stream_data_t *input[], capi_
    return result;
 }
 
+static capi_err_t push_mode_write_batch_header(capi_pm_t *me_ptr,
+                                               uint32_t  *write_index_ptr,
+                                               uint64_t   timestamp)
+{
+   capi_err_t result = CAPI_EOK;
+
+   // Validate input parameters
+   if (NULL == me_ptr || NULL == write_index_ptr)
+   {
+      PULL_PUSH_MSG(MIID_UNKNOWN, DBG_ERROR_PRIO, "Invalid parameters for header write");
+      return CAPI_EBADPARAM;
+   }
+
+   uint32_t   miid   = me_ptr->pull_push_mode_info.miid;
+
+   // Validate header buffer is allocated
+   if (NULL == me_ptr->header_buffer_ptr || 0 == me_ptr->header_buffer_size)
+   {
+      PULL_PUSH_MSG(miid, DBG_ERROR_PRIO, "Header buffer not allocated");
+      return CAPI_EFAILED;
+   }
+
+   // Use pre-allocated buffer
+   uint8_t *local_header_buf_ptr = me_ptr->header_buffer_ptr;
+   uint32_t max_size = me_ptr->header_buffer_size;
+   uint32_t local_offset = 0;
+
+   // Clear buffer
+   memset(local_header_buf_ptr, 0, max_size);
+
+   // Save the starting write index to calculate DDR addresses later
+   uint32_t header_start_index = *write_index_ptr;
+
+   // 1. Write Batch Header - Sync Word
+   sh_mem_push_mode_batch_header_t *batch_hdr_ptr =
+      (sh_mem_push_mode_batch_header_t *)&local_header_buf_ptr[local_offset];
+   batch_hdr_ptr->sync_word = SH_MEM_PUSH_MODE_HEADER_SYNC_WORD;
+   local_offset += sizeof(sh_mem_push_mode_batch_header_t);
+
+   PULL_PUSH_MSG(miid, DBG_LOW_PRIO,
+                 "Batch header: sync_word=0x%x", batch_hdr_ptr->sync_word);
+
+   // 2. Write UTC Timestamp Parameter (if enabled)
+   if (me_ptr->header_type_flags & HEADER_TYPE_UTC_TIMESTAMP)
+   {
+      // Write parameter header
+      sh_mem_push_mode_param_header_t *ts_param_hdr_ptr =
+         (sh_mem_push_mode_param_header_t *)&local_header_buf_ptr[local_offset];
+      ts_param_hdr_ptr->param_id = PARAM_ID_HEADER_TYPE_UTC_TIMESTAMP;
+      ts_param_hdr_ptr->actual_size = sizeof(sh_mem_push_mode_timestamp_payload_t);
+      ts_param_hdr_ptr->padding_size = 0;  // No padding needed for timestamp
+      local_offset += sizeof(sh_mem_push_mode_param_header_t);
+
+      // Write timestamp payload
+      sh_mem_push_mode_timestamp_payload_t *ts_payload_ptr =
+         (sh_mem_push_mode_timestamp_payload_t *)&local_header_buf_ptr[local_offset];
+      ts_payload_ptr->timestamp_us_lsw = (uint32_t)(timestamp & 0xFFFFFFFF);
+      ts_payload_ptr->timestamp_us_msw = (uint32_t)(timestamp >> 32);
+      local_offset += sizeof(sh_mem_push_mode_timestamp_payload_t);
+
+      PULL_PUSH_MSG(miid, DBG_LOW_PRIO,
+                    "UTC timestamp: 0x%08x%08x",
+                    ts_payload_ptr->timestamp_us_msw,
+                    ts_payload_ptr->timestamp_us_lsw);
+   }
+
+   // 3. Write PCM Data Parameter Header (size will be updated later)
+   sh_mem_push_mode_param_header_t *pcm_param_hdr_ptr =
+      (sh_mem_push_mode_param_header_t *)&local_header_buf_ptr[local_offset];
+   pcm_param_hdr_ptr->param_id = PARAM_ID_HEADER_TYPE_PCM_DATA;
+   pcm_param_hdr_ptr->actual_size = 0;  // Will be updated when batch ends
+   pcm_param_hdr_ptr->padding_size = 0; // Will be updated when batch ends
+
+
+   uint32_t pcm_param_actual_size_offset = (uint8_t*)&pcm_param_hdr_ptr->actual_size - local_header_buf_ptr;
+   uint32_t pcm_param_padding_size_offset = (uint8_t*)&pcm_param_hdr_ptr->padding_size - local_header_buf_ptr;
+
+   local_offset += sizeof(sh_mem_push_mode_param_header_t);
+
+   // Sanity check: ensure we didn't overflow the buffer
+   if (local_offset > max_size)
+   {
+      PULL_PUSH_MSG(miid, DBG_ERROR_PRIO,
+                    "Header size %d exceeds allocated size %d",
+                    local_offset, max_size);
+      return CAPI_EFAILED;
+   }
+
+   // 4. Write header to DDR with wrap-around handling
+   pull_push_mode_t *pm_ptr = &me_ptr->pull_push_mode_info;
+   uint32_t circ_buf_size = pm_ptr->shared_circ_buf_size;
+   uint32_t bytes_to_write = local_offset;
+   uint32_t current_write_index = *write_index_ptr;
+   uint32_t bytes_written = 0;
+
+   while (bytes_to_write)
+   {
+      // Calculate space available till end of buffer
+      uint32_t rem_lin_size = circ_buf_size - current_write_index;
+      uint32_t bytes_to_copy = MIN(bytes_to_write, rem_lin_size);
+
+      // Copy to DDR
+      memscpy(pm_ptr->shared_circ_buf_start_ptr + current_write_index,
+              bytes_to_copy,
+              &local_header_buf_ptr[bytes_written],
+              bytes_to_copy);
+
+      bytes_to_write -= bytes_to_copy;
+      bytes_written  += bytes_to_copy;
+
+      current_write_index = current_write_index + bytes_to_copy;
+      if (current_write_index >= pm_ptr->shared_circ_buf_size)
+      {
+         current_write_index = 0;
+      }
+   }
+
+   // 5. Calculate DDR indices with wrap-around
+   uint32_t param_actual_size_sh_mem_index =
+      (header_start_index + pcm_param_actual_size_offset) % circ_buf_size;
+   me_ptr->pcm_param_actual_size_ptr =
+      (uint32_t *)(pm_ptr->shared_circ_buf_start_ptr + param_actual_size_sh_mem_index);
+
+   uint32_t param_padding_sh_mem_index =
+      (header_start_index + pcm_param_padding_size_offset) % circ_buf_size;
+   me_ptr->pcm_param_padding_size_ptr =
+      (uint32_t *)(pm_ptr->shared_circ_buf_start_ptr + param_padding_sh_mem_index);
+
+
+   PULL_PUSH_MSG(miid, DBG_HIGH_PRIO,
+                 "Batch header written to DDR: size=%d bytes, start_index=%d, end_index=%d",
+                 bytes_written, *write_index_ptr, current_write_index);
+
+   PULL_PUSH_MSG(miid, DBG_LOW_PRIO,
+              "SH MEM: actual_size=0x%lx (index=%d), padding_size=0x%lx (index=%d)",
+              *me_ptr->pcm_param_actual_size_ptr, param_actual_size_sh_mem_index,
+              *me_ptr->pcm_param_padding_size_ptr, param_padding_sh_mem_index);
+
+   *write_index_ptr = current_write_index;
+   me_ptr->batch_bytes_written = local_offset;
+
+   return result;
+}
+
+capi_err_t push_mode_end_header_batch(capi_pm_t *_pif, uint64_t timestamp)
+{
+   capi_pm_t                               *capi_ptr       = (capi_pm_t *)_pif;
+   pull_push_mode_t                        *me_ptr         = &(capi_ptr->pull_push_mode_info);
+   uint32_t                                 rem_lin_size, temp_wr_ind, padding_bytes = 0;
+   int8_t                                  *write_ptr      = NULL;
+   sh_mem_pull_push_mode_position_buffer_t *pos_buf_ptr    = me_ptr->shared_pos_buf_ptr;
+   uint32_t                                 miid = me_ptr->miid;
+
+   // add padding bytes if write_index is not 4-byte aligned
+   uint32_t misaligned_bytes = capi_ptr->pcm_bytes_written % BYTE_FOR_HEADER_ALIGNMENT;
+
+   if(misaligned_bytes)
+   {
+      padding_bytes = BYTE_FOR_HEADER_ALIGNMENT - misaligned_bytes;
+
+      rem_lin_size = me_ptr->shared_circ_buf_size - capi_ptr->batch_write_index;
+
+      write_ptr = (int8_t *)(me_ptr->shared_circ_buf_start_ptr + capi_ptr->batch_write_index);
+      if(padding_bytes <= rem_lin_size)
+      {
+         memset(write_ptr, 0, padding_bytes);
+         capi_ptr->batch_write_index += padding_bytes;
+      }
+      else
+      {
+         PULL_PUSH_MSG(miid, DBG_ERROR_PRIO, "Padding bytes %d exceeds remaining linear memory %d, shared memory is not 4-byte aligned",
+                                              padding_bytes, rem_lin_size);
+
+         memset(write_ptr, 0, rem_lin_size);
+         capi_ptr->batch_write_index += rem_lin_size;
+      }
+
+      if (capi_ptr->batch_write_index >= me_ptr->shared_circ_buf_size)
+      {
+         capi_ptr->batch_write_index = 0;
+      }
+   }
+
+
+   // Update header size
+   *capi_ptr->pcm_param_actual_size_ptr = capi_ptr->pcm_bytes_written;
+   *capi_ptr->pcm_param_padding_size_ptr = padding_bytes;
+   capi_ptr->batch_bytes_written += (capi_ptr->pcm_bytes_written + padding_bytes);
+
+   temp_wr_ind = pos_buf_ptr->index;
+   write_ptr   = (int8_t *)(me_ptr->shared_circ_buf_start_ptr + temp_wr_ind);
+   rem_lin_size = me_ptr->shared_circ_buf_size - temp_wr_ind;
+
+   //cache flush now, check for watermark event and update index (Handle the wrap around case here)
+   if(capi_ptr->batch_bytes_written < rem_lin_size)
+   {
+#ifndef DISABLE_CACHE_OPERATIONS
+      posal_cache_flush_v2(&write_ptr, capi_ptr->batch_bytes_written);
+#endif
+      pull_push_mode_check_send_watermark_event(capi_ptr, temp_wr_ind, capi_ptr->batch_write_index);
+   }
+   else
+   {
+#ifndef DISABLE_CACHE_OPERATIONS
+      posal_cache_flush_v2(&write_ptr, rem_lin_size);
+#endif
+      pull_push_mode_check_send_watermark_event(capi_ptr, temp_wr_ind, me_ptr->shared_circ_buf_size);
+
+      if(0 != capi_ptr->batch_write_index)
+      {
+         write_ptr   = (int8_t *)(me_ptr->shared_circ_buf_start_ptr);
+         temp_wr_ind = 0;
+#ifndef DISABLE_CACHE_OPERATIONS
+         posal_cache_flush_v2(&write_ptr, capi_ptr->batch_bytes_written - rem_lin_size);
+#endif
+         pull_push_mode_check_send_watermark_event(capi_ptr, temp_wr_ind, capi_ptr->batch_write_index);
+      }
+   }
+
+   /** update position buffer with new index*/
+   pull_mode_update_pos_buffer(pos_buf_ptr, me_ptr->ist_priority, capi_ptr->batch_write_index , timestamp);
+
+   PULL_PUSH_MSG(miid, DBG_HIGH_PRIO,
+                 "Batch written actual bytes %lu, padding bytes %lu, next batch starts at index %d",
+                 *capi_ptr->pcm_param_actual_size_ptr, *capi_ptr->pcm_param_padding_size_ptr, capi_ptr->batch_write_index);
+
+   capi_ptr->is_update_header = TRUE;
+
+   return CAPI_EOK;
+}
+
 capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], capi_stream_data_t *output[])
 {
    capi_err_t                               result = CAPI_EOK;
@@ -669,6 +901,32 @@ capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], cap
    }
    else // buffer access extension is disabled.
    {
+      // Use batch_write_index for tracking within batch when headers enabled
+      if (capi_ptr->is_header_enabled && 0 != module_buf_ptr[0].actual_data_len)
+      {
+         // Write batch header at the start of a new batch (when headers enabled and not in middle of batch)
+         if (capi_ptr->is_update_header)
+         {
+            capi_ptr->pcm_bytes_written = 0;
+            // Initialize batch tracking
+            capi_ptr->batch_write_index = write_index;
+            if (CAPI_FAILED(result = push_mode_write_batch_header(capi_ptr, &capi_ptr->batch_write_index, timestamp)))
+            {
+               PULL_PUSH_MSG(miid, DBG_ERROR_PRIO, "Failed to write batch header");
+               return result;
+            }
+
+            capi_ptr->is_update_header = FALSE;
+
+            PULL_PUSH_MSG(miid, DBG_HIGH_PRIO,
+                          "Batch header written at index %d, PCM data starts at index %d",
+                          write_index, capi_ptr->batch_write_index);
+         }
+
+         write_index = capi_ptr->batch_write_index;
+
+      }
+
       uint32_t bytes_to_copy, bytes_copied = 0, bytes_copied_per_channel = 0, bytes_copied_per_channel_now = 0;
       while (module_buf_ptr[0].actual_data_len > 0)
       {
@@ -683,8 +941,12 @@ capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], cap
             memscpy(write_ptr, bytes_to_copy, (module_buf_ptr[0].data_ptr + bytes_copied), bytes_to_copy);
 
 #ifndef DISABLE_CACHE_OPERATIONS
-            posal_cache_flush_v2(&write_ptr, bytes_to_copy);
+            if (!capi_ptr->is_header_enabled)
+            {
+               posal_cache_flush_v2(&write_ptr, bytes_to_copy);
+            }
 #endif
+
             module_buf_ptr[0].actual_data_len -= bytes_to_copy;
             bytes_copied += bytes_to_copy;
          }
@@ -715,7 +977,10 @@ capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], cap
             }
 
 #ifndef DISABLE_CACHE_OPERATIONS
-            posal_cache_flush_v2(&write_ptr, bytes_to_copy);
+            if (!capi_ptr->is_header_enabled)
+            {
+               posal_cache_flush_v2(&write_ptr, bytes_to_copy);
+            }
 #endif
 
             bytes_copied_per_channel_now = bytes_to_copy / me_ptr->media_fmt.num_channels;
@@ -727,9 +992,17 @@ capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], cap
             bytes_copied_per_channel += bytes_copied_per_channel_now;
          }
 
-         temp_wr_ind = write_index;
-         write_index += bytes_to_copy;
-         pull_push_mode_check_send_watermark_event(capi_ptr, temp_wr_ind, write_index);
+         // Only check watermark if headers disabled (will check at batch end if enabled)
+         if (!capi_ptr->is_header_enabled)
+         {
+            temp_wr_ind = write_index;
+            write_index += bytes_to_copy;
+            pull_push_mode_check_send_watermark_event(capi_ptr, temp_wr_ind, write_index);
+         }
+         else
+         {
+            write_index += bytes_to_copy;
+         }
          if (write_index >= me_ptr->shared_circ_buf_size)
          {
             write_index = 0;
@@ -740,16 +1013,51 @@ capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], cap
       if (CAPI_INTERLEAVED == me_ptr->media_fmt.data_interleaving)
       {
          module_buf_ptr[0].actual_data_len = bytes_copied;
+         capi_ptr->pcm_bytes_written += bytes_copied;
       }
       else
       {
          // for unpacked v2 only first ch buffer lens need to be used.
          module_buf_ptr[0].actual_data_len = bytes_copied_per_channel;
+         capi_ptr->pcm_bytes_written += (bytes_copied_per_channel * me_ptr->media_fmt.num_channels);
       }
    }
 
-   /** update position buffer with new index*/
-   pull_mode_update_pos_buffer(pos_buf_ptr, me_ptr->ist_priority, write_index, timestamp);
+   if (!capi_ptr->is_header_enabled)
+   {
+      /** update position buffer with new index*/
+      pull_mode_update_pos_buffer(pos_buf_ptr, me_ptr->ist_priority, write_index, timestamp);
+   }
+   else
+   {
+      capi_ptr->batch_write_index = write_index;
+      capi_stream_data_v2_t *inputv2  = (capi_stream_data_v2_t *)input[0];
+      bool_t is_batch_completed =  (input[0]->flags.marker_eos || input[0]->flags.end_of_frame) ? TRUE: FALSE;
+
+      //check for dam batch marker md
+      if (NULL != inputv2->metadata_list_ptr && !is_batch_completed)
+      {
+         module_cmn_md_list_t *node_ptr = inputv2->metadata_list_ptr;
+         module_cmn_md_list_t *next_ptr = NULL;
+         while (node_ptr)
+         {
+            module_cmn_md_t *      md_ptr              = (module_cmn_md_t *)node_ptr->obj_ptr;
+            next_ptr = node_ptr->next_ptr;
+            if (DAM_BATCH_END_MD_ID_MARKER == md_ptr->metadata_id)
+            {
+               is_batch_completed = TRUE;
+               break;
+            }
+
+            node_ptr = next_ptr;
+         }
+      }
+
+      if(is_batch_completed)
+      {
+         push_mode_end_header_batch(capi_ptr, timestamp);
+      }
+   }
 
    // raise EOS marker event
    if ((*input)->flags.marker_eos)

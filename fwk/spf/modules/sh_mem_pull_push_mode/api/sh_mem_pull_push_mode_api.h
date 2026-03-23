@@ -427,6 +427,101 @@ struct sh_mem_pull_push_mode_cfg_t
 ;
 typedef struct sh_mem_pull_push_mode_cfg_t sh_mem_pull_push_mode_cfg_t;
 
+/*==============================================================================
+   Param ID
+==============================================================================*/
+
+/** @ingroup ar_spf_mod_ep_shmempp_mods
+    Identifier of the parameter that configures header information for Push mode.
+    This parameter enables timestamp information to be written alongside PCM data
+    in the shared circular buffer.
+
+    @msgpayload
+    sh_mem_push_mode_header_cfg_t
+ */
+#define PARAM_ID_SH_MEM_PUSH_MODE_HEADER_CFG 0x08001BDF
+
+/*==============================================================================
+   Param structure definitions
+==============================================================================*/
+#include "spf_begin_pack.h"
+struct sh_mem_push_mode_header_cfg_t
+{
+   uint32_t header_type;
+   /**< Bit field to enable/disable additional information to be sent along with
+        the audio data in the buffer.
+
+        Bit 0: Include UTC timestamp (0=disabled, 1=enabled)
+        Bits 1-31: Reserved for future use*/
+
+   /*#< @h2xmle_description {Bit field to enable/disable additional header information.
+                             Bit 0: UTC timestamp
+                             Bits 1-31: Reserved}
+        @h2xmle_default     {0}
+        @h2xmle_range       {0..0xFFFFFFFF}
+        @h2xmle_policy      {Basic} */
+}
+#include "spf_end_pack.h"
+;
+typedef struct sh_mem_push_mode_header_cfg_t sh_mem_push_mode_header_cfg_t;
+
+/*==============================================================================
+   Header Structure Definitions
+==============================================================================*/
+
+/** @ingroup ar_spf_mod_ep_shmempp_mods
+    Sync word for header validation. Value is ASCII "SPFM" (0x5350464D). */
+#define SH_MEM_PUSH_MODE_HEADER_SYNC_WORD  0x5350464D
+
+/** @ingroup ar_spf_mod_ep_shmempp_mods
+    Batch header structure that appears at the start of each batch in shared memory.
+    Contains sync word for validation. */
+struct sh_mem_push_mode_batch_header_t
+{
+   uint32_t sync_word;
+   /**< Sync word for validation. Must be 0x5350464D ("SPFM"). */
+};
+
+typedef struct sh_mem_push_mode_batch_header_t sh_mem_push_mode_batch_header_t;
+
+/** @ingroup ar_spf_mod_ep_shmempp_mods
+    Parameter header type information structure (PARAM_ID + SIZE).
+    This header precedes each header type data/payload in the batch header. */
+struct sh_mem_push_mode_param_header_t
+{
+   uint32_t param_id;
+   /**< Parameter ID identifying the type of data that follows. */
+
+   uint32_t actual_size;
+   /**< Actual size of the payload in bytes */
+
+   uint32_t padding_size;
+   /**< Size of the padded bytes in param payload, to make next header SYNC_WORD 4-byte aligned. */
+};
+
+typedef struct sh_mem_push_mode_param_header_t sh_mem_push_mode_param_header_t;
+
+/** @ingroup ar_spf_mod_ep_shmempp_mods
+    Header Parameter ID for UTC timestamp. */
+#define PARAM_ID_HEADER_TYPE_UTC_TIMESTAMP  0x08001BE0
+
+/** @ingroup ar_spf_mod_ep_shmempp_mods
+    Timestamp parameter payload structure.
+    Can be used for both Propagated timestamp and UTC timestamp parameters. */
+struct sh_mem_push_mode_timestamp_payload_t
+{
+   uint32_t timestamp_us_lsw;
+   /**< Lower 32 bits of the 64-bit timestamp, in microseconds*/
+
+   uint32_t timestamp_us_msw;
+   /**< Upper 32 bits of the 64-bit timestamp, in microseconds*/
+};
+
+typedef struct sh_mem_push_mode_timestamp_payload_t sh_mem_push_mode_timestamp_payload_t;
+
+/** @ingroup ar_spf_mod_ep_shmempp_mods
+    Header Parameter ID for PCM data. */
+#define PARAM_ID_HEADER_TYPE_PCM_DATA  0x08001BE1
 
 /** @ingroup ar_spf_mod_ep_shmempp_mods
     Identifier for the Shared Memory Pull mode module, which writes data to the
@@ -530,6 +625,8 @@ typedef struct sh_mem_pull_push_mode_cfg_t sh_mem_pull_push_mode_cfg_t;
     @h2xml_Select           {"sh_mem_pull_push_mode_cfg_t"}
     @h2xmlm_InsertParameter
     @h2xml_Select           {"event_cfg_sh_mem_pull_push_mode_watermark_t"}
+    @h2xmlm_InsertParameter
+    @h2xml_Select           {"sh_mem_push_mode_header_cfg_t"}
     @h2xmlm_InsertParameter
     @}                      <-- End of the Module --> */
 

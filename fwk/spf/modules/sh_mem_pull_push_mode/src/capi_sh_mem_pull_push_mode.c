@@ -58,7 +58,8 @@ static void capi_pm_check_n_enable_module_buffer_access_extension(capi_pm_t *me_
 
    // note that push/pull module only process CAPI_INTERLEAVED format, hence just checking for validaty is sufficient
    bool_t need_to_enable_extension = (TRUE == pull_push_check_media_fmt_validity(&me_ptr->pull_push_mode_info)) &&
-                                     (CAPI_INTERLEAVED == me_ptr->pull_push_mode_info.media_fmt.data_interleaving);
+                                     (CAPI_INTERLEAVED == me_ptr->pull_push_mode_info.media_fmt.data_interleaving) &&
+                                     (FALSE == me_ptr->is_header_enabled);
 
    // check if circular buffer size is set and mulitple of container framelength
    if (me_ptr->pull_push_mode_info.shared_circ_buf_size && me_ptr->frame_dur_us)
@@ -323,6 +324,14 @@ static capi_err_t capi_pm_end(capi_t *_pif)
    }
    capi_pm_t *me_ptr = (capi_pm_t *)_pif;
 
+   // Free header buffer if allocated (PUSH mode specific cleanup)
+   if (NULL != me_ptr->header_buffer_ptr)
+   {
+      posal_memory_free(me_ptr->header_buffer_ptr);
+      me_ptr->header_buffer_ptr = NULL;
+      me_ptr->header_buffer_size = 0;
+   }
+
    pull_push_mode_deinit(&(me_ptr->pull_push_mode_info));
 
    return capi_result;
@@ -389,6 +398,96 @@ static capi_err_t capi_pm_set_param(capi_t                 *_pif,
                              capi_result);
             }
          }
+         break;
+      }
+      case PARAM_ID_SH_MEM_PUSH_MODE_HEADER_CFG:
+      {
+         // Validate this parameter is only for PUSH mode
+         if (PUSH_MODE != me_ptr->pull_push_mode_info.mode)
+         {
+            PULL_PUSH_MSG(miid, DBG_ERROR_PRIO,
+                          "param id 0x%lX only supported for PUSH mode", param_id);
+            CAPI_SET_ERROR(capi_result, CAPI_EUNSUPPORTED);
+            break;
+         }
+
+         // Validate payload size
+         if (params_ptr->actual_data_len < sizeof(sh_mem_push_mode_header_cfg_t))
+         {
+            PULL_PUSH_MSG(miid, DBG_ERROR_PRIO,
+                          "param id 0x%lX: Insufficient payload size %d",
+                          param_id,
+                          params_ptr->actual_data_len);
+            CAPI_SET_ERROR(capi_result, CAPI_ENEEDMORE);
+            break;
+         }
+
+         // Get the configuration payload
+         sh_mem_push_mode_header_cfg_t *cfg_ptr =
+            (sh_mem_push_mode_header_cfg_t *)params_ptr->data_ptr;
+
+         // Validate reserved bits
+         uint32_t unreserved_bits = cfg_ptr->header_type & ~(HEADER_TYPE_RESERVED_BITS);
+         if (unreserved_bits == 0)
+         {
+            PULL_PUSH_MSG(miid, DBG_ERROR_PRIO,
+                          "No Supported header type found, header type received is 0x%x",
+                          cfg_ptr->header_type);
+            break;
+         }
+
+         // Calculate required header buffer size based on enabled header types
+         uint32_t required_size = sizeof(sh_mem_push_mode_batch_header_t) + sizeof(sh_mem_push_mode_param_header_t);  // Sync word + PCM header
+
+         if (cfg_ptr->header_type & HEADER_TYPE_UTC_TIMESTAMP)
+         {
+            required_size += sizeof(sh_mem_push_mode_param_header_t);      // Timestamp param header
+            required_size += sizeof(sh_mem_push_mode_timestamp_payload_t); // Timestamp payload
+         }
+
+         // Free existing buffer if already allocated and size not same
+         if (NULL != me_ptr->header_buffer_ptr && required_size != me_ptr->header_buffer_size)
+         {
+            posal_memory_free(me_ptr->header_buffer_ptr);
+            me_ptr->header_buffer_ptr = NULL;
+            me_ptr->header_buffer_size = 0;
+
+            PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "Freed existing header buffer");
+
+         }
+
+         if(NULL == me_ptr->header_buffer_ptr)
+         {
+            // Allocate new header buffer
+            me_ptr->header_buffer_ptr =
+               (uint8_t *)posal_memory_malloc(required_size, me_ptr->heap_mem.heap_id);
+
+            if (NULL == me_ptr->header_buffer_ptr)
+            {
+               PULL_PUSH_MSG(miid, DBG_ERROR_PRIO,
+                             "Failed to allocate header buffer of size %d", required_size);
+               CAPI_SET_ERROR(capi_result, CAPI_ENOMEMORY);
+               break;
+            }
+
+            me_ptr->header_buffer_size = required_size;
+         }
+
+         // Initialize buffer to zero
+         memset(me_ptr->header_buffer_ptr, 0, required_size);
+
+         // Store the header type flags
+         me_ptr->header_type_flags = cfg_ptr->header_type;
+         // Update the module state
+         me_ptr->is_header_enabled = TRUE;
+         me_ptr->is_update_header = TRUE;
+
+         PULL_PUSH_MSG(miid, DBG_MED_PRIO,
+                       "Header buffer allocated: size=%d bytes, type=0x%x, enabled=%d",
+                       required_size,
+                       me_ptr->header_type_flags,
+                       me_ptr->is_header_enabled);
+
          break;
       }
       case PARAM_ID_MEDIA_FORMAT:
