@@ -11,9 +11,6 @@ source ${GITHUB_WORKSPACE}/install/environment-setup-cortexa7t2hf-neon-vfpv4-pok
 # Make sure we are in the right directory
 cd ${GITHUB_WORKSPACE}
 
-# Set LDFLAGS
-export TARGET_CC_ARCH="${LDFLAGS}"
-export LDFLAGS="${LDFLAGS} -pthread -lar-gpr -ltinyalsa"
 
 # Create and enter build directory
 mkdir -p build && cd build

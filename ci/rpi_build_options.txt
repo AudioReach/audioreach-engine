@@ -3,4 +3,4 @@
 --DCMAKE_BUILD_TYPE=Release
 --DCMAKE_INSTALL_PREFIX=/usr
 --DCMAKE_TOOLCHAIN_FILE=${OECORE_NATIVE_SYSROOT}/usr/share/cmake/OEToolchainConfig.cmake
---DOECMAKE_GENERATOR='Unix Makefiles'
+--DOECMAKE_GENERATOR=Unix Makefiles
