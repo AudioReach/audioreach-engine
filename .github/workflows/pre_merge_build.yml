@@ -4,6 +4,9 @@ run-name: ${{ github.event.pull_request.number && 'Pre Merge Build PR:' || 'Pre 
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - temp
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
