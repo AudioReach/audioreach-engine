@@ -1,0 +1,87 @@
+---
+name: pre_merge_build
+run-name: ${{ github.event.pull_request.number && 'Pre Merge Build PR:' || 'Pre Merge Build:' }}${{ github.event.pull_request.number || github.run_number }}
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - temp
+    paths-ignore:
+      - '.github/**'
+
+jobs:
+  load_parameters:
+    uses: Audioreach/audioreach-workflows/.github/workflows/loading.yml@temp
+    with:
+      event_name: ${{ github.event_name }}
+      pr_ref: ${{ github.event.pull_request.head.ref }}
+      pr_repo: ${{ github.event.pull_request.head.repo.full_name }}
+
+  build:
+    needs: load_parameters
+    uses: Audioreach/audioreach-workflows/.github/workflows/build.yml@temp
+    secrets: inherit
+    with:
+      build_args: ${{ needs.load_parameters.outputs.build_args }}
+      build_matrix: ${{ needs.load_parameters.outputs.build_matrix }}
+      event_name: ${{ github.event_name }}
+      pr_ref: ${{ github.event.pull_request.head.ref }}
+      pr_repo: ${{ github.event.pull_request.head.repo.full_name }}
+
+  process_image:
+    needs: [ load_parameters, build ]
+    uses: Audioreach/audioreach-workflows/.github/workflows/process_image.yml@temp
+    secrets: inherit
+    with:
+      event_name: ${{ github.event_name }}
+      build_matrix: ${{ needs.load_parameters.outputs.build_matrix }}
+      pr_ref: ${{ github.event.pull_request.head.ref }}
+      pr_repo: ${{ github.event.pull_request.head.repo.full_name }}
+
+  filter_test_matrix:
+    needs: load_parameters
+    runs-on: ubuntu-latest
+    outputs:
+      test_matrix: ${{ steps.filter.outputs.test_matrix }}
+    steps:
+      - id: filter
+        shell: bash
+        run: |
+            MATRIX='${{ needs.load_parameters.outputs.build_matrix }}'
+
+            echo "RAW build_matrix:"
+            echo "$MATRIX"
+
+            echo "Validating JSON..."
+            echo "$MATRIX" | jq . >/dev/null
+
+            # Supports:
+            # 1) object keyed by name: { "name": {testing_enabled:true}, ... }
+            # 2) array of entries: [ {Testing_enabled:true,...}, ... ]  (will convert to include list)
+            FILTERED=$(
+              echo "$MATRIX" | jq -c '
+                if type == "object" then
+                  to_entries
+                  | map(select(.value.testing_enabled == true))
+                  | from_entries
+                elif type == "array" then
+                  map(select(.testing_enabled == true))  # <-- Just return the array
+                else
+                  error("Unsupported build_matrix JSON type: " + (type|tostring))
+                end
+              '
+            )
+
+            echo "Filtered matrix (pretty):"
+            echo "$FILTERED" | jq .
+
+            echo "test_matrix=$FILTERED" >> "$GITHUB_OUTPUT"
+
+  trigger_lava:
+    needs: [ process_image, filter_test_matrix ]
+    uses: Audioreach/audioreach-workflows/.github/workflows/test.yml@temp
+    secrets: inherit
+    with:
+      build_matrix: ${{ needs.filter_test_matrix.outputs.test_matrix }}
