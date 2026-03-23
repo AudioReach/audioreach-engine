@@ -10,6 +10,7 @@
  *  SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+
 #define AR_OSAL_FILE_IO_LOG_TAG    "COFI"
 #include <stdio.h>
 #include <string.h>
