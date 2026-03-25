@@ -48,6 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       test_matrix: ${{ steps.filter.outputs.test_matrix }}
+      has_tests: ${{ steps.filter.outputs.has_tests }}
     steps:
       - id: filter
         shell: bash
@@ -80,11 +81,22 @@ jobs:
             echo "Filtered matrix (pretty):"
             echo "$FILTERED" | jq .
 
+            # Determine if there are any tests to run
+            HAS_TESTS="false"
+            if [ "$FILTERED" != "[]" ] && [ "$FILTERED" != "{}" ] && [ "$FILTERED" != "null" ] && [ -n "$FILTERED" ]; then
+              # Additional check: for objects, ensure they have at least one key
+              if echo "$FILTERED" | jq -e 'if type == "object" then . | length > 0 elif type == "array" then . | length > 0 else false end' >/dev/null 2>&1; then
+                HAS_TESTS="true"
+              fi
+            fi
+
             echo "test_matrix=$FILTERED" >> "$GITHUB_OUTPUT"
+            echo "has_tests=$HAS_TESTS" >> "$GITHUB_OUTPUT"
+            echo "Tests enabled: $HAS_TESTS"
 
   trigger_lava:
     needs: [process_image, filter_test_matrix]
-    if: ${{ needs.filter_test_matrix.outputs.test_matrix != '' && needs.filter_test_matrix.outputs.test_matrix != '[]' }}
+    if: needs.filter_test_matrix.outputs.has_tests == 'true'
     permissions:
       checks: write
       pull-requests: write
@@ -93,3 +105,40 @@ jobs:
     with:
       build_matrix: ${{ needs.filter_test_matrix.outputs.test_matrix }}
 
+  # This job ensures the workflow always completes successfully
+  # even when trigger_lava is skipped due to no tests
+  workflow_complete:
+    needs: [load_parameters, build, process_image, filter_test_matrix, trigger_lava]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Workflow completion status
+        run: |
+          echo "=== Workflow Completion Summary ==="
+          echo "load_parameters: ${{ needs.load_parameters.result }}"
+          echo "build: ${{ needs.build.result }}"
+          echo "process_image: ${{ needs.process_image.result }}"
+          echo "filter_test_matrix: ${{ needs.filter_test_matrix.result }}"
+          echo "trigger_lava: ${{ needs.trigger_lava.result }}"
+          echo ""
+          
+          if [ "${{ needs.filter_test_matrix.outputs.has_tests }}" == "false" ]; then
+            echo "ℹ️  No tests were enabled in the build matrix - trigger_lava was skipped"
+          fi
+          
+          # Check if any required job failed
+          if [ "${{ needs.load_parameters.result }}" == "failure" ] || \
+             [ "${{ needs.build.result }}" == "failure" ] || \
+             [ "${{ needs.process_image.result }}" == "failure" ] || \
+             [ "${{ needs.filter_test_matrix.result }}" == "failure" ]; then
+            echo "❌ Workflow failed - one or more required jobs failed"
+            exit 1
+          fi
+          
+          # trigger_lava can be skipped or success, both are acceptable
+          if [ "${{ needs.trigger_lava.result }}" == "failure" ]; then
+            echo "❌ Testing failed"
+            exit 1
+          fi
+          
+          echo "✅ Workflow completed successfully"
