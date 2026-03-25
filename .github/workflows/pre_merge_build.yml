@@ -83,11 +83,13 @@ jobs:
             echo "test_matrix=$FILTERED" >> "$GITHUB_OUTPUT"
 
   trigger_lava:
-    needs: [ process_image, filter_test_matrix ]
+    needs: [process_image, filter_test_matrix]
+    if: ${{ needs.filter_test_matrix.outputs.test_matrix != '' && needs.filter_test_matrix.outputs.test_matrix != '[]' }}
     permissions:
       checks: write
       pull-requests: write
-    uses: Audioreach/audioreach-workflows/.github/workflows/test.yml@temp
+    uses: AudioReach/audioreach-workflows/.github/workflows/test.yml@temp
     secrets: inherit
     with:
       build_matrix: ${{ needs.filter_test_matrix.outputs.test_matrix }}
+
