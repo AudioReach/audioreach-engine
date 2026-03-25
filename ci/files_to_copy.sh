@@ -7,4 +7,4 @@
 cd ..
 
 # copy the build artifacts to a temporary directory
-echo "Files to copy called"
+cp -R build/usr/* /tmp/rootfs/usr/
