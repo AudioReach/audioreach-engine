@@ -5,7 +5,6 @@
 set -ex
 
 
-
 # Source SDK environment 
 ## <strong>ToDo</strong>: Need to update for SDK path and GITHUB_WORKSPACE handling.
 source ${GITHUB_WORKSPACE}/install/environment-setup-cortexa7t2hf-neon-vfpv4-poky-linux-gnueabi
