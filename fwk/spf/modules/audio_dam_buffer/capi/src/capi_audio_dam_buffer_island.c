@@ -54,7 +54,8 @@ uint32_t capi_dam_get_ctrl_port_arr_idx_from_ctrl_port_id(capi_audio_dam_t *me_p
 
 static capi_err_t capi_audio_dam_handle_and_drop_metadata(capi_audio_dam_t   *me_ptr,
                                                           capi_stream_data_t *input,
-                                                          uint32_t            ip_port_index)
+                                                          uint32_t            ip_port_index,
+                                                          bool_t             *is_eos_recieved)
 {
    capi_err_t             capi_result   = CAPI_EOK;
    capi_stream_data_v2_t *in_stream_ptr = (capi_stream_data_v2_t *)input;
@@ -76,21 +77,8 @@ static capi_err_t capi_audio_dam_handle_and_drop_metadata(capi_audio_dam_t   *me
       else if (MODULE_CMN_MD_ID_EOS == node_ptr->obj_ptr->metadata_id)
       {
          DAM_MSG_ISLAND(me_ptr->miid, DBG_HIGH_PRIO, "EOS rcvd");
-
-         for (uint32_t op_arr_index = 0; op_arr_index < me_ptr->max_output_ports; op_arr_index++)
-         {
-            /** do not reset the circ buffer if gate is open*/
-            if (!me_ptr->out_port_info_arr[op_arr_index].is_gate_opened)
-            {
-
-               // adjust rd ptr inorder to drop all the data
-               uint32_t read_offset_in_us = 0;
-               audio_dam_stream_read_adjust(me_ptr->out_port_info_arr[op_arr_index].strm_reader_ptr,
-                                          read_offset_in_us,
-                                          NULL,
-                                          FALSE);
-            }
-         }
+         // handle the eos after stream write
+         *is_eos_recieved = TRUE;
       }
 
       if (me_ptr->metadata_handler.metadata_destroy)
@@ -110,6 +98,44 @@ static capi_err_t capi_audio_dam_handle_and_drop_metadata(capi_audio_dam_t   *me
    // EOF/EOS will be dropped from the module.
    in_stream_ptr->flags.end_of_frame = FALSE;
    in_stream_ptr->flags.marker_eos   = FALSE;
+
+   return capi_result;
+}
+
+static capi_err_t capi_audio_dam_handle_eos_and_partial_batch(capi_audio_dam_t *me_ptr, bool_t new_data_arrived, bool_t is_eos_recieved)
+{
+   capi_err_t             capi_result   = CAPI_EOK;
+
+   for (uint32_t op_arr_index = 0; op_arr_index < me_ptr->max_output_ports; op_arr_index++)
+   {
+
+      if(new_data_arrived && me_ptr->out_port_info_arr[op_arr_index].is_handle_partial_drain)
+      {
+         DAM_MSG_ISLAND(me_ptr->miid, DBG_ERROR_PRIO, " Previous EOS event is not handled yet, Merging new data in the partial batch.");
+         me_ptr->out_port_info_arr[op_arr_index].is_handle_partial_drain = FALSE;
+      }
+
+      if(is_eos_recieved)
+      {
+         /** do not reset the circ buffer if gate is open*/
+         if (!me_ptr->out_port_info_arr[op_arr_index].is_gate_opened)
+         {
+            // adjust rd ptr inorder to drop all the data
+            uint32_t read_offset_in_us = 0;
+            audio_dam_stream_read_adjust(me_ptr->out_port_info_arr[op_arr_index].strm_reader_ptr,
+                                       read_offset_in_us,
+                                       NULL,
+                                       FALSE);
+         }
+
+         /** Handle partial batch */
+         if(me_ptr->out_port_info_arr[op_arr_index].is_partial_batch_drain_enabled)
+         {
+            me_ptr->out_port_info_arr[op_arr_index].is_handle_partial_drain = TRUE;
+         }
+
+      }
+   }
 
    return capi_result;
 }
@@ -137,6 +163,8 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
 
    if (input)
    {
+      bool_t is_eos_recieved = FALSE;
+
       for (uint32_t arr_idx = 0; arr_idx < me_ptr->max_input_ports; arr_idx++)
       {
          // Check the port index from arr index
@@ -149,7 +177,7 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
             continue;
          }
 
-         result |= capi_audio_dam_handle_and_drop_metadata(me_ptr, input[port_index], port_index);
+         result |= capi_audio_dam_handle_and_drop_metadata(me_ptr, input[port_index], port_index, &is_eos_recieved);
 
          // input port buffers sanity check
          if ((NULL == me_ptr->in_port_info_arr[arr_idx].strm_writer_ptr) ||
@@ -179,6 +207,11 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
                 input[port_index]->flags.is_timestamp_valid,
                 input[port_index]->buf_ptr[0].actual_data_len);
 #endif
+
+
+            bool_t new_data_arrived = input[port_index]->buf_ptr[0].actual_data_len > 0? TRUE : FALSE;
+            capi_audio_dam_handle_eos_and_partial_batch(me_ptr, new_data_arrived, is_eos_recieved);
+
       }
    }
 
@@ -240,9 +273,36 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
          uint32_t output_frame_len_us = 0;
          bool_t   is_timestamp_valid  = FALSE;
 
+         // Handle partial drain: Wait for pending bytes to become zero, then force drain
          if (me_ptr->out_port_info_arr[arr_idx].is_dcm_duty_cycling_enabled)
          {
             bool_t is_batching_req_met = audio_dam_if_batching_req_met(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr);
+
+            if(TRUE == me_ptr->out_port_info_arr[arr_idx].is_handle_partial_drain)
+            {
+               uint32_t pending_batch_bytes = 0;
+               audio_dam_get_stream_reader_pending_bytes(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr, &pending_batch_bytes);
+
+               // Only drain when pending bytes become zero (current batch completes)
+               if(0 == pending_batch_bytes)
+               {
+                  //force set the unread bytes in DAM buffer to pending bytes
+                  audio_dam_force_set_pending_bytes(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr);
+
+                  audio_dam_get_stream_reader_pending_bytes(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr, &pending_batch_bytes);
+                  DAM_MSG_ISLAND(me_ptr->miid, DBG_HIGH_PRIO, " Partial batch created with total_data_bytes: %lu.", pending_batch_bytes);
+
+                  //pending bytes must be non-zero for island exit
+                  if(0 < pending_batch_bytes)
+                  {
+                     is_batching_req_met = TRUE;
+                     me_ptr->out_port_info_arr[arr_idx].send_dfg_md = TRUE;
+                  }
+
+                  me_ptr->out_port_info_arr[arr_idx].is_handle_partial_drain = FALSE;
+               }
+            }
+
             if (is_batching_req_met)
             {
                DAM_MSG_ISLAND(me_ptr->miid, DBG_MED_PRIO, "voting for island exit");
@@ -277,12 +337,14 @@ capi_err_t capi_audio_dam_buffer_process(capi_t *capi_ptr, capi_stream_data_t *i
 
             if(me_ptr->out_port_info_arr[arr_idx].handle_md_batch_tracking && is_batch_sent)           //send the marker metadata as batch is sent
             {
-               if (CAPI_EOK == (result = capi_dam_insert_tracking_md_at_out_port(me_ptr, output[port_index], port_index)))
+               if (CAPI_EOK == (result = capi_dam_insert_tracking_md_at_out_port(me_ptr, output[port_index], port_index, me_ptr->out_port_info_arr[arr_idx].send_dfg_md)))
                {
                   DAM_MSG_ISLAND(me_ptr->miid,
                                  DBG_HIGH_PRIO,
                                  "DAM: Inserted tracking MD after Batch");
+                  ++me_ptr->out_port_info_arr[arr_idx].ref_count_batch_end_md;
                }
+               me_ptr->out_port_info_arr[arr_idx].send_dfg_md = FALSE;
             }
 
             output[port_index]->flags.is_timestamp_valid = is_timestamp_valid;

@@ -183,6 +183,16 @@ typedef struct
 
    /*Indicate if metadata needs to be sent after every batch in batching mode*/
    bool_t handle_md_batch_tracking;
+   /* ref count of end metadata sent for island entry condition*/
+   uint32_t ref_count_batch_end_md;
+
+   /* Indicate if partial data needs to be drained if eos is received*/
+   bool_t  is_partial_batch_drain_enabled;
+   bool_t  is_handle_partial_drain;
+
+   /*Handle frame size mismatch*/
+   bool_t  send_dfg_md;
+
 } _aud_dam_output_port_info;
 
 typedef struct
@@ -428,7 +438,8 @@ capi_err_t capi_dam_insert_flushing_eos_at_out_port(capi_audio_dam_t   *me_ptr,
 
 capi_err_t capi_dam_insert_tracking_md_at_out_port(capi_audio_dam_t   *me_ptr,
                                                     capi_stream_data_t *output,
-                                                    uint32_t            output_port_index);
+                                                    uint32_t            output_port_index,
+                                                    bool_t              send_dfg_md);
 
 capi_vtbl_t *capi_audio_dam_buffer_get_vtable();
 

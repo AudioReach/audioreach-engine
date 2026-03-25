@@ -186,6 +186,7 @@ capi_err_t capi_audio_dam_imcl_set_hdlr_flow_ctrl_v2(capi_audio_dam_t *me_ptr,
             if(AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING_MD_TRACKING_EVENT == cfg_ptr->gate_ctrl)
             {
                me_ptr->out_port_info_arr[op_arr_index].handle_md_batch_tracking    = TRUE;
+               me_ptr->out_port_info_arr[op_arr_index].is_partial_batch_drain_enabled    = TRUE;
             }
 
             capi_audio_dam_raise_allow_duty_cycling(me_ptr, TRUE);
@@ -265,10 +266,20 @@ bool_t capi_audio_dam_check_island_entry_cond(capi_audio_dam_t* me_ptr)
          DAM_MSG(me_ptr->miid, DBG_MED_PRIO, "Processing on port_index:%d still going on", i);
          trigger_dcm_island_entry = FALSE;
       }
+      if(me_ptr->out_port_info_arr[i].is_handle_partial_drain)
+      {
+         DAM_MSG(me_ptr->miid, DBG_MED_PRIO, "EOS patial batch needs to be handled on port_index: %d", i);
+         return FALSE;
+      }
       audio_dam_get_stream_reader_pending_bytes(me_ptr->out_port_info_arr[i].strm_reader_ptr, &pending_bytes_to_read);
       if (pending_bytes_to_read)
       {
          DAM_MSG(me_ptr->miid, DBG_MED_PRIO, "Batching stream data buffering started on port_index: %d, pending_bytes:%lu", i, pending_bytes_to_read);
+         return FALSE;
+      }
+      if(0 != me_ptr->out_port_info_arr[i].ref_count_batch_end_md && me_ptr->out_port_info_arr[i].handle_md_batch_tracking)
+      {
+         DAM_MSG(me_ptr->miid, DBG_MED_PRIO, "Ref batch end md count is: %lu", me_ptr->out_port_info_arr[i].ref_count_batch_end_md);
          return FALSE;
       }
    }
