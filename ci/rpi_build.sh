@@ -19,7 +19,15 @@ cd ${GITHUB_WORKSPACE}
 mkdir -p build && cd build
 
 # Configure with CMake
-cmake -DARCH=linux -DCONFIG=defconfig -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_TOOLCHAIN_FILE=${OECORE_NATIVE_SYSROOT}/usr/share/cmake/OEToolchainConfig.cmake -G "Unix Makefiles" ..
+#cmake -DARCH=linux -DCONFIG=defconfig -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_TOOLCHAIN_FILE=${OECORE_NATIVE_SYSROOT}/usr/share/cmake/OEToolchainConfig.cmake -G "Unix Makefiles" ..
+cmake \
+    -DARCH=linux \
+    -DCONFIG=defconfig \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_TOOLCHAIN_FILE=${OECORE_NATIVE_SYSROOT}/usr/share/cmake/OEToolchainConfig.cmake \
+    -G "Unix Makefiles" \
+    ..
 
 # Build and install
 make -j$(nproc)
