@@ -1,0 +1,26 @@
+#!/bin/bash
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+set -ex
+# Source SDK environment 
+source ${GITHUB_WORKSPACE}/install/environment-setup-cortexa7t2hf-neon-vfpv4-poky-linux-gnueabi
+
+# Make sure we are in the right directory
+cd ${GITHUB_WORKSPACE}
+# Create and enter build directory
+mkdir -p build && cd build
+
+# Configure with CMake
+cmake \
+    -DARCH=linux \
+    -DCONFIG=defconfig \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_TOOLCHAIN_FILE=${OECORE_NATIVE_SYSROOT}/usr/share/cmake/OEToolchainConfig.cmake \
+    -G "Unix Makefiles" \
+    ..
+
+# Build and install
+make -j$(nproc)
+make DESTDIR=${GITHUB_WORKSPACE}/build install
