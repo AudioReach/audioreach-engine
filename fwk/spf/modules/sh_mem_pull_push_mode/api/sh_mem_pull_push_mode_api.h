@@ -440,6 +440,9 @@ typedef struct sh_mem_pull_push_mode_cfg_t sh_mem_pull_push_mode_cfg_t;
     sh_mem_push_mode_header_cfg_t
  */
 #define PARAM_ID_SH_MEM_PUSH_MODE_HEADER_CFG 0x08001BDF
+/** @h2xmlp_parameter   {"PARAM_ID_SH_MEM_PUSH_MODE_HEADER_CFG", PARAM_ID_SH_MEM_PUSH_MODE_HEADER_CFG}
+    @h2xmlp_description  {Configures the header info.\n}
+    @h2xmlp_toolPolicy   {Calibration} */
 
 /*==============================================================================
    Param structure definitions

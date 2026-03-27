@@ -307,7 +307,6 @@ capi_err_t capi_push_mode_init(capi_t *_pif, capi_proplist_t *init_set_propertie
    me_ptr->vtbl.vtbl_ptr = &push_mode_vtbl;
 
    me_ptr->pull_push_mode_info.mode = PUSH_MODE;
-
    memset(&me_ptr->pull_push_mode_info.media_fmt, 0, sizeof(pm_media_fmt_t));
    capi_result = capi_pm_process_init(me_ptr, init_set_properties);
 
@@ -323,6 +322,13 @@ static capi_err_t capi_pm_end(capi_t *_pif)
       return CAPI_EBADPARAM;
    }
    capi_pm_t *me_ptr = (capi_pm_t *)_pif;
+
+   // Free UTC time module if allocated
+   if (NULL != me_ptr->ts_data.utc_time_module_ptr)
+   {
+      posal_memory_free(me_ptr->ts_data.utc_time_module_ptr);
+      me_ptr->ts_data.utc_time_module_ptr = NULL;
+   }
 
    // Free header buffer if allocated (PUSH mode specific cleanup)
    if (NULL != me_ptr->header_buffer_ptr)
@@ -443,6 +449,26 @@ static capi_err_t capi_pm_set_param(capi_t                 *_pif,
          {
             required_size += sizeof(sh_mem_push_mode_param_header_t);      // Timestamp param header
             required_size += sizeof(sh_mem_push_mode_timestamp_payload_t); // Timestamp payload
+
+            if(me_ptr->ts_data.utc_time_module_ptr)
+            {
+               posal_reset_utc_time_module((void *)me_ptr->ts_data.utc_time_module_ptr);
+            }
+            else
+            {
+               uint32_t posal_timer_size = posal_get_time_module_size();
+               if(posal_timer_size)
+               {
+                  uint8_t* ptr = (uint8_t *)posal_memory_malloc(posal_timer_size, (POSAL_HEAP_ID)me_ptr->heap_mem.heap_id);
+                  if(NULL == ptr)
+                  {
+                     PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "Failed to allocated time module of size %lu", posal_timer_size);
+                     return CAPI_EFAILED;
+                  }
+                  me_ptr->ts_data.utc_time_module_ptr = ptr;
+                  posal_reset_utc_time_module((void *)me_ptr->ts_data.utc_time_module_ptr);
+               }
+            }
          }
 
          // Free existing buffer if already allocated and size not same

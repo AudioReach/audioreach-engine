@@ -619,10 +619,21 @@ static capi_err_t push_mode_write_batch_header(capi_pm_t *me_ptr,
       local_offset += sizeof(sh_mem_push_mode_param_header_t);
 
       // Write timestamp payload
-      sh_mem_push_mode_timestamp_payload_t *ts_payload_ptr =
+      sh_mem_push_mode_timestamp_payload_t *ts_payload_ptr = 
          (sh_mem_push_mode_timestamp_payload_t *)&local_header_buf_ptr[local_offset];
-      ts_payload_ptr->timestamp_us_lsw = (uint32_t)(timestamp & 0xFFFFFFFF);
-      ts_payload_ptr->timestamp_us_msw = (uint32_t)(timestamp >> 32);
+
+      uint32_t utc_ts_lsw = (uint32_t)(timestamp & 0xFFFFFFFF);
+      uint32_t utc_ts_msw = (uint32_t)(timestamp >> 32);
+      PULL_PUSH_MSG(miid, DBG_LOW_PRIO,
+                    "PRE UTC timestamp: 0x%08x%08x",
+                    utc_ts_msw,
+                    utc_ts_lsw);
+
+      posal_query_utc_time_from_nw((void *)me_ptr->ts_data.utc_time_module_ptr, TIME_USEC);
+
+      posal_date_time_get_utc_time((void *)me_ptr->ts_data.utc_time_module_ptr, (posal_time)timestamp,TIME_USEC, &utc_ts_msw, &utc_ts_lsw);
+      ts_payload_ptr->timestamp_us_lsw = utc_ts_lsw;
+      ts_payload_ptr->timestamp_us_msw = utc_ts_msw;
       local_offset += sizeof(sh_mem_push_mode_timestamp_payload_t);
 
       PULL_PUSH_MSG(miid, DBG_LOW_PRIO,
