@@ -47,7 +47,9 @@ ar_result_t alsa_device_driver_start(alsa_device_driver_t *alsa_device_driver_pt
 ar_result_t alsa_device_driver_prepare(alsa_device_driver_t *alsa_device_driver_ptr);
 
 // Perform ALSA device Driver read
-ar_result_t alsa_device_driver_read(alsa_device_driver_t *alsa_device_driver_ptr);
+ar_result_t alsa_device_driver_read(alsa_device_driver_t *alsa_device_driver_ptr,
+                                    int8_t *buffer_ptr,
+                                    uint32_t num_bytes);
 
 // Perform ALSA device Driver write
 ar_result_t alsa_device_driver_write(alsa_device_driver_t *alsa_device_driver_ptr,
@@ -67,6 +69,9 @@ ar_result_t alsa_device_driver_set_intf_cfg(param_id_alsa_device_intf_cfg_t *als
 // Perform ALSA device Driver operating frame size configuration
 ar_result_t alsa_device_driver_set_frame_size_cfg(param_id_frame_size_factor_t *alsa_device_cfg_ptr,
                                                   alsa_device_driver_t *alsa_device_driver_ptr);
+
+// Wait for DMA interrupt/buffer availability
+ar_result_t alsa_device_driver_wait(alsa_device_driver_t *alsa_device_driver_ptr);
 
 #ifdef __cplusplus
 }

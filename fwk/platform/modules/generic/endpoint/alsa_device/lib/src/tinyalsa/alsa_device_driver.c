@@ -14,8 +14,6 @@
 
 ar_result_t alsa_device_driver_set_cfg(alsa_device_driver_t *alsa_device_driver_ptr, param_id_hw_ep_mf_t *alsa_device_cfg_ptr)
 {
-   ar_result_t result = AR_EOK;
-
    if ((NULL == alsa_device_driver_ptr) || (NULL == alsa_device_cfg_ptr))
    {
       AR_MSG(DBG_ERROR_PRIO,
@@ -40,13 +38,11 @@ ar_result_t alsa_device_driver_set_cfg(alsa_device_driver_t *alsa_device_driver_
           alsa_device_cfg_ptr->sample_rate,
           alsa_device_cfg_ptr->bit_width);
 
-   return result;
+   return AR_EOK;
 }
 
 ar_result_t alsa_device_driver_init(alsa_device_driver_t *alsa_device_driver_ptr)
 {
-   ar_result_t result = AR_EOK;
-
    alsa_device_driver_ptr->card_id = 0;
    alsa_device_driver_ptr->device_id = 0;
 
@@ -61,12 +57,11 @@ ar_result_t alsa_device_driver_init(alsa_device_driver_t *alsa_device_driver_ptr
    config->period_count = 0;
    config->period_size = 0;
 
-   return result;
+   return AR_EOK;
 }
 
 ar_result_t alsa_device_driver_open(alsa_device_driver_t *alsa_device_driver_ptr, uint32_t direction)
 {
-   ar_result_t result = AR_EOK;
    uint32_t flags = 0;
    if (direction == ALSA_DEVICE_SINK)
    {
@@ -97,13 +92,17 @@ ar_result_t alsa_device_driver_open(alsa_device_driver_t *alsa_device_driver_ptr
           alsa_device_driver_ptr->card_id,
           alsa_device_driver_ptr->device_id);
 
-   return result;
+   // Log the ACTUAL config after pcm_open and warn if hardware changed it
+   AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: AFTER pcm_open - period_size=%d, rate=%d, channels=%d",
+          alsa_device_driver_ptr->config.period_size,
+          alsa_device_driver_ptr->config.rate,
+          alsa_device_driver_ptr->config.channels);
+
+   return AR_EOK;
 }
 
 ar_result_t alsa_device_driver_start(alsa_device_driver_t *alsa_device_driver_ptr)
 {
-   ar_result_t result = AR_EOK;
-
    if (pcm_start(alsa_device_driver_ptr->pcm) < 0)
    {
       AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: pcm start failed with error: %s\n",
@@ -113,13 +112,11 @@ ar_result_t alsa_device_driver_start(alsa_device_driver_t *alsa_device_driver_pt
 
    AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: pcm start success.\n");
 
-   return result;
+   return AR_EOK;
 }
 
 ar_result_t alsa_device_driver_prepare(alsa_device_driver_t *alsa_device_driver_ptr)
 {
-   ar_result_t result = AR_EOK;
-
    if (pcm_prepare(alsa_device_driver_ptr->pcm) < 0)
    {
       AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: pcm prepare failed with error: %s\n",
@@ -129,19 +126,32 @@ ar_result_t alsa_device_driver_prepare(alsa_device_driver_t *alsa_device_driver_
 
    AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: pcm prepare success.\n");
 
-   return result;
+   return AR_EOK;
 }
 
-ar_result_t alsa_device_driver_read(alsa_device_driver_t *alsa_device_driver_ptr)
+ar_result_t alsa_device_driver_read(alsa_device_driver_t *alsa_device_driver_ptr,
+                                    int8_t *buffer_ptr,
+                                    uint32_t num_bytes)
 {
-   ar_result_t result = AR_EUNSUPPORTED;
-   return result;
+   if (!alsa_device_driver_ptr || !alsa_device_driver_ptr->pcm || !buffer_ptr)
+   {
+      AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: Invalid parameters for read");
+      return AR_EBADPARAM;
+   }
+
+   if (pcm_read(alsa_device_driver_ptr->pcm, buffer_ptr, num_bytes) < 0)
+   {
+      AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: pcm_read failed: %s",
+             pcm_get_error(alsa_device_driver_ptr->pcm));
+      return AR_EFAILED;
+   }
+
+   AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: pcm_read success, bytes: %d", num_bytes);
+   return AR_EOK;
 }
 
 ar_result_t alsa_device_driver_write(alsa_device_driver_t *alsa_device_driver_ptr, int8_t *buffer_ptr, uint32_t num_bytes)
 {
-   ar_result_t result = AR_EOK;
-
    if (pcm_write(alsa_device_driver_ptr->pcm, buffer_ptr, num_bytes) < 0)
    {
       AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: pcm write failed with error: %s\n",
@@ -151,13 +161,11 @@ ar_result_t alsa_device_driver_write(alsa_device_driver_t *alsa_device_driver_pt
 
    //AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: pcm write success \n");
 
-   return result;
+   return AR_EOK;
 }
 
 ar_result_t alsa_device_driver_stop(alsa_device_driver_t *alsa_device_driver_ptr)
 {
-   ar_result_t result = AR_EOK;
-
    if (pcm_stop(alsa_device_driver_ptr->pcm) < 0)
    {
       AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: pcm stop failed with error: %s\n",
@@ -167,13 +175,11 @@ ar_result_t alsa_device_driver_stop(alsa_device_driver_t *alsa_device_driver_ptr
 
    AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: pcm stop success.\n");
 
-   return result;
+   return AR_EOK;
 }
 
 ar_result_t alsa_device_driver_close(alsa_device_driver_t *alsa_device_driver_ptr)
 {
-   ar_result_t result = AR_EOK;
-
    if (pcm_close(alsa_device_driver_ptr->pcm) < 0)
    {
       AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: pcm close failed with error: %s\n",
@@ -183,14 +189,12 @@ ar_result_t alsa_device_driver_close(alsa_device_driver_t *alsa_device_driver_pt
 
    AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: pcm close success.\n");
 
-   return result;
+   return AR_EOK;
 }
 
 ar_result_t alsa_device_driver_set_intf_cfg(param_id_alsa_device_intf_cfg_t *alsa_device_cfg_ptr,
                                             alsa_device_driver_t *alsa_device_driver_ptr)
 {
-   ar_result_t result = AR_EOK;
-
    if ((NULL == alsa_device_driver_ptr) || (NULL == alsa_device_cfg_ptr))
    {
      AR_MSG(DBG_ERROR_PRIO,
@@ -215,14 +219,12 @@ ar_result_t alsa_device_driver_set_intf_cfg(param_id_alsa_device_intf_cfg_t *als
           alsa_device_driver_ptr->config.stop_threshold,
           alsa_device_driver_ptr->config.silence_threshold);
 
-   return result;
+   return AR_EOK;
 }
 
 ar_result_t alsa_device_driver_set_frame_size_cfg(param_id_frame_size_factor_t *alsa_device_cfg_ptr,
                                                   alsa_device_driver_t *alsa_device_driver_ptr)
 {
-   ar_result_t result = AR_EOK;
-
    if ((NULL == alsa_device_driver_ptr) || (NULL == alsa_device_cfg_ptr))
    {
       AR_MSG(DBG_ERROR_PRIO,
@@ -233,14 +235,55 @@ ar_result_t alsa_device_driver_set_frame_size_cfg(param_id_frame_size_factor_t *
    struct pcm_config *config = &(alsa_device_driver_ptr->config);
 
    // Compute period_size from frame size factor(in ms).
-   alsa_device_driver_ptr->config.period_size = 
+   alsa_device_driver_ptr->config.period_size =
       (alsa_device_driver_ptr->config.rate / NUM_MS_PER_SEC) *
-      alsa_device_driver_ptr->config.channels *
       alsa_device_cfg_ptr->frame_size_factor;
 
    AR_MSG(DBG_HIGH_PRIO,
-          "ALSA_DEVICE_DRIVER: set_frame_size_cfg: Period Size : %d \n",
-          alsa_device_driver_ptr->config.period_size);
+          "ALSA_DEVICE_DRIVER: set_frame_size_cfg: frame_size=%d ms, period_size=%d frames @ %d Hz",
+          alsa_device_cfg_ptr->frame_size_factor,
+          alsa_device_driver_ptr->config.period_size,
+          alsa_device_driver_ptr->config.rate);
 
-   return result; 
+   return AR_EOK;
+}
+
+ar_result_t alsa_device_driver_wait(alsa_device_driver_t *alsa_device_driver_ptr)
+{
+   // Enhanced parameter validation
+   if (!alsa_device_driver_ptr || !alsa_device_driver_ptr->pcm)
+   {
+      AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: Invalid parameters for wait");
+      return AR_EBADPARAM;
+   }
+
+   struct pcm_config *config = &alsa_device_driver_ptr->config;
+
+   if (config->rate == 0 || config->period_size == 0)
+   {
+      AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: Invalid PCM config - rate: %d, period_size: %d",
+             config->rate, config->period_size);
+      return AR_EBADPARAM;
+   }
+
+   // Calculate timeout dynamically: (period_size / sample_rate) * 1000 * 2
+   // 2x safety factor (one period to fill + one for safety)
+   uint32_t timeout_ms = (config->period_size * 1000 * 2) / config->rate;
+
+   // Wait for frames to be available
+   int ret = pcm_wait(alsa_device_driver_ptr->pcm, timeout_ms);
+
+   if (ret == 0)
+   {
+      // Timeout - no frames available within timeout period
+      AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: pcm_wait timeout after %d ms", timeout_ms);
+      return AR_ETIMEOUT;
+   }
+   else if (ret < 0)
+   {
+      AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: pcm_wait error %d", ret);
+      return AR_EFAILED;
+   }
+
+   return AR_EOK;
 }
