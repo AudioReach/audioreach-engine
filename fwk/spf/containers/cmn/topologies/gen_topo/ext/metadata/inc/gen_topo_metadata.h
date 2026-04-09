@@ -224,8 +224,8 @@ ar_result_t gen_topo_validate_metadata_eof(gen_topo_module_t *module_ptr);
 void gen_topo_populate_metadata_for_peer_cntr(gen_topo_t *           gen_topo_ptr,
                                               gu_ext_out_port_t *    ext_out_port_ptr,
                                               module_cmn_md_list_t **md_list_pptr,
-											  module_cmn_md_list_t **out_md_list_pptr,
-                                              bool_t *               out_buf_has_flushing_eos_ptr);
+                                              module_cmn_md_list_t **out_md_list_pptr,
+                                              bool_t *               out_buf_has_flushing_eos_dfg_ptr);
 
 ar_result_t gen_topo_check_realloc_md_list_in_peer_heap_id(uint32_t               log_id,
                                                          gu_ext_out_port_t *    ext_out_port_ptr,

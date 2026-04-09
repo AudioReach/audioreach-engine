@@ -256,7 +256,7 @@ static ar_result_t gen_cntr_output_buf_set_up_peer_cntr(gen_cntr_t *me_ptr, gen_
 
 static ar_result_t gen_cntr_populate_peer_cntr_out_buf(gen_cntr_t *             me_ptr,
                                                        gen_cntr_ext_out_port_t *ext_out_port_ptr,
-                                                       bool_t *                 out_buf_has_flushing_eos_ptr)
+                                                       bool_t *                 out_buf_has_flushing_eos_dfg_ptr)
 {
    ar_result_t result = AR_EOK;
 
@@ -345,7 +345,7 @@ static ar_result_t gen_cntr_populate_peer_cntr_out_buf(gen_cntr_t *             
                                                &(ext_out_port_ptr->gu),
                                                &(ext_out_port_ptr->md_list_ptr),
                                                outbuf_md_list_pptr,
-                                               out_buf_has_flushing_eos_ptr);
+                                               out_buf_has_flushing_eos_dfg_ptr);
    }
 
 #ifdef VERBOSE_DEBUGGING
@@ -515,7 +515,7 @@ static ar_result_t gen_cntr_send_peer_cntr_out_buffers(gen_cntr_t *             
                                                        spf_msg_t *              media_fmt_msg_ptr)
 {
    ar_result_t result                   = AR_EOK;
-   bool_t      out_buf_has_flushing_eos = FALSE;
+   bool_t      out_buf_has_flushing_eos_dfg = FALSE;
 
    if (media_fmt_msg_ptr && media_fmt_msg_ptr->payload_ptr)
    {
@@ -583,7 +583,7 @@ static ar_result_t gen_cntr_send_peer_cntr_out_buffers(gen_cntr_t *             
          return result;
       }
 
-      gen_cntr_populate_peer_cntr_out_buf(me_ptr, ext_out_port_ptr, &out_buf_has_flushing_eos);
+      gen_cntr_populate_peer_cntr_out_buf(me_ptr, ext_out_port_ptr, &out_buf_has_flushing_eos_dfg);
 
       // if module output unpacked, container needs to convert to packed.
       // note that internal output port may have new media format that hasn't been propagated to ext
@@ -646,7 +646,7 @@ static ar_result_t gen_cntr_send_peer_cntr_out_buffers(gen_cntr_t *             
    gen_cntr_clear_ext_out_bufs(ext_out_port_ptr, TRUE /*clear_max*/);
 
    // if flushing EOS was sent out, reset the ext out port
-   if (out_buf_has_flushing_eos)
+   if (out_buf_has_flushing_eos_dfg)
    {
       gen_cntr_ext_out_port_basic_reset(me_ptr, ext_out_port_ptr);
       if (FALSE == me_ptr->topo.flags.defer_voting_on_dfs_change)

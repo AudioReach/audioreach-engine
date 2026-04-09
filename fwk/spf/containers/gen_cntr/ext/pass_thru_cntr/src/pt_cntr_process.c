@@ -776,12 +776,12 @@ PT_CNTR_STATIC ar_result_t pt_cntr_post_process_peer_ext_output(pt_cntr_t       
                                                         &(ext_out_port_ptr->gc.gu),
                                                         &(sdata_ptr->metadata_list_ptr));
 
-         bool_t out_buf_has_flushing_eos = FALSE;
+         bool_t out_buf_has_flushing_eos_dfg = FALSE;
          gen_topo_populate_metadata_for_peer_cntr(&(me_ptr->gc.topo),
                                                   &(ext_out_port_ptr->gc.gu),
                                                   &(sdata_ptr->metadata_list_ptr),
                                                   &out_buf_ptr->metadata_list_ptr,
-                                                  &out_buf_has_flushing_eos);
+                                                  &out_buf_has_flushing_eos_dfg);
       }
 
 #ifdef PT_CNTR_TIME_PROP_ENABLE

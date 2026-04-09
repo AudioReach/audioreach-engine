@@ -1159,9 +1159,9 @@ void gen_topo_populate_metadata_for_peer_cntr(gen_topo_t *           gen_topo_pt
                                               gu_ext_out_port_t *    ext_out_port_ptr,
                                               module_cmn_md_list_t **md_list_pptr,
                                               module_cmn_md_list_t **out_md_list_pptr,
-                                              bool_t *               out_buf_has_flushing_eos_ptr)
+                                              bool_t *               out_buf_has_flushing_eos_dfg_ptr)
 {
-   *out_buf_has_flushing_eos_ptr = FALSE;
+   *out_buf_has_flushing_eos_dfg_ptr = FALSE;
 
    if ((!md_list_pptr) || (!(*md_list_pptr)))
    {
@@ -1204,7 +1204,7 @@ void gen_topo_populate_metadata_for_peer_cntr(gen_topo_t *           gen_topo_pt
          }
          if (eos_metadata_ptr->flags.is_flushing_eos)
          {
-            *out_buf_has_flushing_eos_ptr = TRUE;
+            *out_buf_has_flushing_eos_dfg_ptr = TRUE;
 
             // Check if container voting changes need to be deferred for this Flushing EOS.
             gen_topo_check_eos_md_update_defer_voting_flag(&ext_out_port_ptr->int_out_port_ptr->cmn, md_ptr);
@@ -1213,7 +1213,10 @@ void gen_topo_populate_metadata_for_peer_cntr(gen_topo_t *           gen_topo_pt
          // should free only contr ref ptr. others should stay for next containers use
          gen_topo_free_eos_cargo(gen_topo_ptr, md_ptr, eos_metadata_ptr);
       }
-
+      else if(MODULE_CMN_MD_ID_DFG == md_ptr->metadata_id)
+      {
+         *out_buf_has_flushing_eos_dfg_ptr = TRUE;
+      }
 #if defined(METADATA_DEBUGGING)
       TOPO_MSG_ISLAND(gen_topo_ptr->gu.log_id,
                DBG_HIGH_PRIO,
