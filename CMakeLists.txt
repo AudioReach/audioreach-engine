@@ -131,6 +131,14 @@ if ( ARCH MATCHES "^(linux)")
    set(TGT_SPECIFIC_FOLDER linux)
 endif()
 
+if (ARCH MATCHES "^(zephyr)")
+   set(zephyr_INCLUDE
+      ${PROJECT_SOURCE_DIR}/ar_osal/api
+   )
+   # Reuse linux posix based implementation.
+   set(TGT_SPECIFIC_FOLDER linux)
+endif()
+
 ## Global Includes
 include_directories(
    ${PROJECT_SOURCE_DIR}/fwk/spf/interfaces/module/audio_cmn_lib/
@@ -155,6 +163,7 @@ include_directories(
    ${PROJECT_SOURCE_DIR}/fwk/platform/posal/inc
    ${hexagon_INCLUDE}
    ${linux_INCLUDE}
+   ${zephyr_INCLUDE}
    ${PROJECT_SOURCE_DIR}/fwk/platform/posal/inc/generic
    ${PROJECT_SOURCE_DIR}/gpr/api
    ${PROJECT_SOURCE_DIR}/fwk/spf/utils/cmn/inc
@@ -191,6 +200,10 @@ add_custom_target(
    USES_TERMINAL
 )
 
+if (ARCH MATCHES "^(zephyr)")
+   link_libraries(zephyr_interface)
+endif()
+
 add_compile_definitions(AMDB_REG_SPF_MODULES)
 add_subdirectory(fwk/build)
 add_subdirectory(modules)
@@ -225,6 +238,14 @@ if ( ARCH MATCHES "^(linux)")
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GPR REQUIRED IMPORTED_TARGET gpr)
 target_link_libraries(spf PUBLIC PkgConfig::GPR)
+endif()
+
+if (ARCH MATCHES "^(zephyr)")
+add_subdirectory(gpr)
+add_subdirectory(ar_osal)
+
+target_link_libraries(spf PUBLIC ar-gpr)
+target_link_libraries(spf PUBLIC ar-osal)
 endif()
 
 target_link_libraries(spf PUBLIC "$<LINK_GROUP:RESCAN,${spf_static_libs}>" "-Wl,--allow-multiple-definition")
