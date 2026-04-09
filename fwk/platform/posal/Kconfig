@@ -1,5 +1,13 @@
 menu "POSAL"
 
+config COMPILE_POSAL
+        bool "Compile POSAL source files."
+        default n if ARCH_HEXAGON
+        default y
+        help
+           Select y to compile posal source files,
+           say n to skip posal source files compilation.
+
 config DLS_DATA_LOGGING
         bool "Enable Data Logging using Data Logging Service (DLS)."
         default y

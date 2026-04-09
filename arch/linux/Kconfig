@@ -12,11 +12,4 @@ config DISABLE_PLATFORM
         Select y to disable platform compilation,
         say n to compile platform.
 
-config COMPILE_POSAL
-    bool "Compile POSAL source files."
-    default y
-    help
-        Select y to compile posal source files,
-        say n to skip posal source files compilation.
-
 endif
