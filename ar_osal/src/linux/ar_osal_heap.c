@@ -73,9 +73,33 @@ void* ar_heap_malloc(_In_ size_t bytes, _In_ par_heap_info heap_info)
         if (alignment < sizeof(void *)) {
             alignment = sizeof(void *);
         }
+
+#ifdef __ZEPHYR__
+        char *   ptr, *ptr2, *aligned_ptr;
+        uint32_t align_mask = ~(alignment - 1);
+
+        /* allocate enough for requested bytes + alignment wasteage + 1 word for storing offset
+        * (which will be just before the aligned ptr) */
+        ptr = (char *)malloc(bytes + alignment + sizeof(int));
+
+        if (ptr == NULL)
+        {
+        return (NULL);
+        }
+
+        /* allocate enough for requested bytes + alignment wasteage + 1 word for storing offset */
+        ptr2        = ptr + sizeof(int);
+        aligned_ptr = (char *)((uint32_t)(ptr2 - 1) & align_mask) + alignment;
+
+        /* save offset to raw pointer from aligned pointer */
+        ptr2           = aligned_ptr - sizeof(int);
+        *((int *)ptr2) = (int)(aligned_ptr - ptr);
+        pBuff = (aligned_ptr);
+#else
         if (posix_memalign(&pBuff, alignment, bytes) != 0) {
             pBuff = NULL;
         }
+#endif /* __ZEPHYR__ */
     }
 
 end:
@@ -117,7 +141,23 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void ar_heap_free(_In_ void* heap_ptr, _In_ par_heap_info heap_info)
 {
     if (NULL != heap_ptr && NULL != heap_info) {
+#ifdef __ZEPHYR__
+        if (AR_HEAP_ALIGN_DEFAULT == heap_info->align_bytes)
+        {
+            free(heap_ptr);
+        }
+        else{
+            uint32_t *pTemp = (uint32_t *)heap_ptr;
+            uint32_t *ptr2  = pTemp - 1;
+
+            /* Get the base pointer address */
+            pTemp -= *ptr2 / sizeof(uint32_t);
+
+            free(pTemp);
+        }
+#else
         free(heap_ptr);
+#endif /* __ZEPHYR__ */
     }
     return;
 }
