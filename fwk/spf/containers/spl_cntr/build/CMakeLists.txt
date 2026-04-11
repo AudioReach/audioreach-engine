@@ -23,4 +23,6 @@ include_directories(
 
 #Add the sub directory
 add_subdirectory(../core/build core)
+if (CONFIG_SPL_CNTR_EXT)
 add_subdirectory(../ext/build ext)
+endif()
