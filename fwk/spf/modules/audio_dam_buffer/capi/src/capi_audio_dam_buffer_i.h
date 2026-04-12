@@ -439,7 +439,8 @@ capi_err_t capi_dam_insert_flushing_eos_at_out_port(capi_audio_dam_t   *me_ptr,
 capi_err_t capi_dam_insert_tracking_md_at_out_port(capi_audio_dam_t   *me_ptr,
                                                     capi_stream_data_t *output,
                                                     uint32_t            output_port_index,
-                                                    bool_t              send_dfg_md);
+                                                    bool_t              send_dfg_md,
+                                                    bool_t              is_eos_case);
 
 capi_vtbl_t *capi_audio_dam_buffer_get_vtable();
 

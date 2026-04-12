@@ -139,6 +139,7 @@ typedef struct capi_pm_t
    /*header related parameter*/
    bool_t     is_header_enabled;
    bool_t     is_update_header;
+   bool_t is_pending_pos_buf_reset;
    uint32_t   header_type_flags;
    uint8_t    *header_buffer_ptr;
    uint32_t   header_buffer_size;
@@ -151,7 +152,8 @@ typedef struct capi_pm_t
    uint32_t  batch_bytes_written;
    // UTC timestamp handling
    capi_push_ts_data_t ts_data;
-
+   uint64_t  last_valid_timestamp; // tracks last valid timestamp received in current batch
+   
 } capi_pm_t;
 
 /*------------------------------------------------------------------------
@@ -187,6 +189,7 @@ void pull_push_mode_deinit(pull_push_mode_t *pm_ptr);
 
 capi_err_t pull_mode_read_input(capi_t *_pif, capi_stream_data_t *input[], capi_stream_data_t *output[]);
 capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], capi_stream_data_t *output[]);
+capi_err_t push_mode_end_header_batch(capi_pm_t *_pif, uint64_t timestamp);
 
 capi_err_t pull_push_mode_watermark_levels_init(pull_push_mode_t *pm_ptr,
                                                 uint32_t          num_water_mark_levels,

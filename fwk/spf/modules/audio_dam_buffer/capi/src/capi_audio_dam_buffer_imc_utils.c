@@ -181,7 +181,7 @@ capi_err_t capi_audio_dam_imcl_set_hdlr_flow_ctrl_v2(capi_audio_dam_t *me_ptr,
          {
             me_ptr->out_port_info_arr[op_arr_index].is_dcm_duty_cycling_enabled = TRUE;
             me_ptr->out_port_info_arr[op_arr_index].ready_for_island_entry      = TRUE;
-            me_ptr->out_port_info_arr[op_arr_index].gate_ctrl_op                = AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING;
+            
 
             if(AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING_MD_TRACKING_EVENT == cfg_ptr->gate_ctrl)
             {
@@ -189,6 +189,7 @@ capi_err_t capi_audio_dam_imcl_set_hdlr_flow_ctrl_v2(capi_audio_dam_t *me_ptr,
                me_ptr->out_port_info_arr[op_arr_index].is_partial_batch_drain_enabled    = TRUE;
             }
 
+            me_ptr->out_port_info_arr[op_arr_index].gate_ctrl_op = cfg_ptr->gate_ctrl;
             capi_audio_dam_raise_allow_duty_cycling(me_ptr, TRUE);
          }
          break;

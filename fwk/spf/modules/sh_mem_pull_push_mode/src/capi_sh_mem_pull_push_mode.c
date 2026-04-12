@@ -1000,15 +1000,33 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
          case CAPI_ALGORITHMIC_RESET:
          {
             PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Set property received for algorithmic reset");
-
+            if ((PUSH_MODE == me_ptr->pull_push_mode_info.mode) && me_ptr->is_header_enabled && !me_ptr->is_update_header && (me_ptr->pcm_bytes_written > 0))
+            {
+               PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO,
+                             "Algo reset: finalizing in-progress batch "
+                             "(pcm_bytes_written=%lu) before reset",
+                             me_ptr->pcm_bytes_written);
+               push_mode_end_header_batch(me_ptr, posal_timer_get_time());
+            }
             if (NULL != me_ptr->pull_push_mode_info.shared_pos_buf_ptr)
             {
-               PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Resetting shared position structure");
-               memset(me_ptr->pull_push_mode_info.shared_pos_buf_ptr,
-                      0,
-                      sizeof(sh_mem_pull_push_mode_position_buffer_t));
-
-               me_ptr->pull_push_mode_info.next_read_index = 0;
+               if (PUSH_MODE == me_ptr->pull_push_mode_info.mode && me_ptr->is_header_enabled)
+               {
+                  /* Defer position buffer reset to the next process call so HLOS can
+                   * still read the last finalized batch. Resetting here would move
+                   * pos_buf->index back to 0, making the just-written batch unreadable. */
+                  me_ptr->is_pending_pos_buf_reset = TRUE;
+                  PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO,
+                                "Algo reset: deferring position buffer reset to next process call");
+               }
+               else
+               {
+                  PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Resetting shared position structure");
+                  memset(me_ptr->pull_push_mode_info.shared_pos_buf_ptr,
+                         0,
+                         sizeof(sh_mem_pull_push_mode_position_buffer_t));
+                  me_ptr->pull_push_mode_info.next_read_index = 0;
+               }
             }
             break;
          }

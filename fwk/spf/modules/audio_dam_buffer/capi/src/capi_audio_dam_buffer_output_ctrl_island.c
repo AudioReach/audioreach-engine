@@ -293,7 +293,8 @@ capi_err_t capi_dam_insert_flushing_eos_at_out_port(capi_audio_dam_t   *me_ptr,
 capi_err_t capi_dam_insert_tracking_md_at_out_port(capi_audio_dam_t   *me_ptr,
                                                     capi_stream_data_t *output,
                                                     uint32_t            output_port_index,
-                                                    bool_t              send_dfg_md)
+                                                    bool_t              send_dfg_md,
+                                                    bool_t              is_eos_case)
 {
    capi_err_t             capi_result    = CAPI_EOK;
    capi_stream_data_v2_t *out_stream_ptr = (capi_stream_data_v2_t *)output;
@@ -344,7 +345,9 @@ capi_err_t capi_dam_insert_tracking_md_at_out_port(capi_audio_dam_t   *me_ptr,
    md_payload_ptr->output_port_idx             = output_port_index;                                    //output port index to handle Duty cycling
    md_payload_ptr->param_id                    = PARAM_ID_AUDIO_DAM_HANDLE_BATCH_END_TRACKING_EVENT;   //Param ID to set after tracking event
 
-   new_md_ptr->metadata_flag.buf_sample_association = MODULE_CMN_MD_BUFFER_ASSOCIATED; //Metadata reaches along with the DFG to downstream containers
+   /* END md is sample-associated only for EOS; buffer-associated for all other batch completions. */
+   new_md_ptr->metadata_flag.buf_sample_association = is_eos_case ? MODULE_CMN_MD_SAMPLE_ASSOCIATED : MODULE_CMN_MD_BUFFER_ASSOCIATED;
+
 
    DAM_MSG_ISLAND(me_ptr->miid, DBG_HIGH_PRIO, "DAM: Created and inserted tracking MD at output port index:%lu with offset: %lu",
                   output_port_index, new_md_ptr->offset);

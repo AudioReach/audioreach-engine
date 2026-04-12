@@ -247,6 +247,14 @@ capi_err_t capi_history_buffer_imcl_send_resize_to_dam(capi_history_buffer_t *me
 capi_err_t capi_history_buffer_resize_and_batch_gate_open_to_dam(capi_history_buffer_t *me_ptr);
 
 /* =========================================================================
+ * FUNCTION : capi_history_buffer_send_allow_dcm_island_entry_to_dam
+ * 
+ * Sends PARAM_ID_AUDIO_DAM_ALLOW_DCM_ISLAND_ENTRY to DAM via IMCL. 
+ * Called at ctrl port connect (after gate open) to trigger island entry for the first batch. 
+ * ========================================================================= */
+capi_err_t capi_history_buffer_send_allow_dcm_island_entry_to_dam(capi_history_buffer_t *me_ptr);
+
+/* =========================================================================
  * FUNCTION : capi_history_buffer_validate_intent_id
  *
  * Utility to check if the given control port supports the intent id.

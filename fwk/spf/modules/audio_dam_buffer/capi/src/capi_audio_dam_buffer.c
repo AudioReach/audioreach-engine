@@ -2449,6 +2449,7 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
                me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = FALSE;
                me_ptr->out_port_info_arr[arr_index].handle_md_batch_tracking = FALSE;
                me_ptr->out_port_info_arr[arr_index].is_partial_batch_drain_enabled = FALSE;
+               me_ptr->out_port_info_arr[arr_index].is_handle_partial_drain     = FALSE;
             }
 
             break;
@@ -2473,6 +2474,14 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
                if(AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING == me_ptr->out_port_info_arr[arr_index].gate_ctrl_op)
                {
                   me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = TRUE;
+               }
+
+               else if(AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING_MD_TRACKING_EVENT == me_ptr->out_port_info_arr[arr_index].gate_ctrl_op)
+               {
+                  me_ptr->out_port_info_arr[arr_index].handle_md_batch_tracking    = TRUE;
+                  me_ptr->out_port_info_arr[arr_index].is_partial_batch_drain_enabled    = TRUE;
+                  me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = TRUE;
+                  me_ptr->out_port_info_arr[arr_index].is_handle_partial_drain     = FALSE;
                }
 
                /** for outputs trigger policy is optional present if gate is opened, other wise it is non-trigger
@@ -2591,6 +2600,21 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
                me_ptr->out_port_info_arr[arr_index].is_started = FALSE;
                me_ptr->out_port_info_arr[arr_index].gate_ctrl_op                = AUDIO_DAM_BATCH_INVALID;
                me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = FALSE;
+               me_ptr->out_port_info_arr[arr_index].handle_md_batch_tracking    = FALSE;
+               me_ptr->out_port_info_arr[arr_index].is_partial_batch_drain_enabled    = FALSE;
+               me_ptr->out_port_info_arr[arr_index].is_handle_partial_drain     = FALSE;
+               me_ptr->out_port_info_arr[arr_index].pending_eos                 = FALSE;
+               me_ptr->out_port_info_arr[arr_index].bytes_before_eos            = 0;
+               
+               if (is_dam_output_port_initialized(me_ptr, arr_index))
+               {
+                  // Reset read offset to zero to drop all stale data  
+                  uint32_t read_offset_in_us = 0;                     
+                  audio_dam_stream_read_adjust(me_ptr->out_port_info_arr[arr_index].strm_reader_ptr,  
+                                             read_offset_in_us,                                        
+                                             NULL,                                                     
+                                             FALSE);                                                 
+               }
             }
 
             break;
