@@ -2,14 +2,3 @@ menuconfig ARCH_LINUX
     bool "Linux Architecture"
     help
         Say yes if you need Linxu Architecture support
-
-if ARCH_LINUX
-
-config DISABLE_PLATFORM
-    bool "Disable compiling platform."
-    default y
-    help
-        Select y to disable platform compilation,
-        say n to compile platform.
-
-endif

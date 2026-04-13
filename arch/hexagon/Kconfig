@@ -15,11 +15,4 @@ config HEXAGON_SDK_ROOT
 	help
 	 Absolute Path to Hexagon SDK root
 
-config DISABLE_PLATFORM
-	bool "Disable compiling platform."
-	default y
-	help
-	Select y to disable platform compilation,
-	say n to compile platform.
-
 endif

@@ -1,0 +1,12 @@
+menu "Platform"
+
+config DISABLE_PLATFORM
+        bool "Disable compiling platform."
+        default y if ARCH_LINUX || ARCH_HEXAGON
+        default y
+        help
+          Select y to disable platform compilation,
+          say n to compile platform.
+          Defaults to 'y' for Linux and Hexagon architectures.
+
+endmenu
