@@ -880,6 +880,10 @@ capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], cap
          me_ptr->curr_shared_buf_ptr = NULL;
          module_buf_ptr[0].data_ptr  = NULL;
       }
+      if(capi_ptr->is_header_enabled)
+      {
+         write_index = capi_ptr->batch_write_index;
+      }
    }
    else if (me_ptr->curr_shared_buf_ptr)
    {
@@ -950,10 +954,10 @@ capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], cap
    else // buffer access extension is disabled.
    {
       // Use batch_write_index for tracking within batch when headers enabled
-      if (capi_ptr->is_header_enabled && 0 != module_buf_ptr[0].actual_data_len)
+      if (capi_ptr->is_header_enabled)
       {
          // Write batch header at the start of a new batch (when headers enabled and not in middle of batch)
-         if (capi_ptr->is_update_header)
+         if (capi_ptr->is_update_header && 0 != module_buf_ptr[0].actual_data_len)
          {
             capi_ptr->pcm_bytes_written = 0;
             // Initialize batch tracking
