@@ -73,3 +73,8 @@ ar_result_t pt_cntr_validate_topo_at_open(pt_cntr_t *me_ptr)
 {
    return AR_EUNSUPPORTED;
 }
+
+ar_result_t pt_cntr_init_data_ports_post_async_create_finish(gen_topo_t *topo_ptr)
+{
+   return AR_EUNSUPPORTED;
+}

@@ -194,6 +194,7 @@ ar_result_t pt_cntr_create_module(gen_topo_t            *topo_ptr,
                                   gen_topo_graph_init_t *graph_init_data_ptr);
 ar_result_t pt_cntr_init_ext_in_port(void *base_ptr, gu_ext_in_port_t *gu_ext_port_ptr);
 ar_result_t pt_cntr_init_ext_out_port(void *base_ptr, gu_ext_out_port_t *gu_ext_port_ptr);
+ar_result_t pt_cntr_init_data_ports_post_async_create_finish(gen_topo_t *topo_ptr);
 
 ar_result_t pt_cntr_deinit_ext_in_port(void *base_ptr, gu_ext_in_port_t *gu_ext_port_ptr);
 

@@ -354,6 +354,10 @@ static ar_result_t gen_cntr_handle_rest_of_graph_open(cu_base_t *base_ptr, void 
 
    // note: since newly opened modules/ports are not going to change the order of started_sorted_module_list therefore
    // not updating it
+   if (check_if_pass_thru_container(me_ptr))
+   {
+      TRY(result, pt_cntr_init_data_ports_post_async_create_finish(&me_ptr->topo));
+   }
 
    TRY(result, gen_cntr_allocate_wait_mask_arr(me_ptr));
 
