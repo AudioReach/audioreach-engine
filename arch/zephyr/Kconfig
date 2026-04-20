@@ -1,0 +1,6 @@
+menuconfig ARCH_ZEPHYR
+    bool "Zephyr Architecture"
+    help
+        Say yes if you need Zephyr Architecture support
+
+endif
