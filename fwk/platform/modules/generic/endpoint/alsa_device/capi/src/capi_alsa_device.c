@@ -55,7 +55,7 @@ static void capi_alsa_device_dma_wait_thread(void *arg)
          continue;
       }
 
-      AR_MSG(DBG_HIGH_PRIO, "CAPI_ALSA_DEVICE: DMA thread read %d bytes", me_ptr->read_buffer_size);
+      AR_MSG(DBG_LOW_PRIO, "CAPI_ALSA_DEVICE: DMA thread read %d bytes", me_ptr->read_buffer_size);
 
       /* Mark data as ready */
       me_ptr->data_ready = TRUE;
@@ -63,7 +63,7 @@ static void capi_alsa_device_dma_wait_thread(void *arg)
       /* Signal framework using STM signal */
       if (me_ptr->signal_ptr && me_ptr->enable_stm)
       {
-         AR_MSG(DBG_HIGH_PRIO, "CAPI_ALSA_DEVICE: signaling the container");
+         AR_MSG(DBG_LOW_PRIO, "CAPI_ALSA_DEVICE: signaling the container");
          posal_signal_send(me_ptr->signal_ptr);
       }
    }
@@ -1169,7 +1169,7 @@ capi_err_t capi_alsa_device_process_sink(capi_t *_pif, capi_stream_data_t *input
          {
             need_to_underrun = TRUE;
             is_input_available = FALSE;
-            AR_MSG_ISLAND(DBG_ERROR_PRIO, "CAPI: Failed to interleave data");
+            AR_MSG(DBG_ERROR_PRIO, "CAPI: Failed to interleave data");
          }
       }
    }
@@ -1224,7 +1224,7 @@ capi_err_t capi_alsa_device_process_sink(capi_t *_pif, capi_stream_data_t *input
       return CAPI_EFAILED;
    }
 
-   AR_MSG_ISLAND(DBG_HIGH_PRIO, "CAPI: alsa_device_driver_write successful, total bytes copied: %d", total_bytes_copied);
+   AR_MSG(DBG_LOW_PRIO, "CAPI: alsa_device_driver_write successful, total bytes copied: %d", total_bytes_copied);
 
    return capi_result;
 }
@@ -1429,7 +1429,7 @@ capi_err_t capi_alsa_device_process_source(capi_t *_pif, capi_stream_data_t *inp
 
    me_ptr->data_ready = FALSE;
 
-   AR_MSG_ISLAND(DBG_HIGH_PRIO, "CAPI_ALSA_DEVICE: Process source successful, bytes: %d", total_bytes);
+   AR_MSG(DBG_LOW_PRIO, "CAPI_ALSA_DEVICE: Process source successful, bytes: %d", total_bytes);
 
    return capi_result;
 }

@@ -146,7 +146,7 @@ ar_result_t alsa_device_driver_read(alsa_device_driver_t *alsa_device_driver_ptr
       return AR_EFAILED;
    }
 
-   AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: pcm_read success, bytes: %d", num_bytes);
+   AR_MSG(DBG_LOW_PRIO, "ALSA_DEVICE_DRIVER: pcm_read success, bytes: %d", num_bytes);
    return AR_EOK;
 }
 
@@ -159,7 +159,7 @@ ar_result_t alsa_device_driver_write(alsa_device_driver_t *alsa_device_driver_pt
       return AR_EFAILED;
    }
 
-   //AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: pcm write success \n");
+   AR_MSG(DBG_LOW_PRIO, "ALSA_DEVICE_DRIVER: pcm write success \n");
 
    return AR_EOK;
 }
