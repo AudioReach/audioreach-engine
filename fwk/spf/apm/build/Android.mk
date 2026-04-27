@@ -9,14 +9,14 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/ext/debug_info_cfg/inc \
     $(LOCAL_PATH)/ext/multi_client/inc
 
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 include $(BUILD_HEADER_LIBRARY)
 
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libapm
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/core/inc \
     $(LOCAL_PATH)/core/src \
@@ -63,11 +63,18 @@ LOCAL_SRC_FILES := \
     ext/shared_mem/src/apm_shmem_util_v2.c \
     ext/spf_cmd_hdlr/src/apm_spf_cmd_hdlr.c \
     ext/sys_util/src/apm_sys_util.c \
-    ext/multi_client/src/apm_multi_client_db.c \
-    ext/multi_client/src/apm_multi_client_msg_rsp_handler.c \
-    ext/multi_client/src/apm_multi_client_utils.c \
-    ext/multi_client/src/apm_multi_client.c \
     ext/offload/src/apm_offload_memmap_utils_v2.c
+
+ifeq ($(CONFIG_APM_MULTI_CLIENT),y)
+    LOCAL_SRC_FILES += \
+          ext/multi_client/src/apm_multi_client_db.c \
+          ext/multi_client/src/apm_multi_client_msg_rsp_handler.c \
+          ext/multi_client/src/apm_multi_client_utils.c \
+          ext/multi_client/src/apm_multi_client.c
+else
+    LOCAL_SRC_FILES += \
+          ext/multi_client/stub_src/apm_multi_client_stub.c
+endif
 
 LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
 

@@ -33,4 +33,9 @@ config SPL_CNTR_EXT
             Enable compilation of Special Container extension modules.
             This includes framework extensions for processing, synchronization,
             and voice delivery.
+
+config CONFIG_APM_THIN_TOPO
+        bool "Enable THIN TOPO Library"
+        default n
+
 endmenu

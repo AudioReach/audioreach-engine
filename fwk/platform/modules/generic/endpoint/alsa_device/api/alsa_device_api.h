@@ -147,4 +147,60 @@ typedef struct param_id_alsa_device_intf_cfg_t param_id_alsa_device_intf_cfg_t;
 
 #define MODULE_ID_ALSA_DEVICE_SOURCE 0x18000003
 
+/** @h2xmlm_module       {"MODULE_ID_ALSA_DEVICE_SOURCE",
+                           MODULE_ID_ALSA_DEVICE_SOURCE}
+    @h2xmlm_displayName  {"ALSA Device Source"}
+    @h2xmlm_modSearchKeys{hardware}
+    @h2xmlm_description  {ALSA_DEVICE Source Module\n
+                        - Supports following params:
+                          - PARAM_ID_ALSA_DEVICE_INTF_CFG \n
+                          - PARAM_ID_HW_EP_MF_CFG \n
+                          - PARAM_ID_HW_EP_FRAME_SIZE_FACTOR \n
+                          - Data Format          : FIXED_POINT \n
+                          - fmt_id               : Don't care \n
+                          - Sample Rates         : 8, 11.025, 12, 16, 22.05, 24, 32, 44.1, 48, \n
+                          -                        88.2, 96, 176.4, 192, 352.8, 384 kHz \n
+                          - Number of channels   : 1 to 8 \n
+                          - Channel type         : Don't care \n
+                          - Bit Width            : 16 (bits per sample 16 and Q15), \n
+                          -                      : 24 (bits per sample 24 and Q27) \n
+                          -                      : 32 (bits per sample 32 and Q31)  \n
+                          - Q format             : Q15, Q27, Q31 \n
+                          - Interleaving         : ALSA Device source module needs de-interleaved unpacked or interleaved }
+    @h2xmlm_dataOutputPorts      {OUT = PORT_ID_ALSA_DEVICE_OUTPUT}
+    @h2xmlm_dataMaxInputPorts   {0}
+    @h2xmlm_dataMaxOutputPorts  {1}
+    @h2xmlm_supportedContTypes { APM_CONTAINER_TYPE_GC }
+    @h2xmlm_isOffloadable       {false}
+    @h2xmlm_stackSize           { ALSA_DEVICE_STACK_SIZE }
+    @{                   <-- Start of the Module -->
+
+    @h2xml_Select     {param_id_hw_ep_mf_t}
+    @h2xmlm_InsertParameter
+    @h2xml_Select        {param_id_hw_ep_mf_t::num_channels}
+    @h2xmle_rangeList    {"ONE"=1;
+                         "TWO"=2;
+                         "THREE"=3;
+                         "FOUR"=4;
+                         "FIVE"=5;
+                         "SIX"=6;
+                         "SEVEN"=7;
+                         "EIGHT"=8}
+    @h2xmle_default      {1}
+    @h2xml_Select        {param_id_hw_ep_mf_t::data_format}
+    @h2xmle_rangeList    {"DATA_FORMAT_FIXED_POINT"=1}
+    @h2xmle_default      {1}
+
+    @h2xml_Select     {param_id_frame_size_factor_t}
+    @h2xmlm_InsertParameter
+    @h2xml_Select     {param_id_alsa_device_intf_cfg_t}
+    @h2xmlm_InsertParameter
+    @h2xml_Select        {param_id_alsa_device_intf_cfg_t::card_id}
+    @h2xmle_range       {0..4294967295}
+    @h2xmle_default     {0}
+    @h2xml_Select        {param_id_alsa_device_intf_cfg_t::device_id}
+    @h2xmle_range       {0..4294967295}
+    @h2xmle_default     {0}
+    @}                   <-- End of the Module -->*/
+
 #endif /* ALSA_DEVICE_API_H */

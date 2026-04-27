@@ -1,25 +1,28 @@
 LOCAL_PATH := $(call my-dir)/..
 
 #####################################
-# Module: DATA LOGGING
+# Module: SAL
 #####################################
 include $(CLEAR_VARS)
-LOCAL_MODULE             := lib_data_logging
-LOCAL_MODULE_TAGS        := optional
+LOCAL_MODULE             := lib_sal
 LOCAL_VENDOR_MODULE      := true
+LOCAL_MODULE_TAGS        := optional
 
 LOCAL_C_INCLUDES := \
+    $(LOCAL_PATH)/api \
     $(LOCAL_PATH)/capi/inc \
-    $(LOCAL_PATH)/capi/src \
-    $(LOCAL_PATH)/api
+    $(LOCAL_PATH)/capi/src
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
+    $(LOCAL_PATH)/api \
     $(LOCAL_PATH)/capi/inc
 
 LOCAL_SRC_FILES := \
-    capi/src/capi_data_logging.c \
-    capi/src/capi_data_logging_island.c \
-    capi/src/capi_data_logging_config_utils.c
+    capi/src/capi_sal.cpp \
+    capi/src/capi_sal_island.cpp \
+    capi/src/capi_sal_md_utils_island.cpp \
+    capi/src/capi_sal_port_utils.cpp \
+    capi/src/capi_sal_utils.cpp
 
 LOCAL_CFLAGS    += -O3 -Wall -ffixed-x18
 
@@ -34,24 +37,27 @@ LOCAL_HEADER_LIBRARIES := \
     libspf_api \
     libposal_headers \
     libspf_interfaces_headers \
+    lib_spm_cmn_utils_headers \
     libspf_utils_headers
 
 LOCAL_STATIC_LIBRARIES := \
     libposal \
     libspf_interfaces \
-    libspf_utils
+    lib_spm_cmn_utils \
+    libspf_utils \
+    lib_limiter
 
-LOCAL_SPF_MODULE_KCONFIG          := CONFIG_DATA_LOGGING
+LOCAL_SPF_MODULE_KCONFIG          := CONFIG_SAL
 LOCAL_SPF_MODULE_NAME             := $(LOCAL_MODULE)
 LOCAL_SPF_MODULE_MAJOR_VER        := 1
 LOCAL_SPF_MODULE_MINOR_VER        := 0
 LOCAL_SPF_MODULE_AMDB_ITYPE       := "capi"
-LOCAL_SPF_MODULE_AMDB_MTYPE       := "generic"
-LOCAL_SPF_MODULE_AMDB_MID         := "0x0700101a"
-LOCAL_SPF_MODULE_AMDB_TAG         := "capi_data_logging"
-LOCAL_SPF_MODULE_AMDB_MOD_NAME    := "MODULE_ID_DATA_LOGGING"
+LOCAL_SPF_MODULE_AMDB_MTYPE       := "pp"
+LOCAL_SPF_MODULE_AMDB_MID         := "0x07001010"
+LOCAL_SPF_MODULE_AMDB_TAG         := "capi_sal"
+LOCAL_SPF_MODULE_AMDB_MOD_NAME    := "MODULE_ID_SAL"
 LOCAL_SPF_MODULE_QACT_MODULE_TYPE := ""
-LOCAL_SPF_MODULE_AMDB_FMT_ID1     := "MODULE_ID_DATA_LOGGING"
-LOCAL_SPF_MODULE_H2XML_HEADERS    := "$(LOCAL_PATH)/api/data_logging_api.h"
+LOCAL_SPF_MODULE_AMDB_FMT_ID1     := "MODULE_ID_SAL"
+LOCAL_SPF_MODULE_H2XML_HEADERS    := "$(LOCAL_PATH)/api/sal_api.h"
 
 include $(BUILD_ARE_MODULES)

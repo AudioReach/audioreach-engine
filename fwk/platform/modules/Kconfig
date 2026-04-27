@@ -4,4 +4,8 @@ config ALSA_DEVICE_SINK
         tristate "Enable ALSA_DEVICE_SINK Library"
         default y
 
+config ALSA_DEVICE_SOURCE
+        tristate "Enable ALSA_DEVICE_SOURCE Library"
+        default y
+
 endmenu

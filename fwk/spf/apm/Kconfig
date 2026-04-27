@@ -1,0 +1,7 @@
+menu "APM"
+
+config CONFIG_APM_MULTI_CLIENT
+        bool "Enable Multi Client Library"
+        default n
+
+endmenu

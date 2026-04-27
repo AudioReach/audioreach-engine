@@ -100,11 +100,10 @@ ar_result_t spf_deintlv_to_intlv_v2(capi_buf_t *input_buf_ptr,
          for (j = 0; j < num_channels; j++)
          {
             src_ptr = (int8_t *)input_buf_ptr[j].data_ptr;
-            k       = bytes_per_samp * (j - num_channels);
             temp    = 0;
             for (i = 0; i < num_samp_per_ch; i++)
             {
-               k += bytes_per_samp * num_channels;
+               k = bytes_per_samp * (i * num_channels + j);
                byte_1 = src_ptr[temp + 0]; // load first byte in the sample
                byte_2 = src_ptr[temp + 1]; // load second byte in the sample
                byte_3 = src_ptr[temp + 2]; // load third byte in the sample

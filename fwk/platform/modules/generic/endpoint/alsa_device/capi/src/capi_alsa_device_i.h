@@ -30,7 +30,8 @@
 
  /* Number of CAPI Framework extension needed
 Note: this module is not defined as Signal Triggered Module */
-#define ALSA_DEVICE_NUM_FRAMEWORK_EXTENSIONS 0
+#define ALSA_DEVICE_NUM_FRAMEWORK_EXTENSIONS_SOURCE 1
+#define ALSA_DEVICE_NUM_FRAMEWORK_EXTENSIONS_SINK 0
 
 /* Number of milliseconds in a second*/
 #define NUM_MS_PER_SEC 1000
@@ -100,6 +101,19 @@ typedef struct capi_alsa_device
    uint32_t hw_delay_us;
 
    alsa_device_driver_t alsa_device_driver;
+
+   void *   signal_ptr; // Signal ptr for STM
+   uint32_t enable_stm;
+
+   /* Thread management for source direction */
+   posal_thread_t dma_wait_thread;    // Thread handle for DMA waiting
+   bool_t is_thread_running;          // Thread running state
+   bool_t exit_thread;                // Thread exit flag
+
+   /* Buffer to store the data read form ALSA driver in wait thread */
+   int8_t *read_buffer;               // Buffer to hold one period of captured data
+   uint32_t read_buffer_size;         // Size of read buffer in bytes
+   bool_t data_ready;                 // Flag: data available in read buffer
 } capi_alsa_device_t;
 
 /*------------------------------------------------------------------------

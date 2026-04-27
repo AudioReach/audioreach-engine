@@ -19,18 +19,24 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/ext/rd_sh_mem_ep/inc \
     $(LOCAL_PATH)/ext/sync_fwk_ext/inc \
     $(LOCAL_PATH)/ext/wr_sh_mem_ep/inc \
-    $(LOCAL_PATH)/ext/thin_topo_cntr_utils/src \
     $(LOCAL_PATH)/ext/thin_topo_cntr_utils/inc
 
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_EXPORT_C_INCLUDE_DIRS += \
+          $(LOCAL_PATH)/ext/thin_topo_cntr_utils/src
+else
+    LOCAL_EXPORT_C_INCLUDE_DIRS += \
+          $(LOCAL_PATH)/ext/thin_topo_cntr_utils/stub_src
+endif
 
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 include $(BUILD_HEADER_LIBRARY)
 
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libspf_gen_cntr
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/cmn/inc \
     $(LOCAL_PATH)/core/inc \
@@ -48,8 +54,15 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/ext/rd_sh_mem_ep/inc \
     $(LOCAL_PATH)/ext/sync_fwk_ext/inc \
     $(LOCAL_PATH)/ext/wr_sh_mem_ep/inc \
-    $(LOCAL_PATH)/ext/thin_topo_cntr_utils/src \
     $(LOCAL_PATH)/ext/thin_topo_cntr_utils/inc
+
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_C_INCLUDES += \
+          $(LOCAL_PATH)/ext/thin_topo_cntr_utils/src
+else
+    LOCAL_C_INCLUDES += \
+          $(LOCAL_PATH)/ext/thin_topo_cntr_utils/stub_src
+endif
 
 LOCAL_SRC_FILES := \
     core/src/gen_cntr.c \
@@ -87,12 +100,22 @@ LOCAL_SRC_FILES := \
     ext/placeholder/stub_src/gen_cntr_placeholder.c \
     ext/pure_st/stub_src/gen_cntr_pure_st_handler.c \
     ext/pure_st/stub_src/gen_cntr_pure_st_handler_island.c \
-    ext/sync_fwk_ext/stub_src/gen_cntr_sync_fwk_ext.c \
-    ext/thin_topo_cntr_utils/src/thin_topo_cntr_utils_island.c \
-    ext/thin_topo_cntr_utils/src/thin_topo_cntr_utils.c
+    ext/sync_fwk_ext/stub_src/gen_cntr_sync_fwk_ext.c
 
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_SRC_FILES += \
+          ext/thin_topo_cntr_utils/src/thin_topo_cntr_utils_island.c \
+          ext/thin_topo_cntr_utils/src/thin_topo_cntr_utils.c
+else
+    LOCAL_SRC_FILES += \
+          ext/thin_topo_cntr_utils/stub_src/thin_topo_cntr_utils.c
+endif
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_CFLAGS += -DUSES_THIN_TOPO
+endif
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
@@ -115,14 +138,18 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := lib_wr_shmem_ep
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/ext/wr_sh_mem_ep/inc
 
 LOCAL_SRC_FILES := \
     ext/wr_sh_mem_ep/src/gen_cntr_wr_sh_mem_ep.c
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_CFLAGS += -DUSES_THIN_TOPO
+endif
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
@@ -157,14 +184,18 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := lib_rd_shmem_ep
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/ext/rd_sh_mem_ep/inc
 
 LOCAL_SRC_FILES := \
     ext/rd_sh_mem_ep/src/gen_cntr_rd_sh_mem_ep.c
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_CFLAGS += -DUSES_THIN_TOPO
+endif
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
@@ -198,14 +229,18 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := lib_placeholder_dec
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/ext/placeholder/inc
 
 LOCAL_SRC_FILES := \
     ext/placeholder/src/gen_cntr_placeholder.c
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_CFLAGS += -DUSES_THIN_TOPO
+endif
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto
@@ -239,14 +274,18 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := lib_placeholder_enc
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/ext/placeholder/inc
 
 LOCAL_SRC_FILES := \
     ext/placeholder/src/gen_cntr_placeholder.c
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_CFLAGS += -DUSES_THIN_TOPO
+endif
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto

@@ -10,14 +10,14 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := \
     $(LOCAL_PATH)/ext/sync_fwk_ext/inc
 
 
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 include $(BUILD_HEADER_LIBRARY)
 
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libspf_spl_cntr
 LOCAL_MODULE_TAGS := optional
-LOCAL_PROPRIETARY_MODULE := true
+LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/inc \
     $(LOCAL_PATH)/cmn/inc \
@@ -42,7 +42,11 @@ LOCAL_SRC_FILES := \
     ext/sync_fwk_ext/src/spl_cntr_sync_fwk_ext.c \
     ext/voice_delivery_fwk_ext/src/spl_cntr_voice_delivery_fwk_ext.c
 
-LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -DUSES_THIN_TOPO
+LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17
+
+ifeq ($(CONFIG_APM_THIN_TOPO),y)
+    LOCAL_CFLAGS += -DUSES_THIN_TOPO
+endif
 
 LOCAL_CFLAGS_32 += -mfpu=neon -fasm -ftree-vectorize -O3
 LOCAL_CFLAGS_64 += -fasm -ftree-vectorize -O3 -march=armv8-a+crypto

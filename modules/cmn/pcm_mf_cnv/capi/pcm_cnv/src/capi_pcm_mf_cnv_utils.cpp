@@ -415,7 +415,7 @@ static void *capi_pcm_mf_cnv_chmixer_get_coef_set_ptr(capi_pcm_mf_cnv_t *const m
    capi_pcm_mf_cnv_chmixer_coef_set_t *coef_set_ptr = me_ptr->config.coef_sets_ptr;
    int16_t *                           coef_ptr     = NULL;
 
-   for (int8_t i = me_ptr->config.num_coef_sets - 1; i >= 0; i--)
+   for (int32_t i = (int32_t) (me_ptr->config.num_coef_sets) - 1; i >= 0; i--)
    {
       if ((me_ptr->config.num_coef_sets - 1) != i) // except the first iteration
       {
