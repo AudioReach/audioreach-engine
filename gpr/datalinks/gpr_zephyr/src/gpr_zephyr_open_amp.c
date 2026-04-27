@@ -115,6 +115,11 @@ typedef struct gpr_dl_zephyr_port{
 /*Array of structure pointers each member pointer corresponds to one domain*/
 gpr_dl_zephyr_port_t *gpr_dl_zephyr_ports[GPR_PL_NUM_TOTAL_DOMAINS_V]={NULL};
 
+static inline bool gpr_domain_valid(uint32_t domain_id)
+{
+    return domain_id < GPR_PL_NUM_TOTAL_DOMAINS_V;
+}
+
 static uint32_t gpr_dl_zephyr_send(uint32_t domain_id, void *buf, uint32_t size);
 
 static uint32_t gpr_dl_zephyr_receive_done(uint32_t domain_id, void *buf);
@@ -125,13 +130,11 @@ static ipc_to_gpr_vtbl_t gpr_dl_zephyr_vtbl = {
     gpr_dl_zephyr_receive_done,
 };
 
-
 static gpr_dl_zephyr_port_t * gpr_dl_zephyr_local_init(uint32_t src_domain_id, uint32_t dst_domain_id)
 {
     gpr_dl_zephyr_port_t *dl_zephyr_port;
 
-    if ((dst_domain_id < 0) || (dst_domain_id >= GPR_PL_NUM_TOTAL_DOMAINS_V)
-        || (src_domain_id < 0) || (src_domain_id >= GPR_PL_NUM_TOTAL_DOMAINS_V)) {
+    if (!gpr_domain_valid(dst_domain_id) || !gpr_domain_valid(src_domain_id)) {
         AR_MSG(DBG_ERROR_PRIO, "invalid domain(src domain id %d, dst domain id %d)",
                 src_domain_id, dst_domain_id);
         return NULL;
@@ -442,8 +445,7 @@ uint32_t ipc_dl_zephyr_init(uint32_t src_domain_id,
 {
     gpr_dl_zephyr_port_t *dl_zephyr_port;
 
-    if ((dest_domain_id < 0) || (dest_domain_id >= GPR_PL_NUM_TOTAL_DOMAINS_V)
-        || (src_domain_id < 0) || (src_domain_id >= GPR_PL_NUM_TOTAL_DOMAINS_V)) {
+    if (!gpr_domain_valid(dest_domain_id) || !gpr_domain_valid(src_domain_id)) {
         AR_MSG(DBG_ERROR_PRIO, "invalid domain(src domain id %d, dst domain id %d)",
                 src_domain_id, dest_domain_id);
         return AR_EBADPARAM;
@@ -499,6 +501,11 @@ static uint32_t gpr_dl_zephyr_send(uint32_t domain_id, void *buf, uint32_t size)
     unsigned char tx_buff[RPMSG_TX_BUFFER_SIZE];
     gpr_dl_zephyr_port_t *dl_zephyr_port;
 
+    if (!gpr_domain_valid(domain_id)) {
+        AR_MSG(DBG_ERROR_PRIO, "invalid domain_id %u", domain_id);
+        return AR_EBADPARAM;
+    }
+
     if ((dl_zephyr_port = gpr_dl_zephyr_ports[domain_id]) == NULL) {
         AR_MSG(DBG_ERROR_PRIO, "port domain %d not initialized",
               domain_id);
@@ -532,6 +539,11 @@ static uint32_t gpr_dl_zephyr_receive_done(uint32_t domain_id, void *buf)
 {
     uint32_t status = AR_EOK;
     gpr_dl_zephyr_port_t *dl_zephyr_port;
+
+    if (!gpr_domain_valid(domain_id)) {
+        AR_MSG(DBG_ERROR_PRIO, "invalid domain_id %u", domain_id);
+        return AR_EBADPARAM;
+    }
 
     if ((dl_zephyr_port = gpr_dl_zephyr_ports[domain_id]) == NULL) {
         AR_MSG(DBG_ERROR_PRIO, "port domain %d not initialized",
