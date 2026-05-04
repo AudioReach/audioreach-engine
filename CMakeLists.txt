@@ -41,7 +41,7 @@ if(ARSDK_BUILD_ENABLED)
     add_definitions(-DARSDK_BUILD_ENABLED)
 endif()
 
-if ((NOT ARCH MATCHES "^(hexagon)") AND (NOT ARCH MATCHES "^(linux)"))
+if ((NOT ARCH MATCHES "^(hexagon)") AND (NOT ARCH MATCHES "^(linux)") AND (NOT ARCH MATCHES "^(zephyr)"))
    message(FATAL_ERROR
       "Please specify supported Architecture.\n")
 endif()
