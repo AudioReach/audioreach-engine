@@ -27,7 +27,6 @@ set(SPF_TIME_STAMP "")
 string(TIMESTAMP SPF_TIME_STAMP "[%Y-%m-%d %H:%M:%S]" UTC)
 
 option(ARSDK_BUILD_ENABLED  "AudioReach SDK build" ON)
-option(CONFIG_DYNAMIC_LOADING "option to include the required source files for dynamic loading support" ON)
 option(DISABLE_UNIT_TEST "preprocessor defintion to disable APM unit tests" ON)
 set(LIB_ROOT ../)
 #Set the global property to generate the list of SPF static libs
