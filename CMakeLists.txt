@@ -182,6 +182,7 @@ else()
    add_library(spf SHARED "" )
 endif()
 
+if(NOT TARGET menuconfig)
 add_custom_target(
    menuconfig
    COMMAND ${CMAKE_COMMAND} -E env
@@ -199,6 +200,7 @@ add_custom_target(
    VERBATIM
    USES_TERMINAL
 )
+endif()
 
 if (ARCH MATCHES "^(zephyr)")
    link_libraries(zephyr_interface)
