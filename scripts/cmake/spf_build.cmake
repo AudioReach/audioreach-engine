@@ -28,7 +28,7 @@ function(spf_build_static_library)
     set(static_lib_name ${ARGV0})
 
     #create the static library with lib name passed in the first argument
-    if(CONFIG_ARCH_LINUX)
+    if(CONFIG_ARCH_LINUX OR CONFIG_ARCH_ZEPHYR)
         add_library(${static_lib_name} OBJECT "")
         set_property(TARGET ${static_lib_name} PROPERTY POSITION_INDEPENDENT_CODE ON)
     else()

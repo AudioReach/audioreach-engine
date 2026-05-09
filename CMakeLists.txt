@@ -15,6 +15,10 @@ set(NAME "AR")
 set(AR_VERSION "AR-${AR_MAJOR_VERSION}.${AR_MINOR_VERSION}-${AR_PATCHLEVEL}")
 cmake_minimum_required(VERSION 3.24)  
 
+if (CONFIG_ARCH_ZEPHYR)
+include(scripts/cmake/zephyr-toolchain.cmake)
+endif()
+
 project(AR VERSION 1.0)
 set(H2XML "${PROJECT_SOURCE_DIR}/scripts/h2xml/h2xml")
 set(H2XML_CONFIG "${PROJECT_SOURCE_DIR}/scripts/h2xml/h2xml_config_spf.xml")
@@ -36,7 +40,7 @@ if(ARSDK_BUILD_ENABLED)
     add_definitions(-DARSDK_BUILD_ENABLED)
 endif()
 
-if ((NOT ARCH MATCHES "^(hexagon)") AND (NOT ARCH MATCHES "^(linux)"))
+if ((NOT ARCH MATCHES "^(hexagon)") AND (NOT ARCH MATCHES "^(linux)") AND (NOT ARCH MATCHES "^(zephyr)"))
    message(FATAL_ERROR
       "Please specify supported Architecture.\n")
 endif()
@@ -181,6 +185,7 @@ else()
    add_library(spf SHARED "" )
 endif()
 
+if(NOT TARGET menuconfig)
 add_custom_target(
    menuconfig
    COMMAND ${CMAKE_COMMAND} -E env
@@ -198,6 +203,7 @@ add_custom_target(
    VERBATIM
    USES_TERMINAL
 )
+endif()
 
 if (ARCH MATCHES "^(zephyr)")
    link_libraries(zephyr_interface)
