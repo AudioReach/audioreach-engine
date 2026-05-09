@@ -68,8 +68,14 @@ if (NOT CONFIG)
    set (CONFIG "defconfig")
 endif()
 
-message(STATUS "using ${PROJECT_SOURCE_DIR}/arch/${ARCH}/configs/${CONFIG} config")
-configure_file("${PROJECT_SOURCE_DIR}/arch/${ARCH}/configs/${CONFIG}" ${SPF_DOT_CONFIG_PATH} COPYONLY)
+if (ARCH MATCHES "^(zephyr)")
+   set(SPF_CONFIG_PATH "${PROJECT_SOURCE_DIR}/app/${CONFIG}")
+else()
+   set(SPF_CONFIG_PATH "${PROJECT_SOURCE_DIR}/arch/${ARCH}/configs/${CONFIG}")
+endif()
+
+message(STATUS "using ${SPF_CONFIG_PATH} config")
+configure_file("${SPF_CONFIG_PATH}" ${SPF_DOT_CONFIG_PATH} COPYONLY)
 
 include(scripts/cmake/spf.cmake)
 include(scripts/cmake/spf_build.cmake)
