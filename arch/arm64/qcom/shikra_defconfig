@@ -36,6 +36,7 @@ CONFIG_PLACEHOLDER_ENC_DEC=y
 # Signal Processing Framework
 #
 # CONFIG_SPF_DEBUG is not set
+CONFIG_DYNAMIC_LOADING=y
 
 #
 # Signal Processing Framework Modules

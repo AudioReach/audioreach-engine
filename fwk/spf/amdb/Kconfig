@@ -1,0 +1,12 @@
+menu "Audio Module Database (AMDB)"
+
+config DYNAMIC_LOADING
+        bool "Dynamic loading support"
+        default n
+        help
+          Enable dynamic loading of audio modules at runtime via dlopen.
+ 
+          When disabled, modules are compiled and linked statically
+          regardless of their individual dynamic loading configuration.
+
+endmenu
