@@ -10,11 +10,14 @@
 #ifndef _MATHLIB_H
 #define _MATHLIB_H
 
+#if 0
 #ifdef __XTENSA__
 #include "../audioss/audio_basic_op.h"
 #else
 #include "audio_basic_op.h"
 #endif
+#endif
+#include "audio_basic_op.h"
 
 #ifdef __cplusplus
 extern "C" {
