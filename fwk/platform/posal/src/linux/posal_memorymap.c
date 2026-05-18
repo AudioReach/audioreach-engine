@@ -629,6 +629,11 @@ ar_result_t posal_memorymap_shm_mem_map_v2(posal_mem_map_v2_input_args_t *in_arg
       //For now - extern the va addr in the osal and get it working for QNX.
       //TODO: To find the proper solution without externing the mdf_mem_base_va_addr
       cont_phys_regions_ptr[idx].virt_addr_ptr = mdf_mem_base_va_addr;
+#elif defined(POSAL_MMAP_NO_MMU)
+      /* PA == VA; cast physical address directly as virtual pointer. */
+      uint64_t phy_addr_64bits = ((uint64_t)cont_phys_regions_ptr[idx].shm_addr.mem_addr_32b.msw << 32)
+                                 | (cont_phys_regions_ptr[idx].shm_addr.mem_addr_32b.lsw);
+      cont_phys_regions_ptr[idx].virt_addr_ptr = (void *)(uintptr_t)phy_addr_64bits;
 #else
       cont_phys_regions_ptr[idx].virt_addr_ptr  = mmap (NULL, cont_phys_regions_ptr[idx].mem_size,
                         PROT_READ | PROT_WRITE, MAP_SHARED,
@@ -975,10 +980,12 @@ ar_result_t posal_memorymap_unmap_all(uint32_t client_token)
 #else
 #ifdef POSAL_MMAP_EXTN
 #else
+#ifndef POSAL_MMAP_NO_MMU
       for (int i = 0; i < current_mem_map_node_ptr->unNumContPhysReg; ++i)
       {
          munmap(cont_phys_regions_ptr[i].virt_addr_ptr, cont_phys_regions_ptr[i].mem_size);
       }
+#endif /* POSAL_MMAP_NO_MMU */
 #endif /* POSAL_MMAP_EXTN */
 #endif /* POSAL_MMAP_VFIO */
 
@@ -1446,10 +1453,12 @@ static ar_result_t memorymap_util_cmd_handler(uint32_t client_token,
 #else
 #ifdef POSAL_MMAP_EXTN
 #else
+#ifndef POSAL_MMAP_NO_MMU
          for (int i = 0; i < found_mem_map_node_ptr->unNumContPhysReg; ++i)
          {
             munmap(cont_phys_regions_ptr[i].virt_addr_ptr, cont_phys_regions_ptr[i].mem_size);
          }
+#endif /* POSAL_MMAP_NO_MMU */
 #endif /* POSAL_MMAP_EXTN */
 #endif /* POSAL_MMAP_VFIO */
       }
