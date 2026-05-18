@@ -384,10 +384,10 @@ int32_t posal_timer_periodic_start(posal_timer_t p_obj, int64_t duration)
    struct itimerspec its = {0};
 
    //Set the timer delay and interval
-   its.it_interval.tv_sec = 0;
-   its.it_interval.tv_nsec = duration * 1000; //Convert duration to nanoseconds
-   its.it_value.tv_sec = 0;
-   its.it_value.tv_nsec = duration * 1000; //Indicates when the timer will fire next
+   its.it_interval.tv_sec  = duration / 1000000;
+   its.it_interval.tv_nsec = (duration % 1000000) * 1000;
+   its.it_value.tv_sec     = its.it_interval.tv_sec;
+   its.it_value.tv_nsec    = its.it_interval.tv_nsec;
 
    //Start the timer
    nStatus = timer_settime(*timer, 0, &its, NULL);
