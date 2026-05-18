@@ -22,6 +22,12 @@ INCLUDE FILES FOR MODULE
 /*--------------------------------------------------------------*/
 /* Macro / Global definitions                                            */
 /* -------------------------------------------------------------*/
+#ifdef __ZEPHYR__
+#define POSAL_CLOCK_ID CLOCK_MONOTONIC
+#else
+#define POSAL_CLOCK_ID CLOCK_BOOTTIME
+#endif
+
 #define ATS_TIMER_MAX_DURATION 0
 #define TIMER_SIGNAL_MARGIN 300
 #define TIMER_SLEEP_MARGIN 200
@@ -203,7 +209,7 @@ int32_t posal_timer_create_v2(posal_timer_t *                        pp_timer,
    timer_event.sigev_notify_function = &posal_timer_expire_cb;
    timer_event.sigev_value.sival_ptr = p_timer; //Save the timer info for callback function
 
-   nStatus = timer_create(CLOCK_REALTIME, &timer_event, timerId);
+   nStatus = timer_create(POSAL_CLOCK_ID, &timer_event, timerId);
    if (nStatus != 0)
    {
       AR_MSG(DBG_ERROR_PRIO, "Failed to create timer");
