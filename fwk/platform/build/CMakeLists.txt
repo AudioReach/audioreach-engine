@@ -16,11 +16,6 @@ cmake_minimum_required(VERSION 3.10)
 include_directories()
 
 #Add the sub directories
-if (NOT DEFINED CONFIG_DISABLE_PLATFORM)
-add_subdirectory(../core_drv/build core_drv)
-add_subdirectory(../init/build init)
-endif()
-
 add_subdirectory(../modules/build modules)
 
 if (DEFINED CONFIG_COMPILE_POSAL)
