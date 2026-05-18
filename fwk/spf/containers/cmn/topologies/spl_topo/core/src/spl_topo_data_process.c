@@ -1030,6 +1030,20 @@ static uint32_t spl_topo_check_reduce_sdata_input_length(spl_topo_t *topo_ptr, s
          }
 #else
          in_port_ptr->t_base.common.sdata.buf_ptr[0].actual_data_len = new_in_len;
+
+         /* For unpacked V1 format, spl_topo_setup_proc_ctx_in_port() explicitly propagates ch0
+          * actual_data_len to ch1+ (to satisfy the V1 contract that all channel lengths
+          * must be equal before calling process()). If we reduce only ch0 here, ch1+
+          * retains the pre-reduction value, causing inconsistent channel lengths when
+          * capi_process() is called. capi modules which support unpacked V2,
+          * operates only on ch0 actual_data_len, so ch1+ need not be updated */
+         if (GEN_TOPO_MF_PCM_UNPACKED_V1 == in_port_ptr->t_base.common.flags.is_pcm_unpacked)
+         {
+            for (uint32_t ch_idx = 1; ch_idx < in_port_ptr->t_base.common.sdata.bufs_num; ch_idx++)
+            {
+               in_port_ptr->t_base.common.sdata.buf_ptr[ch_idx].actual_data_len = new_in_len;
+            }
+         }
 #endif
       }
 
