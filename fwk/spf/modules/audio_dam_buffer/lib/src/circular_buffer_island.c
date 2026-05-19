@@ -151,10 +151,12 @@ circbuf_result_t add_circ_buf_write_util(circ_buf_client_t *wr_client_ptr,
    }
 
    // Update the timestamp of the latest sample in the buffer.
+   // Guard: only store a valid timestamp; zero out the cached value when the
+   // incoming timestamp is not valid so that downstream readers never see garbage.
    if (bytes_to_write > 0)
    {
-      circ_buf_ptr->timestamp          = timestamp;
       circ_buf_ptr->is_valid_timestamp = is_valid_timestamp;
+      circ_buf_ptr->timestamp          = is_valid_timestamp ? timestamp : 0;
    }
 
    // Iterate through all the reader clients and update unread byte count.
