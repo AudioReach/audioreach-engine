@@ -101,12 +101,12 @@ ar_result_t spf_framework_pre_init(void)
 ar_result_t spf_framework_post_init(void){
    ar_result_t result = AR_EOK;
 
-   /* create APM service : must be the last one because spf up state is sent by APM upon query from the client. */
-   result = apm_create();
-
 #ifdef USES_SPF_THREAD_POOL
    result = spf_thread_pool_init();
 #endif
+
+   /* create APM service : must be the last one because spf up state is sent by APM upon query from the client. */
+   result = apm_create();
 
    spf_watchdog_svc_init();
 
@@ -143,12 +143,12 @@ ar_result_t spf_framework_pre_deinit(void)
 
    spf_watchdog_svc_deinit();
 
+   /* First destroy the apm service*/
+   apm_destroy();
+
 #ifdef USES_SPF_THREAD_POOL
    spf_thread_pool_deinit();
 #endif
-
-   /* First destroy the apm service*/
-   apm_destroy();
 
 #endif //#ifndef DISABLE_DEINIT
 

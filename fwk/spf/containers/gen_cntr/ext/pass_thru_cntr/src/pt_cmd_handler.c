@@ -67,6 +67,12 @@ const cu_cntr_vtable_t pt_cntr_cntr_funcs = {
 
    .initiate_duty_cycle_island_entry         = gen_cntr_initiate_duty_cycle_island_entry,
    .initiate_duty_cycle_island_exit          = gen_cntr_initiate_duty_cycle_island_exit,
+
+   // ptc is signal triggered so input/output buffers are are setup in the interrupt trigger context.
+   .ipc_port_ext_in_data_trigger_handler          = NULL,
+   .ipc_port_ext_out_data_trigger_handler         = NULL,
+
+   .get_and_update_fwk_extn_ipc_port_msg_cb_info = gen_cntr_get_and_update_fwk_extn_ipc_port_msg_cb_info,
 };
 
 const topo_to_cntr_vtable_t topo_to_pt_cntr_vtable = {
@@ -104,6 +110,7 @@ const topo_to_cntr_vtable_t topo_to_pt_cntr_vtable = {
    .module_buffer_access_event                  = pt_cntr_handle_module_buffer_access_event,
 
    .check_if_any_ext_in_has_to_preserve_prebuffer = NULL,
+   .handle_ipc_data_link_info_event = gen_cntr_handle_ipc_data_link_info_event,
 };
 // clang-format on
 

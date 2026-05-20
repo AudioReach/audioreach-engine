@@ -529,6 +529,7 @@ static ar_result_t gen_cntr_populate_metadata_from_wr_client_buffer(gen_cntr_t *
          if (MODULE_CMN_MD_ID_EOS != md_data_header_ptr->metadata_id)
          {
             tracking_info.tracking_payload.flags.requires_custom_event = MODULE_CMN_MD_TRACKING_USE_GENERIC_EVENT;
+
             // create metadata with tracking would create the node and add it to the list
             result = handler.metadata_create_with_tracking(handler.context_ptr,
                                                            &ext_in_port_ptr->buf.md_buf_ptr->md_list_ptr,
@@ -551,6 +552,7 @@ static ar_result_t gen_cntr_populate_metadata_from_wr_client_buffer(gen_cntr_t *
             {
                tracking_info.tracking_payload.flags.requires_custom_event = MODULE_CMN_MD_TRACKING_USE_CUSTOM_EVENT;
             }
+
 
             result = gen_topo_create_eos_for_cntr(&me_ptr->topo,
                                                   (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr,
@@ -624,7 +626,6 @@ static ar_result_t gen_cntr_populate_metadata_from_wr_client_buffer(gen_cntr_t *
 
          if (MODULE_CMN_MD_ID_EOS != md_data_header_ptr->metadata_id)
          {
-            // copy the metadata payload
             // copy the metadata payload
             new_md_ptr->actual_size = memscpy(new_md_ptr->metadata_buf,
                                               new_md_ptr->max_size,
@@ -985,13 +986,14 @@ static ar_result_t gen_cntr_input_data_buffer_set_up_gpr_client_v2(gen_cntr_t * 
    return result;
 }
 
-ar_result_t gen_cntr_input_dataQ_trigger_gpr_client(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr)
+ar_result_t gen_cntr_input_dataQ_trigger_gpr_client(cu_base_t *base_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr)
 {
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
    uint32_t      gpr_opcode = 0;
    gpr_packet_t *packet_ptr;
-
+   gen_cntr_t * me_ptr = (gen_cntr_t*)base_ptr;
+   gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t*)gu_ext_in_port_ptr;
    // Take next msg off the q
    TRY(result, gen_cntr_get_input_data_cmd(me_ptr, ext_in_port_ptr));
 

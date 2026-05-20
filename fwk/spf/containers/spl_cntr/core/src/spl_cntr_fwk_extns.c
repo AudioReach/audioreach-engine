@@ -43,6 +43,7 @@ ar_result_t spl_cntr_handle_fwk_extn_at_init(gen_topo_t *topo_ptr, gen_topo_modu
          SPF_CRITICAL_SECTION_END(&topo_ptr->gu);
       }
       SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id, DBG_HIGH_PRIO, "FWK_EXTN_CNTR_FRAME_DURATION init handling done");
+
    }
    if (module_ptr->t_base.flags.need_proc_dur_extn)
    {

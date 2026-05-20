@@ -318,7 +318,8 @@ static inline ar_result_t gen_topo_return_one_buf_mgr_buf(gen_topo_t *          
       gen_topo_buf_mgr_wrapper_dec_ref_count_return(topo_ptr, module_inst_id, port_id, cmn_port_ptr);
    }
 
-   if (GEN_TOPO_BUF_ORIGIN_EXT_BUF != cmn_port_ptr->flags.buf_origin)
+   // do not reset buffer for the ext buffer or the buffer provided by the module.
+   if (!((GEN_TOPO_BUF_ORIGIN_EXT_BUF | GEN_TOPO_BUF_ORIGIN_CAPI_MODULE) & cmn_port_ptr->flags.buf_origin))
    {
 // for ext-out buffers assigned to non-ext-ports (borrowed), mark as returned (they will be assigned back with
 // gen_topo_check_get_out_buf_from_buf_mgr)

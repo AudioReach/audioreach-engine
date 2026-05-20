@@ -296,6 +296,8 @@ ar_result_t gen_cntr_notify_timestamp_discontinuity_event_cb(gen_topo_t *topo_pt
                                                              bool_t      ts_valid,
                                                              int64_t     timestamp_disc_us,
                                                              uint32_t    path_index);
+
+ar_result_t gen_cntr_handle_events_after_cmds(gen_cntr_t *me_ptr, bool_t is_ack_cmd, ar_result_t rsp_result);
 #ifdef __cplusplus
 }
 #endif //__cplusplus
