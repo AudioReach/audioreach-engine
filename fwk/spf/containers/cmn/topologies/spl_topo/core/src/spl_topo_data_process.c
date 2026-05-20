@@ -248,7 +248,6 @@ spl_topo_process_status_t spl_topo_module_processing_decision(spl_topo_t *topo_p
       }
    }
 
-   // If module is not at the nblc boundary and if there is not trigger policy in topo then run a simple check.
    if (!module_ptr->t_base.flags.is_nblc_boundary_module && (0 == topo_ptr->t_base.num_data_tpm))
    {
       if (module_ptr->t_base.gu.input_port_list_ptr)
@@ -315,6 +314,19 @@ spl_topo_process_status_t spl_topo_module_processing_decision(spl_topo_t *topo_p
 #endif
             return SPL_TOPO_PROCESS_SKIP;
          }
+      }
+   } // If module is not at the nblc boundary and if there is not trigger policy in topo then run a simple check.
+   else if (module_ptr->t_base.flags.need_ipc_port_extn)
+   {
+      if (!spl_topo_is_ipc_module_trigger_satisfied(&topo_ptr->t_base, &module_ptr->t_base))
+      {
+#if SPL_TOPO_DEBUG_LEVEL >= SPL_TOPO_DEBUG_LEVEL_3
+         TOPO_MSG(topo_ptr->t_base.gu.log_id,
+                  DBG_MED_PRIO,
+                  "spl_topo mpd skipping IPC module: miid 0x%lx, trigger not satisifed.",
+                  module_ptr->t_base.gu.module_instance_id);
+#endif
+         return SPL_TOPO_PROCESS_SKIP;
       }
    }
    else if (!gen_topo_is_module_data_trigger_condition_satisfied(&(module_ptr->t_base),
@@ -457,9 +469,9 @@ static ar_result_t spl_topo_process_attached_modules(spl_topo_t *topo_ptr, spl_t
 
         TOPO_MSG(topo_ptr->t_base.gu.log_id,DBG_LOW_PRIO,"M_iid 0x%lX output ts_valid - %d , TS[MSW, LSW] - [%d, %d]",
                 out_attached_module_ptr->t_base.gu.module_instance_id,
-                topo_ptr->t_base.proc_context.out_port_sdata_pptr[out_port_idx].flags.is_timestamp_valid,
-                (uint32_t )(topo_ptr->t_base.proc_context.out_port_sdata_pptr[out_port_idx].timestamp >>32),
-                (uint32_t )topo_ptr->t_base.proc_context.out_port_sdata_pptr[out_port_idx].timestamp);
+                topo_ptr->t_base.proc_context.out_port_sdata_pptr[out_port_idx]->flags.is_timestamp_valid,
+                (uint32_t )(topo_ptr->t_base.proc_context.out_port_sdata_pptr[out_port_idx]->timestamp >>32),
+                (uint32_t )topo_ptr->t_base.proc_context.out_port_sdata_pptr[out_port_idx]->timestamp);
 #endif
 
 #if SPL_TOPO_DEBUG_LEVEL >= SPL_TOPO_DEBUG_LEVEL_2

@@ -115,7 +115,7 @@ static ar_result_t cu_update_sg_port_states(cu_base_t *me_ptr, gu_sg_t *sg_ptr, 
 
          if (out_port_ptr->ext_out_port_ptr)
          {
-            uint8_t *          gu_ext_out_port_ptr = (uint8_t *)out_port_ptr->ext_out_port_ptr;
+            uint8_t           *gu_ext_out_port_ptr = (uint8_t *)out_port_ptr->ext_out_port_ptr;
             cu_ext_out_port_t *ext_out_port_ptr =
                (cu_ext_out_port_t *)(gu_ext_out_port_ptr + me_ptr->ext_out_port_cu_offset);
 
@@ -168,6 +168,12 @@ static ar_result_t cu_update_sg_port_states(cu_base_t *me_ptr, gu_sg_t *sg_ptr, 
          }
       }
 
+      // update IPC port states
+      if (module_ptr->ipc_output_port_list_ptr)
+      {
+         result |= cu_ipc_output_ports_update_sg_state(me_ptr, module_ptr, self_port_state);
+      }
+
       /**
        * For input ports we just set self state. there's no downgrade wrt ext-in or US SG.
        * However, state prop can still happen from DS to US (later in the flow in cu_apply_downgraded_port_states)
@@ -181,7 +187,7 @@ static ar_result_t cu_update_sg_port_states(cu_base_t *me_ptr, gu_sg_t *sg_ptr, 
           *  state must also be set internally based on SG state*/
          if (MODULE_ID_WR_SHARED_MEM_EP == module_ptr->module_id && in_port_ptr->ext_in_port_ptr)
          {
-            uint8_t *         gu_ext_in_port_ptr = (uint8_t *)in_port_ptr->ext_in_port_ptr;
+            uint8_t          *gu_ext_in_port_ptr = (uint8_t *)in_port_ptr->ext_in_port_ptr;
             cu_ext_in_port_t *ext_in_port_ptr =
                (cu_ext_in_port_t *)(gu_ext_in_port_ptr + me_ptr->ext_in_port_cu_offset);
 
@@ -193,6 +199,11 @@ static ar_result_t cu_update_sg_port_states(cu_base_t *me_ptr, gu_sg_t *sg_ptr, 
                                                   PORT_PROPERTY_TOPO_STATE,
                                                   in_port_ptr,
                                                   self_port_state);
+      }
+
+      if (module_ptr->ipc_input_port_list_ptr)
+      {
+         result |= cu_ipc_input_ports_update_sg_state(me_ptr, module_ptr, self_port_state);
       }
 
       if (is_skip_ctrl_ports)
@@ -894,6 +905,72 @@ bool_t cu_is_disconnect_ext_ctrl_port_needed(cu_base_t *base_ptr, gu_ext_ctrl_po
    return FALSE;
 }
 
+static ar_result_t cu_init_external_output_port(cu_base_t *base_ptr, gu_ext_out_port_t *ext_out_port_ptr)
+{
+   ar_result_t result = AR_EOK;
+   SPF_MANAGE_CRITICAL_SECTION
+
+   cu_ext_out_port_t *cu_ext_out_port_ptr =
+      (cu_ext_out_port_t *)((uint8_t *)ext_out_port_ptr + base_ptr->ext_out_port_cu_offset);
+
+   if (GU_STATUS_NEW == ext_out_port_ptr->gu_status)
+   {
+      switch (ext_out_port_ptr->int_out_port_ptr->cmn.module_ptr->module_id)
+      {
+         case MODULE_ID_RD_SHARED_MEM_EP:
+         {
+            cu_offload_ds_propagation_init(base_ptr, cu_ext_out_port_ptr);
+            break;
+         }
+         default: // for all other modules, it's considered peer cntr
+         {
+            cu_peer_cntr_ds_propagation_init(base_ptr, cu_ext_out_port_ptr);
+            break;
+         }
+      }
+
+      SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
+      result |= base_ptr->cntr_vtbl_ptr->init_ext_out_port(base_ptr, ext_out_port_ptr);
+      SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
+
+      // NEW handling is done, so reset the status.
+      ext_out_port_ptr->gu_status = GU_STATUS_DEFAULT;
+   }
+   return result;
+}
+
+static ar_result_t cu_init_external_input_port(cu_base_t *base_ptr, gu_ext_in_port_t *ext_in_port_ptr)
+{
+   SPF_MANAGE_CRITICAL_SECTION
+   ar_result_t       result = AR_EOK;
+   cu_ext_in_port_t *cu_ext_in_port_ptr =
+      (cu_ext_in_port_t *)((uint8_t *)ext_in_port_ptr + base_ptr->ext_in_port_cu_offset);
+
+   if (GU_STATUS_NEW == ext_in_port_ptr->gu_status)
+   {
+      switch (ext_in_port_ptr->int_in_port_ptr->cmn.module_ptr->module_id)
+      {
+         case MODULE_ID_WR_SHARED_MEM_EP:
+         {
+            cu_offload_us_propagation_init(base_ptr, cu_ext_in_port_ptr);
+            break;
+         }
+         default: // for all other modules, it's considered peer cntr
+         {
+            cu_peer_cntr_us_propagation_init(base_ptr, cu_ext_in_port_ptr);
+            break;
+         }
+      }
+
+      SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
+      result |= base_ptr->cntr_vtbl_ptr->init_ext_in_port(base_ptr, ext_in_port_ptr);
+      SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
+
+      // NEW handling is done, so reset the status.
+      ext_in_port_ptr->gu_status = GU_STATUS_DEFAULT;
+   }
+   return result;
+}
 /**
  * Checks all external data & control port new statuses and handle any non-default status.
  * For now, external port statuses only ever get changed to new. In this case, we need to
@@ -908,7 +985,10 @@ bool_t cu_is_disconnect_ext_ctrl_port_needed(cu_base_t *base_ptr, gu_ext_ctrl_po
  * other gu struct handling is taken care of by the topo layer.
  *
  */
-ar_result_t cu_init_external_ports(cu_base_t *base_ptr, uint32_t ctrl_ptr_queue_offset)
+ar_result_t cu_init_external_ports(cu_base_t *base_ptr,
+                                   uint32_t   ext_in_queue_offset,
+                                   uint32_t   ext_out_queue_offset,
+                                   uint32_t   ctrl_ptr_queue_offset)
 {
    INIT_EXCEPTION_HANDLING
    SPF_MANAGE_CRITICAL_SECTION
@@ -918,70 +998,42 @@ ar_result_t cu_init_external_ports(cu_base_t *base_ptr, uint32_t ctrl_ptr_queue_
           base_ptr->cntr_vtbl_ptr && base_ptr->cntr_vtbl_ptr->init_ext_in_port &&
              base_ptr->cntr_vtbl_ptr->init_ext_out_port && base_ptr->cntr_vtbl_ptr->init_ext_ctrl_port);
 
+   uint32_t self_proc_domain_id = 0;
+   __gpr_cmd_get_host_domain_id(&self_proc_domain_id);
+
    gu_t *gu_ptr = get_gu_ptr_for_current_command_context(base_ptr->gu_ptr);
 
-   for (gu_ext_out_port_list_t *ext_out_port_list_ptr = gu_ptr->ext_out_port_list_ptr; (NULL != ext_out_port_list_ptr);
+   for (gu_ext_out_port_list_t *ext_out_port_list_ptr = gu_ptr->ext_out_port_list_ptr; ext_out_port_list_ptr;
         LIST_ADVANCE(ext_out_port_list_ptr))
    {
       gu_ext_out_port_t *ext_out_port_ptr = ext_out_port_list_ptr->ext_out_port_ptr;
-      cu_ext_out_port_t *cu_ext_out_port_ptr =
-         (cu_ext_out_port_t *)((uint8_t *)ext_out_port_ptr + base_ptr->ext_out_port_cu_offset);
-
-      if (GU_STATUS_NEW == ext_out_port_ptr->gu_status)
-      {
-         switch (ext_out_port_ptr->int_out_port_ptr->cmn.module_ptr->module_id)
-         {
-            case MODULE_ID_RD_SHARED_MEM_EP:
-            {
-               cu_offload_ds_propagation_init(base_ptr, cu_ext_out_port_ptr);
-               break;
-            }
-            default: // for all other modules, it's considered peer cntr
-            {
-               cu_peer_cntr_ds_propagation_init(base_ptr, cu_ext_out_port_ptr);
-               break;
-            }
-         }
-
-         SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
-         result |= base_ptr->cntr_vtbl_ptr->init_ext_out_port(base_ptr, ext_out_port_ptr);
-         SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
-
-         // NEW handling is done, so reset the status.
-         ext_out_port_ptr->gu_status = GU_STATUS_DEFAULT;
-      }
+      result |= cu_init_external_output_port(base_ptr, ext_out_port_ptr);
    }
 
-   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = gu_ptr->ext_in_port_list_ptr; (NULL != ext_in_port_list_ptr);
+   for (gu_ext_out_port_list_t *ipc_ext_out_port_list_ptr = gu_ptr->ipc_ext_out_port_list_ptr;
+        ipc_ext_out_port_list_ptr;
+        LIST_ADVANCE(ipc_ext_out_port_list_ptr))
+   {
+      gu_ext_out_port_t *ipc_ext_out_port_ptr = ipc_ext_out_port_list_ptr->ext_out_port_ptr;
+      SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
+      result |= cu_ipc_tx_init_ext_out_port(base_ptr, ipc_ext_out_port_ptr, ext_out_queue_offset);
+      SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
+   }
+
+   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = gu_ptr->ext_in_port_list_ptr; ext_in_port_list_ptr;
         LIST_ADVANCE(ext_in_port_list_ptr))
    {
       gu_ext_in_port_t *ext_in_port_ptr = ext_in_port_list_ptr->ext_in_port_ptr;
-      cu_ext_in_port_t *cu_ext_in_port_ptr =
-         (cu_ext_in_port_t *)((uint8_t *)ext_in_port_ptr + base_ptr->ext_out_port_cu_offset);
+      result |= cu_init_external_input_port(base_ptr, ext_in_port_ptr);
+   }
 
-      if (GU_STATUS_NEW == ext_in_port_ptr->gu_status)
-      {
-         switch (ext_in_port_ptr->int_in_port_ptr->cmn.module_ptr->module_id)
-         {
-            case MODULE_ID_WR_SHARED_MEM_EP:
-            {
-               cu_offload_us_propagation_init(base_ptr, cu_ext_in_port_ptr);
-               break;
-            }
-            default: // for all other modules, it's considered peer cntr
-            {
-               cu_peer_cntr_us_propagation_init(base_ptr, cu_ext_in_port_ptr);
-               break;
-            }
-         }
-
-         SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
-         result |= base_ptr->cntr_vtbl_ptr->init_ext_in_port(base_ptr, ext_in_port_ptr);
-         SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
-
-         // NEW handling is done, so reset the status.
-         ext_in_port_ptr->gu_status = GU_STATUS_DEFAULT;
-      }
+   for (gu_ext_in_port_list_t *ipc_ext_in_port_list_ptr = gu_ptr->ipc_ext_in_port_list_ptr; ipc_ext_in_port_list_ptr;
+        LIST_ADVANCE(ipc_ext_in_port_list_ptr))
+   {
+      gu_ext_in_port_t *ipc_ext_in_port_ptr = ipc_ext_in_port_list_ptr->ext_in_port_ptr;
+      SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
+      result |= cu_ipc_rx_init_ext_in_port(base_ptr, ipc_ext_in_port_ptr, ext_in_queue_offset);
+      SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
    }
 
    for (gu_ext_ctrl_port_list_t *ext_ctrl_port_list_ptr = gu_ptr->ext_ctrl_port_list_ptr;
@@ -1007,6 +1059,76 @@ ar_result_t cu_init_external_ports(cu_base_t *base_ptr, uint32_t ctrl_ptr_queue_
    return result;
 }
 
+static void cu_deinit_ext_output_port(cu_base_t         *base_ptr,
+                                      gu_ext_out_port_t *ext_out_port_ptr,
+                                      bool_t             b_ignore_ports_from_sg_close,
+                                      bool_t             force_deinit_all_ports)
+{
+   SPF_MANAGE_CRITICAL_SECTION
+   bool_t b_deinit = force_deinit_all_ports;
+
+   // port already deinited, skip
+   if (!ext_out_port_ptr->int_out_port_ptr)
+   {
+      return;
+   }
+
+   if (!b_deinit &&
+       (GU_STATUS_CLOSING == ext_out_port_ptr->gu_status || GU_STATUS_CLOSING == ext_out_port_ptr->sg_ptr->gu_status))
+   {
+      // If external port/SG is marked for the closing then deinit it.
+      b_deinit = TRUE;
+
+      // If subgraph is marked for the closing then deinit can be done later when subgraph is being destroyed.
+      if (b_ignore_ports_from_sg_close && GU_STATUS_CLOSING == ext_out_port_ptr->sg_ptr->gu_status)
+      {
+         b_deinit = FALSE;
+      }
+   }
+
+   if (b_deinit)
+   {
+      SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
+      base_ptr->cntr_vtbl_ptr->deinit_ext_out_port(base_ptr, ext_out_port_ptr);
+      SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
+   }
+}
+
+static void cu_deinit_ext_input_port(cu_base_t        *base_ptr,
+                                     gu_ext_in_port_t *ext_in_port_ptr,
+                                     bool_t            b_ignore_ports_from_sg_close,
+                                     bool_t            force_deinit_all_ports)
+{
+   SPF_MANAGE_CRITICAL_SECTION
+   bool_t b_deinit = force_deinit_all_ports;
+
+   // port already deinited, skip
+   if (!ext_in_port_ptr->int_in_port_ptr)
+   {
+      return;
+   }
+
+   if (!b_deinit &&
+       (GU_STATUS_CLOSING == ext_in_port_ptr->gu_status || GU_STATUS_CLOSING == ext_in_port_ptr->sg_ptr->gu_status))
+   {
+      // If external port or SG is marked for the closing then deinit it.
+      b_deinit = TRUE;
+
+      // If subgraph is marked for the closing then deinit can be done later when subgraph is being destroyed.
+      if (b_ignore_ports_from_sg_close && GU_STATUS_CLOSING == ext_in_port_ptr->sg_ptr->gu_status)
+      {
+         b_deinit = FALSE;
+      }
+   }
+
+   if (b_deinit)
+   {
+      SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
+      base_ptr->cntr_vtbl_ptr->deinit_ext_in_port(base_ptr, ext_in_port_ptr);
+      SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
+   }
+}
+
 /**
  * Deinit all external ports passed into the graph management command. This will get
  * called as part of close handling before calling gu_graph_destroy. gu_graph_destroy
@@ -1029,70 +1151,36 @@ void cu_deinit_external_ports(cu_base_t *base_ptr, bool_t b_ignore_ports_from_sg
 
    gu_t *gu_ptr = get_gu_ptr_for_current_command_context(base_ptr->gu_ptr);
 
-   for (gu_ext_out_port_list_t *ext_out_port_list_ptr = gu_ptr->ext_out_port_list_ptr; (NULL != ext_out_port_list_ptr);
+   for (gu_ext_out_port_list_t *ext_out_port_list_ptr = gu_ptr->ext_out_port_list_ptr; ext_out_port_list_ptr;
         LIST_ADVANCE(ext_out_port_list_ptr))
    {
       gu_ext_out_port_t *ext_out_port_ptr = ext_out_port_list_ptr->ext_out_port_ptr;
-      bool_t             b_deinit         = force_deinit_all_ports;
-
-      // port already deinited, skip
-      if (!ext_out_port_ptr->int_out_port_ptr)
-      {
-         continue;
-      }
-
-      if (!b_deinit && (GU_STATUS_CLOSING == ext_out_port_ptr->gu_status ||
-                        GU_STATUS_CLOSING == ext_out_port_ptr->sg_ptr->gu_status))
-      {
-         // If external port/SG is marked for the closing then deinit it.
-         b_deinit = TRUE;
-
-         // If subgraph is marked for the closing then deinit can be done later when subgraph is being destroyed.
-         if (b_ignore_ports_from_sg_close && GU_STATUS_CLOSING == ext_out_port_ptr->sg_ptr->gu_status)
-         {
-            b_deinit = FALSE;
-         }
-      }
-
-      if (b_deinit)
-      {
-         SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
-         base_ptr->cntr_vtbl_ptr->deinit_ext_out_port(base_ptr, ext_out_port_ptr);
-         SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
-      }
+      cu_deinit_ext_output_port(base_ptr, ext_out_port_ptr, b_ignore_ports_from_sg_close, force_deinit_all_ports);
    }
 
-   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = gu_ptr->ext_in_port_list_ptr; (NULL != ext_in_port_list_ptr);
+   for (gu_ext_out_port_list_t *ipc_ext_out_port_list_ptr = gu_ptr->ipc_ext_out_port_list_ptr;
+        ipc_ext_out_port_list_ptr;
+        LIST_ADVANCE(ipc_ext_out_port_list_ptr))
+   {
+      gu_ext_out_port_t *ipc_ext_out_port_ptr = ipc_ext_out_port_list_ptr->ext_out_port_ptr;
+      cu_deinit_ipc_tx_ext_out_port(base_ptr,
+                                    ipc_ext_out_port_ptr,
+                                    b_ignore_ports_from_sg_close,
+                                    force_deinit_all_ports);
+   }
+
+   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = gu_ptr->ext_in_port_list_ptr; ext_in_port_list_ptr;
         LIST_ADVANCE(ext_in_port_list_ptr))
    {
       gu_ext_in_port_t *ext_in_port_ptr = ext_in_port_list_ptr->ext_in_port_ptr;
-      bool_t            b_deinit        = force_deinit_all_ports;
+      cu_deinit_ext_input_port(base_ptr, ext_in_port_ptr, b_ignore_ports_from_sg_close, force_deinit_all_ports);
+   }
 
-      // port already deinited, skip
-      if (!ext_in_port_ptr->int_in_port_ptr)
-      {
-         continue;
-      }
-
-      if (!b_deinit &&
-          (GU_STATUS_CLOSING == ext_in_port_ptr->gu_status || GU_STATUS_CLOSING == ext_in_port_ptr->sg_ptr->gu_status))
-      {
-         // If external port or SG is marked for the closing then deinit it.
-         b_deinit = TRUE;
-
-         // If subgraph is marked for the closing then deinit can be done later when subgraph is being destroyed.
-         if (b_ignore_ports_from_sg_close && GU_STATUS_CLOSING == ext_in_port_ptr->sg_ptr->gu_status)
-         {
-            b_deinit = FALSE;
-         }
-      }
-
-      if (b_deinit)
-      {
-         SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
-         base_ptr->cntr_vtbl_ptr->deinit_ext_in_port(base_ptr, ext_in_port_ptr);
-         SPF_CRITICAL_SECTION_END(base_ptr->gu_ptr);
-      }
+   for (gu_ext_in_port_list_t *ipc_ext_in_port_list_ptr = gu_ptr->ipc_ext_in_port_list_ptr; ipc_ext_in_port_list_ptr;
+        LIST_ADVANCE(ipc_ext_in_port_list_ptr))
+   {
+      gu_ext_in_port_t *ipc_ext_in_port_ptr = ipc_ext_in_port_list_ptr->ext_in_port_ptr;
+      cu_deinit_ipc_rx_ext_in_port(base_ptr, ipc_ext_in_port_ptr, b_ignore_ports_from_sg_close, force_deinit_all_ports);
    }
 
    for (gu_ext_ctrl_port_list_t *ext_ctrl_port_list_ptr = gu_ptr->ext_ctrl_port_list_ptr;
@@ -1165,6 +1253,7 @@ static ar_result_t cu_apply_downgraded_port_states(cu_base_t *cu_ptr)
       {
          gu_module_t *module_ptr = module_list_ptr->module_ptr;
 
+         // IPC ports will not have any attached modules hence skipping here.
          for (gu_output_port_list_t *out_port_list_ptr = module_ptr->output_port_list_ptr; (NULL != out_port_list_ptr);
               LIST_ADVANCE(out_port_list_ptr))
          {
@@ -1195,6 +1284,8 @@ static ar_result_t cu_apply_downgraded_port_states(cu_base_t *cu_ptr)
                                       downgraded_out_port_state);
             }
          }
+
+         // note that IPC outputs will not have any logging module at it output port
       }
 
       for (gu_module_list_t *module_list_ptr = sg_list_ptr->sg_ptr->module_list_ptr; (NULL != module_list_ptr);
@@ -1202,48 +1293,74 @@ static ar_result_t cu_apply_downgraded_port_states(cu_base_t *cu_ptr)
       {
          gu_module_t *module_ptr = module_list_ptr->module_ptr;
 
-         /** Iterate through module's input ports and apply port states. */
-         for (gu_input_port_list_t *in_port_list_ptr = module_ptr->input_port_list_ptr; (NULL != in_port_list_ptr);
-              LIST_ADVANCE(in_port_list_ptr))
+         /** Iterate through module's regular input ports and ipc port ports, and apply port states. */
+         gu_input_port_list_t *in_port_lists[] = { module_ptr->input_port_list_ptr,
+                                                   module_ptr->ipc_input_port_list_ptr };
+
+         for (uint32_t i = 0; i < SIZE_OF_ARRAY(in_port_lists); i++)
          {
-            gu_input_port_t *in_port_ptr = in_port_list_ptr->ip_port_ptr;
-
-            topo_port_state_t downgraded_in_port_state;
-            cu_ptr->topo_vtbl_ptr->get_port_property(cu_ptr->topo_ptr,
-                                                     TOPO_DATA_INPUT_PORT_TYPE,
-                                                     PORT_PROPERTY_TOPO_STATE,
-                                                     (void *)in_port_ptr,
-                                                     (uint32_t *)&downgraded_in_port_state);
-
-            if (TOPO_PORT_STATE_INVALID != downgraded_in_port_state &&
-                (cu_ptr->cntr_vtbl_ptr->apply_downgraded_state_on_input_port))
+            for (gu_input_port_list_t *in_port_list_ptr = in_port_lists[i]; (NULL != in_port_list_ptr);
+                 LIST_ADVANCE(in_port_list_ptr))
             {
-               cu_ptr->cntr_vtbl_ptr->apply_downgraded_state_on_input_port(cu_ptr,
-                                                                           in_port_ptr,
-                                                                           downgraded_in_port_state);
+               gu_input_port_t *in_port_ptr = in_port_list_ptr->ip_port_ptr;
+
+               topo_port_state_t downgraded_in_port_state;
+               cu_ptr->topo_vtbl_ptr->get_port_property(cu_ptr->topo_ptr,
+                                                        TOPO_DATA_INPUT_PORT_TYPE,
+                                                        PORT_PROPERTY_TOPO_STATE,
+                                                        (void *)in_port_ptr,
+                                                        (uint32_t *)&downgraded_in_port_state);
+
+               CU_MSG(cu_ptr->gu_ptr->log_id,
+                      DBG_HIGH_PRIO,
+                      "downgraded state: (mod-inst-id, port-id): (0x%lx, 0x%lx) port_state: %lu ",
+                      in_port_ptr->cmn.module_ptr->module_instance_id,
+                      in_port_ptr->cmn.id,
+                      downgraded_in_port_state);
+
+               if (TOPO_PORT_STATE_INVALID != downgraded_in_port_state &&
+                   (cu_ptr->cntr_vtbl_ptr->apply_downgraded_state_on_input_port))
+               {
+                  cu_ptr->cntr_vtbl_ptr->apply_downgraded_state_on_input_port(cu_ptr,
+                                                                              in_port_ptr,
+                                                                              downgraded_in_port_state);
+               }
             }
          }
 
          /** Iterate through module's output ports and apply port states to modules */
-         for (gu_output_port_list_t *out_port_list_ptr = module_ptr->output_port_list_ptr; (NULL != out_port_list_ptr);
-              LIST_ADVANCE(out_port_list_ptr))
+         gu_output_port_list_t *out_port_lists[] = { module_ptr->output_port_list_ptr,
+                                                     module_ptr->ipc_output_port_list_ptr };
+
+         for (uint32_t i = 0; i < SIZE_OF_ARRAY(out_port_lists); i++)
          {
-            gu_output_port_t *out_port_ptr = out_port_list_ptr->op_port_ptr;
-
-            topo_port_state_t downgraded_out_port_state;
-
-            cu_ptr->topo_vtbl_ptr->get_port_property(cu_ptr->topo_ptr,
-                                                     TOPO_DATA_OUTPUT_PORT_TYPE,
-                                                     PORT_PROPERTY_TOPO_STATE,
-                                                     (void *)out_port_ptr,
-                                                     (uint32_t *)&downgraded_out_port_state);
-
-            if (TOPO_PORT_STATE_INVALID != downgraded_out_port_state &&
-                (cu_ptr->cntr_vtbl_ptr->apply_downgraded_state_on_output_port))
+            for (gu_output_port_list_t *out_port_list_ptr = out_port_lists[i]; (NULL != out_port_list_ptr);
+                 LIST_ADVANCE(out_port_list_ptr))
             {
-               cu_ptr->cntr_vtbl_ptr->apply_downgraded_state_on_output_port(cu_ptr,
-                                                                            out_port_ptr,
-                                                                            downgraded_out_port_state);
+               gu_output_port_t *out_port_ptr = out_port_list_ptr->op_port_ptr;
+
+               topo_port_state_t downgraded_out_port_state;
+
+               cu_ptr->topo_vtbl_ptr->get_port_property(cu_ptr->topo_ptr,
+                                                        TOPO_DATA_OUTPUT_PORT_TYPE,
+                                                        PORT_PROPERTY_TOPO_STATE,
+                                                        (void *)out_port_ptr,
+                                                        (uint32_t *)&downgraded_out_port_state);
+
+               CU_MSG(cu_ptr->gu_ptr->log_id,
+                      DBG_HIGH_PRIO,
+                      "downgraded state: (mod-inst-id, port-id): (0x%lx, 0x%lx) port_state: %lu ",
+                      out_port_ptr->cmn.module_ptr->module_instance_id,
+                      out_port_ptr->cmn.id,
+                      downgraded_out_port_state);
+
+               if (TOPO_PORT_STATE_INVALID != downgraded_out_port_state &&
+                   (cu_ptr->cntr_vtbl_ptr->apply_downgraded_state_on_output_port))
+               {
+                  cu_ptr->cntr_vtbl_ptr->apply_downgraded_state_on_output_port(cu_ptr,
+                                                                               out_port_ptr,
+                                                                               downgraded_out_port_state);
+               }
             }
          }
       }
@@ -1279,3 +1396,21 @@ topo_port_state_t cu_evaluate_n_update_ext_out_ds_downgraded_port_state(cu_base_
    return connected_port_state;
 }
 
+ar_result_t cu_deinit_ext_port_queue(cu_base_t *base_ptr, spf_handle_t *hdl_ptr, uint32_t bit_mask)
+{
+   if (hdl_ptr->q_ptr)
+   {
+      /*Release mask only in Buffer driven mode*/
+      cu_release_bit_in_bit_mask(base_ptr, bit_mask);
+
+      // We can clear without checking input or output or control because only one bit is set in bit_mask.
+      cu_clear_bits_in_x(&base_ptr->all_ext_in_mask, bit_mask);
+      cu_clear_bits_in_x(&base_ptr->all_ext_out_mask, bit_mask);
+
+      /*deinit the queue */
+      posal_queue_deinit(hdl_ptr->q_ptr);
+      hdl_ptr->q_ptr = NULL;
+   }
+
+   return AR_EOK;
+}

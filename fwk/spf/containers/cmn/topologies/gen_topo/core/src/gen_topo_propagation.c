@@ -12,6 +12,7 @@
 
 #include "gen_topo.h"
 #include "gen_topo_capi.h"
+#include "ipc_tx_rx_api.h"
 
 #define PROPAGATION_RECURSE_MAX_DEPTH 50
 
@@ -755,7 +756,7 @@ static bool_t gen_topo_check_and_propagate_across_module(gen_topo_module_t *    
             return FALSE;
          }
 
-         if (module_ptr->gu.num_output_ports == 0)
+         if ((module_ptr->gu.num_output_ports == 0) && (module_ptr->gu.num_ipc_output_ports == 0))
          {
             // Cannot propagate further across sink modules.
             return FALSE;
@@ -772,15 +773,21 @@ static bool_t gen_topo_check_and_propagate_across_module(gen_topo_module_t *    
 
             // Iterate through all inputs and check if atleast one input has upstream realtime.
             bool_t atleast_one_inputs_upstream_is_rt = FALSE;
-            for (gu_input_port_list_t *list_ptr = module_ptr->gu.input_port_list_ptr; list_ptr != NULL;
-                 LIST_ADVANCE(list_ptr))
-            {
-               gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)list_ptr->ip_port_ptr;
 
-               if (TRUE == in_port_ptr->common.flags.is_upstream_realtime)
+            gu_input_port_list_t *in_port_lists[] = { module_ptr->gu.input_port_list_ptr,
+                                                      module_ptr->gu.ipc_input_port_list_ptr };
+            for (uint32_t i = 0; i < SIZE_OF_ARRAY(in_port_lists); i++)
+            {
+               for (gu_input_port_list_t *in_port_list_ptr = in_port_lists[i]; (NULL != in_port_list_ptr);
+                    LIST_ADVANCE(in_port_list_ptr))
                {
-                  atleast_one_inputs_upstream_is_rt = TRUE;
-                  break;
+                  gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
+
+                  if (TRUE == in_port_ptr->common.flags.is_upstream_realtime)
+                  {
+                     atleast_one_inputs_upstream_is_rt = TRUE;
+                     break;
+                  }
                }
             }
 
@@ -819,7 +826,7 @@ static bool_t gen_topo_check_and_propagate_across_module(gen_topo_module_t *    
             return FALSE;
          }
 
-         if (module_ptr->gu.num_input_ports == 0)
+         if ((module_ptr->gu.num_input_ports == 0) && (module_ptr->gu.num_ipc_input_ports == 0 ))
          {
             /* Cannot propagate backwards across a source module */
             return FALSE;
@@ -835,16 +842,20 @@ static bool_t gen_topo_check_and_propagate_across_module(gen_topo_module_t *    
             uint32_t *is_downstream_rt_ptr = (uint32_t *)prop_payload_ptr;
 
             // Iterate through all outputs and check if atleast one outputs downstream is realtime.
-            bool_t atleast_one_outputs_downstream_is_rt = FALSE;
-            for (gu_output_port_list_t *list_ptr = module_ptr->gu.output_port_list_ptr; list_ptr != NULL;
-                 LIST_ADVANCE(list_ptr))
+            bool_t                 atleast_one_outputs_downstream_is_rt = FALSE;
+            gu_output_port_list_t *out_port_lists[]                     = { module_ptr->gu.output_port_list_ptr,
+                                                                            module_ptr->gu.ipc_output_port_list_ptr };
+            for (uint32_t i = 0; i < SIZE_OF_ARRAY(out_port_lists); i++)
             {
-               gen_topo_output_port_t *op_port_ptr = (gen_topo_output_port_t *)list_ptr->op_port_ptr;
-
-               if (TRUE == op_port_ptr->common.flags.is_downstream_realtime)
+               for (gu_output_port_list_t *list_ptr = out_port_lists[i]; list_ptr != NULL; LIST_ADVANCE(list_ptr))
                {
-                  atleast_one_outputs_downstream_is_rt = TRUE;
-                  break;
+                  gen_topo_output_port_t *op_port_ptr = (gen_topo_output_port_t *)list_ptr->op_port_ptr;
+
+                  if (TRUE == op_port_ptr->common.flags.is_downstream_realtime)
+                  {
+                     atleast_one_outputs_downstream_is_rt = TRUE;
+                     break;
+                  }
                }
             }
 
@@ -955,50 +966,55 @@ ar_result_t gen_topo_propagate_port_property_backwards(void *                   
    }
 
    // Iterate through all input port of the previous modules and propagate.
-   for (gu_input_port_list_t *in_port_list_ptr = prev_module_ptr->gu.input_port_list_ptr; (NULL != in_port_list_ptr);
-        LIST_ADVANCE(in_port_list_ptr))
+
+   gu_input_port_list_t *in_port_lists[] = { prev_module_ptr->gu.input_port_list_ptr,
+                                             prev_module_ptr->gu.ipc_input_port_list_ptr };
+   for (uint32_t i = 0; i < SIZE_OF_ARRAY(in_port_lists); i++)
    {
-      gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
-
-      uint32_t bkwrd_prop_payload = propagated_value;
-
-      // Set property on input port.
-      bool_t can_propagate_further = TRUE;
-      gen_topo_set_get_propagated_property_on_the_input_port(topo_ptr,
-                                                             in_port_ptr,
-                                                             prop_type,
-                                                             &bkwrd_prop_payload,
-                                                             &can_propagate_further);
-
-      if (!can_propagate_further)
+      for (gu_input_port_list_t *in_port_list_ptr = in_port_lists[i]; (NULL != in_port_list_ptr);
+           LIST_ADVANCE(in_port_list_ptr))
       {
-#ifdef DEBUG_TOPO_BOUNDARY_STATE_PROP
-         TOPO_MSG(topo_ptr->gu.log_id,
-                  DBG_HIGH_PRIO,
-                  "LOG_BKWRD_PROP: Stop backward propagation of prop_type=0x%x at module-id,port_id (0x%lX,0x%lx) ",
-                  prop_type,
-                  in_port_ptr->gu.cmn.module_ptr->module_instance_id,
-                  in_port_ptr->gu.cmn.id);
-#endif
-         continue;
-      }
+         gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
 
-      // If ext input is hit, propagation terminates and handle port state change on ext input port
-      // through call back.
-      if (in_port_ptr->gu.ext_in_port_ptr)
-      {
-         if (topo_ptr->topo_to_cntr_vtable_ptr->set_propagated_prop_on_ext_input)
+         uint32_t bkwrd_prop_payload = propagated_value;
+
+         // Set property on input port.
+         bool_t can_propagate_further = TRUE;
+         gen_topo_set_get_propagated_property_on_the_input_port(topo_ptr,
+                                                                in_port_ptr,
+                                                                prop_type,
+                                                                &bkwrd_prop_payload,
+                                                                &can_propagate_further);
+
+         if (!can_propagate_further)
          {
-            // Send propagated property state on external port.
-            topo_ptr->topo_to_cntr_vtable_ptr->set_propagated_prop_on_ext_input(topo_ptr,
-                                                                                in_port_ptr->gu.ext_in_port_ptr,
-                                                                                prop_type,
-                                                                                &bkwrd_prop_payload);
+#ifdef DEBUG_TOPO_BOUNDARY_STATE_PROP
+            TOPO_MSG(topo_ptr->gu.log_id,
+                     DBG_HIGH_PRIO,
+                     "LOG_BKWRD_PROP: Stop backward propagation of prop_type=0x%x at module-id,port_id (0x%lX,0x%lx) ",
+                     prop_type,
+                     in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                     in_port_ptr->gu.cmn.id);
+#endif
+            continue;
          }
-      }
-      else // If a connected output port exists, propagate further backwards.
-      {
-         gen_topo_output_port_t *prev_out_port_ptr = (gen_topo_output_port_t *)in_port_ptr->gu.conn_out_port_ptr;
+
+         // If ext input is hit, propagation terminates and handle port state change on ext input port
+         // through call back.
+         if (in_port_ptr->gu.ext_in_port_ptr)
+         {
+            if (topo_ptr->topo_to_cntr_vtable_ptr->set_propagated_prop_on_ext_input)
+            {
+               // Send propagated property state on external port.
+               topo_ptr->topo_to_cntr_vtable_ptr->set_propagated_prop_on_ext_input(topo_ptr,
+                                                                                   in_port_ptr->gu.ext_in_port_ptr,
+                                                                                   prop_type,
+                                                                                   &bkwrd_prop_payload);
+            }
+         }
+         else // If a connected output port exists, propagate further backwards.
+         {
+            gen_topo_output_port_t *prev_out_port_ptr = (gen_topo_output_port_t *)in_port_ptr->gu.conn_out_port_ptr;
 
 #ifdef DEBUG_TOPO_PORT_PROP_TYPE
          LOG_BKWRD_PROP(topo_ptr->gu.log_id,
@@ -1013,6 +1029,7 @@ ar_result_t gen_topo_propagate_port_property_backwards(void *                   
                                                     prop_type,
                                                     bkwrd_prop_payload,
                                                     recurse_depth_ptr);
+      }
       }
    }
 
@@ -1082,64 +1099,69 @@ ar_result_t gen_topo_propagate_port_property_forwards(void                     *
       return result;
    }
 
-   for (gu_output_port_list_t *out_port_list_ptr = next_module_ptr->gu.output_port_list_ptr;
-        (NULL != out_port_list_ptr);
-        LIST_ADVANCE(out_port_list_ptr))
+   gu_output_port_list_t *out_port_lists[] = { next_module_ptr->gu.output_port_list_ptr,
+                                               next_module_ptr->gu.ipc_output_port_list_ptr };
+
+   for (uint32_t i = 0; i < SIZE_OF_ARRAY(out_port_lists); i++)
    {
-      gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
-
-      uint32_t frwd_prop_payload = propagated_value;
-
-      // Set propagated property on output port.
-      bool_t can_propagate_further = TRUE;
-      gen_topo_set_get_propagated_property_on_the_output_port(topo_ptr,
-                                                              out_port_ptr,
-                                                              prop_type,
-                                                              &frwd_prop_payload,
-                                                              &can_propagate_further);
-      if (!can_propagate_further)
+      for (gu_output_port_list_t *out_port_list_ptr = out_port_lists[i]; (NULL != out_port_list_ptr);
+         LIST_ADVANCE(out_port_list_ptr))
       {
-#ifdef DEBUG_TOPO_BOUNDARY_STATE_PROP
-         TOPO_MSG(topo_ptr->gu.log_id,
-                  DBG_HIGH_PRIO,
-                  "LOG_FRWD_PROP: Stop forward propagation of prop_type=0x%x at module-id,port_id (0x%lX,0x%lx) ",
-                  prop_type,
-                  out_port_ptr->gu.cmn.module_ptr->module_instance_id,
-                  out_port_ptr->gu.cmn.id);
-#endif
-         continue;
-      }
+         gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
 
-      // If ext output is hit, propagation terminates and handle port state change on ext output port
-      // through call back.
-      if (out_port_ptr->gu.ext_out_port_ptr)
-      {
-         if (topo_ptr->topo_to_cntr_vtable_ptr->set_propagated_prop_on_ext_output)
+         uint32_t frwd_prop_payload = propagated_value;
+
+         // Set propagated property on output port.
+         bool_t can_propagate_further = TRUE;
+         gen_topo_set_get_propagated_property_on_the_output_port(topo_ptr,
+                                                               out_port_ptr,
+                                                               prop_type,
+                                                               &frwd_prop_payload,
+                                                               &can_propagate_further);
+         if (!can_propagate_further)
          {
-            // Send propagated property state on external port.
-            topo_ptr->topo_to_cntr_vtable_ptr->set_propagated_prop_on_ext_output(topo_ptr,
-                                                                                 out_port_ptr->gu.ext_out_port_ptr,
-                                                                                 prop_type,
-                                                                                 &frwd_prop_payload);
+   #ifdef DEBUG_TOPO_BOUNDARY_STATE_PROP
+            TOPO_MSG(topo_ptr->gu.log_id,
+                     DBG_HIGH_PRIO,
+                     "LOG_FRWD_PROP: Stop forward propagation of prop_type=0x%x at module-id,port_id (0x%lX,0x%lx) ",
+                     prop_type,
+                     out_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                     out_port_ptr->gu.cmn.id);
+   #endif
+            continue;
          }
-      }
-      else
-      {
-         gen_topo_input_port_t *next_in_port_ptr = (gen_topo_input_port_t *)out_port_ptr->gu.conn_in_port_ptr;
 
-#ifdef DEBUG_TOPO_PORT_PROP_TYPE
-         LOG_FRWD_PROP(topo_ptr->gu.log_id,
-                       out_port_ptr,
-                       (gen_topo_input_port_t *)out_port_ptr->gu.conn_in_port_ptr,
-                       prop_type,
-                       &frwd_prop_payload);
-#endif
+         // If ext output is hit, propagation terminates and handle port state change on ext output port
+         // through call back.
+         if (out_port_ptr->gu.ext_out_port_ptr)
+         {
+            if (topo_ptr->topo_to_cntr_vtable_ptr->set_propagated_prop_on_ext_output)
+            {
+               // Send propagated property state on external port.
+               topo_ptr->topo_to_cntr_vtable_ptr->set_propagated_prop_on_ext_output(topo_ptr,
+                                                                                    out_port_ptr->gu.ext_out_port_ptr,
+                                                                                    prop_type,
+                                                                                    &frwd_prop_payload);
+            }
+         }
+         else
+         {
+            gen_topo_input_port_t *next_in_port_ptr = (gen_topo_input_port_t *)out_port_ptr->gu.conn_in_port_ptr;
 
-         gen_topo_propagate_port_property_forwards(vtopo_ptr,
-                                                   (void *)next_in_port_ptr,
-                                                   prop_type,
-                                                   frwd_prop_payload,
-                                                   recurse_depth_ptr);
+   #ifdef DEBUG_TOPO_PORT_PROP_TYPE
+            LOG_FRWD_PROP(topo_ptr->gu.log_id,
+                        out_port_ptr,
+                        (gen_topo_input_port_t *)out_port_ptr->gu.conn_in_port_ptr,
+                        prop_type,
+                        &frwd_prop_payload);
+   #endif
+
+            gen_topo_propagate_port_property_forwards(vtopo_ptr,
+                                                      (void *)next_in_port_ptr,
+                                                      prop_type,
+                                                      frwd_prop_payload,
+                                                      recurse_depth_ptr);
+         }
       }
    }
 
@@ -1215,6 +1237,18 @@ static ar_result_t gen_topo_propagate_is_upstream_realtime(gen_topo_t *topo_ptr)
                }
             }
          }
+         else if(MODULE_ID_IPC_RX == module_ptr->gu.module_id)
+         {
+            /* by default propagates FTRT, if upstream IPC Tx has propagated the same would be propagated here as well. */
+
+            gu_input_port_list_t * list_ptr    = module_ptr->gu.ipc_input_port_list_ptr;
+            if(list_ptr)
+            {
+               gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)list_ptr->ip_port_ptr;
+               is_upstream_realtime               = in_port_ptr->common.flags.is_upstream_realtime;
+            }
+            need_to_propagate                  = TRUE;
+         }
          else
          {
             if (module_ptr->gu.flags.is_ds_at_sg_or_cntr_boundary || module_ptr->flags.supports_prop_is_rt_port_prop)
@@ -1280,66 +1314,73 @@ static ar_result_t gen_topo_propagate_is_upstream_realtime(gen_topo_t *topo_ptr)
             continue;
          }
 
-         for (gu_output_port_list_t *out_port_list_ptr = module_ptr->gu.output_port_list_ptr;
-              (NULL != out_port_list_ptr);
-              LIST_ADVANCE(out_port_list_ptr))
+         gu_output_port_list_t *out_port_lists[] = { module_ptr->gu.output_port_list_ptr,
+                                                     module_ptr->gu.ipc_output_port_list_ptr };
+
+         for (uint32_t i = 0; i < SIZE_OF_ARRAY(out_port_lists); i++)
          {
-            gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
+            for (gu_output_port_list_t *out_port_list_ptr = out_port_lists[i]; (NULL != out_port_list_ptr);
+                 LIST_ADVANCE(out_port_list_ptr))
+            {
+               gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
 
-            uint32_t forward_prop_value = is_upstream_realtime;
+               uint32_t forward_prop_value = is_upstream_realtime;
 
-            // Set propagated property on output port.
-            bool_t can_proapagate_further = TRUE;
-            gen_topo_set_get_propagated_property_on_the_output_port(topo_ptr,
-                                                                    out_port_ptr,
-                                                                    PORT_PROPERTY_IS_UPSTREAM_RT,
-                                                                    &forward_prop_value,
-                                                                    &can_proapagate_further);
+               // Set propagated property on output port.
+               bool_t can_proapagate_further = TRUE;
+               gen_topo_set_get_propagated_property_on_the_output_port(topo_ptr,
+                                                                       out_port_ptr,
+                                                                       PORT_PROPERTY_IS_UPSTREAM_RT,
+                                                                       &forward_prop_value,
+                                                                       &can_proapagate_further);
 #ifdef DEBUG_TOPO_PORT_PROP_TYPE
-            TOPO_MSG(topo_ptr->gu.log_id,
-                     DBG_HIGH_PRIO,
-                     SPF_LOG_PREFIX "gen_topo_propagate_is_upstream_realtime: Propagating forwards from module-id 0x%lX, "
-                     "out-port=0x%lx, is_upstream_rt=0x%lx",
-                     module_ptr->gu.module_instance_id,
-                     out_port_ptr->gu.cmn.id,
-                     forward_prop_value);
+               TOPO_MSG(topo_ptr->gu.log_id,
+                        DBG_HIGH_PRIO,
+                        SPF_LOG_PREFIX
+                        "gen_topo_propagate_is_upstream_realtime: Propagating forwards from module-id 0x%lX, "
+                        "out-port=0x%lx, is_upstream_rt=0x%lx",
+                        module_ptr->gu.module_instance_id,
+                        out_port_ptr->gu.cmn.id,
+                        forward_prop_value);
 #endif
 
-            // ext-out cases, propagation terminates.
-            if (out_port_ptr->gu.ext_out_port_ptr)
-            {
-               if ((can_proapagate_further) && (topo_ptr->topo_to_cntr_vtable_ptr->set_propagated_prop_on_ext_output))
+               // ext-out cases, propagation terminates.
+               if (out_port_ptr->gu.ext_out_port_ptr)
                {
-                  // Send propagated property state on external port.
-                  topo_ptr->topo_to_cntr_vtable_ptr
-                     ->set_propagated_prop_on_ext_output(topo_ptr,
-                                                         out_port_ptr->gu.ext_out_port_ptr,
-                                                         PORT_PROPERTY_IS_UPSTREAM_RT,
-                                                         &forward_prop_value);
+                  if ((can_proapagate_further) &&
+                      (topo_ptr->topo_to_cntr_vtable_ptr->set_propagated_prop_on_ext_output))
+                  {
+                     // Send propagated property state on external port.
+                     topo_ptr->topo_to_cntr_vtable_ptr
+                        ->set_propagated_prop_on_ext_output(topo_ptr,
+                                                            out_port_ptr->gu.ext_out_port_ptr,
+                                                            PORT_PROPERTY_IS_UPSTREAM_RT,
+                                                            &forward_prop_value);
+                  }
                }
-            }
-            else
-            {
-               gen_topo_input_port_t *next_in_port_ptr = (gen_topo_input_port_t *)out_port_ptr->gu.conn_in_port_ptr;
-
-               if (next_in_port_ptr && !gen_topo_is_module_sg_stopped_or_suspended(
-                                          (gen_topo_module_t *)next_in_port_ptr->gu.cmn.module_ptr))
+               else
                {
+                  gen_topo_input_port_t *next_in_port_ptr = (gen_topo_input_port_t *)out_port_ptr->gu.conn_in_port_ptr;
+
+                  if (next_in_port_ptr && !gen_topo_is_module_sg_stopped_or_suspended(
+                                             (gen_topo_module_t *)next_in_port_ptr->gu.cmn.module_ptr))
+                  {
 #ifdef DEBUG_TOPO_PORT_PROP_TYPE
-                  LOG_FRWD_PROP(topo_ptr->gu.log_id,
-                                out_port_ptr,
-                                next_in_port_ptr,
-                                PORT_PROPERTY_IS_UPSTREAM_RT,
-                                &forward_prop_value);
+                     LOG_FRWD_PROP(topo_ptr->gu.log_id,
+                                   out_port_ptr,
+                                   next_in_port_ptr,
+                                   PORT_PROPERTY_IS_UPSTREAM_RT,
+                                   &forward_prop_value);
 #endif
 
-                  // Propagate to the next module.
-                  uint32_t recurse_depth = 0;
-                  result |= gen_topo_propagate_port_property_forwards(topo_ptr,
-                                                                      (void *)next_in_port_ptr,
-                                                                      PORT_PROPERTY_IS_UPSTREAM_RT,
-                                                                      forward_prop_value,
-                                                                      &recurse_depth);
+                     // Propagate to the next module.
+                     uint32_t recurse_depth = 0;
+                     result |= gen_topo_propagate_port_property_forwards(topo_ptr,
+                                                                         (void *)next_in_port_ptr,
+                                                                         PORT_PROPERTY_IS_UPSTREAM_RT,
+                                                                         forward_prop_value,
+                                                                         &recurse_depth);
+                  }
                }
             }
          }
@@ -1415,6 +1456,17 @@ static ar_result_t gen_topo_propagate_is_downstream_realtime(gen_topo_t *topo_pt
                   is_downstream_realtime = in_port_ptr->common.flags.is_downstream_realtime;
                   need_to_propagate      = TRUE;
                }
+            }
+         }
+         else if (MODULE_ID_IPC_TX == module_ptr->gu.module_id)
+         {
+            // FTRT case
+            gu_output_port_list_t * list_ptr     = module_ptr->gu.ipc_output_port_list_ptr;
+            if(list_ptr)
+            {
+               gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)list_ptr->op_port_ptr;
+               is_downstream_realtime               = out_port_ptr->common.flags.is_downstream_realtime;
+               need_to_propagate                    = TRUE;
             }
          }
          else
@@ -1666,7 +1718,8 @@ ar_result_t gen_topo_propagate_boundary_modules_port_state(void *base_ptr)
       /*
        * if number of connected output ports is ZERO and its not a sink module. Then its is dangling boundary module.
        */
-      if ((0 == module_ptr->gu.num_output_ports) && !module_ptr->gu.flags.is_sink)
+      if ((0 == module_ptr->gu.num_output_ports && 0 == module_ptr->gu.num_ipc_output_ports) &&
+          !module_ptr->gu.flags.is_sink)
       {
          continue_propagation = TRUE;
 
@@ -1688,44 +1741,50 @@ ar_result_t gen_topo_propagate_boundary_modules_port_state(void *base_ptr)
           * SUSPEND.
           *  3. if none of the output ports are in START/SUSPEND state then propagate STOP.
           */
-         for (gu_output_port_list_t *out_port_list_ptr = module_ptr->gu.output_port_list_ptr;
-              (NULL != out_port_list_ptr);
-              LIST_ADVANCE(out_port_list_ptr))
+
+         gu_output_port_list_t *out_port_lists[] = { module_ptr->gu.output_port_list_ptr,
+                                                     module_ptr->gu.ipc_output_port_list_ptr };
+
+         for (uint32_t i = 0; i < SIZE_OF_ARRAY(out_port_lists); i++)
          {
-            gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
-
-            // if state propagation is blocked from this output ports then
-            // we need to revert the downgraded state and assign self state to this ports.
-            // ports which blocks the propagated state means that they can run even if downstream is stopped.
-            if (out_port_ptr->common.flags.is_state_prop_blocked)
+            for (gu_output_port_list_t *out_port_list_ptr = out_port_lists[i]; (NULL != out_port_list_ptr);
+                 LIST_ADVANCE(out_port_list_ptr))
             {
-               topo_port_state_t self_port_state =
-                  topo_sg_state_to_port_state(gen_topo_get_sg_state(out_port_ptr->gu.cmn.module_ptr->sg_ptr));
-               out_port_ptr->common.state = self_port_state;
-            }
+               gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
 
-            if (TOPO_PORT_STATE_STARTED == out_port_ptr->common.state)
-            {
-               atleast_one_output_is_started = TRUE;
-            }
-            else if (TOPO_PORT_STATE_SUSPENDED == out_port_ptr->common.state)
-            {
-               atleast_one_output_is_suspended = TRUE;
-            }
+               // if state propagation is blocked from this output ports then
+               // we need to revert the downgraded state and assign self state to this ports.
+               // ports which blocks the propagated state means that they can run even if downstream is stopped.
+               if (out_port_ptr->common.flags.is_state_prop_blocked)
+               {
+                  topo_port_state_t self_port_state =
+                     topo_sg_state_to_port_state(gen_topo_get_sg_state(out_port_ptr->gu.cmn.module_ptr->sg_ptr));
+                  out_port_ptr->common.state = self_port_state;
+               }
 
-            continue_propagation |= is_downstream_state_propagation_allowed(out_port_ptr);
+               if (TOPO_PORT_STATE_STARTED == out_port_ptr->common.state)
+               {
+                  atleast_one_output_is_started = TRUE;
+               }
+               else if (TOPO_PORT_STATE_SUSPENDED == out_port_ptr->common.state)
+               {
+                  atleast_one_output_is_suspended = TRUE;
+               }
 
-            // if it is an external output port and supports the ds-state extension then inform capi about the state
-            // now. for internal output ports, it is handled later in the function.
-            if (module_ptr->flags.supports_prop_port_ds_state)
-            {
-               topo_port_state_t port_state                = out_port_ptr->common.state;
-               bool_t            temp_continue_propagation = FALSE;
-               gen_topo_set_get_propagated_property_on_the_output_port(topo_ptr,
-                                                                       out_port_ptr,
-                                                                       PORT_PROPERTY_TOPO_STATE,
-                                                                       &port_state,
-                                                                       &temp_continue_propagation);
+               continue_propagation |= is_downstream_state_propagation_allowed(out_port_ptr);
+
+               // if it is an external output port and supports the ds-state extension then inform capi about the state
+               // now. for internal output ports, it is handled later in the function.
+               if (module_ptr->flags.supports_prop_port_ds_state)
+               {
+                  topo_port_state_t port_state                = out_port_ptr->common.state;
+                  bool_t            temp_continue_propagation = FALSE;
+                  gen_topo_set_get_propagated_property_on_the_output_port(topo_ptr,
+                                                                          out_port_ptr,
+                                                                          PORT_PROPERTY_TOPO_STATE,
+                                                                          &port_state,
+                                                                          &temp_continue_propagation);
+               }
             }
          }
       }
@@ -1762,38 +1821,45 @@ ar_result_t gen_topo_propagate_boundary_modules_port_state(void *base_ptr)
       /**
        * propagate to input ports
        */
-      for (gu_input_port_list_t *in_port_list_ptr = module_ptr->gu.input_port_list_ptr; (NULL != in_port_list_ptr);
-           LIST_ADVANCE(in_port_list_ptr))
+
+      gu_input_port_list_t *in_port_lists[] = { module_ptr->gu.input_port_list_ptr,
+                                                module_ptr->gu.ipc_input_port_list_ptr };
+
+      for (uint32_t i = 0; i < SIZE_OF_ARRAY(in_port_lists); i++)
       {
-         gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
-
-         uint32_t bkwrd_prop_payload = state_to_propagate_backwrd;
-
-         // Set input ports state.
-         bool_t temp_can_propagate_backwards = TRUE;
-         gen_topo_set_get_propagated_property_on_the_input_port(topo_ptr,
-                                                                in_port_ptr,
-                                                                PORT_PROPERTY_TOPO_STATE,
-                                                                &bkwrd_prop_payload,
-                                                                &temp_can_propagate_backwards);
-
-         if (in_port_ptr->gu.conn_out_port_ptr)
+         for (gu_input_port_list_t *in_port_list_ptr = in_port_lists[i]; (NULL != in_port_list_ptr);
+            LIST_ADVANCE(in_port_list_ptr))
          {
-#ifdef DEBUG_TOPO_PORT_PROP_TYPE
-            LOG_BKWRD_PROP(topo_ptr->gu.log_id,
-                           in_port_ptr,
-                           (gen_topo_output_port_t *)in_port_ptr->gu.conn_out_port_ptr,
-                           PORT_PROPERTY_TOPO_STATE,
-                           &bkwrd_prop_payload);
-#endif
-            // propagate to prev module's output port.
-            // if module supports ds-state extension then Capi will be informed in this call.
-            gen_topo_set_get_propagated_property_on_the_output_port(topo_ptr,
-                                                                    (gen_topo_output_port_t *)
-                                                                       in_port_ptr->gu.conn_out_port_ptr,
-                                                                    PORT_PROPERTY_TOPO_STATE,
-                                                                    &bkwrd_prop_payload,
-                                                                    &temp_can_propagate_backwards);
+            gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
+
+            uint32_t bkwrd_prop_payload = state_to_propagate_backwrd;
+
+            // Set input ports state.
+            bool_t temp_can_propagate_backwards = TRUE;
+            gen_topo_set_get_propagated_property_on_the_input_port(topo_ptr,
+                                                                  in_port_ptr,
+                                                                  PORT_PROPERTY_TOPO_STATE,
+                                                                  &bkwrd_prop_payload,
+                                                                  &temp_can_propagate_backwards);
+
+            if (in_port_ptr->gu.conn_out_port_ptr)
+            {
+   #ifdef DEBUG_TOPO_PORT_PROP_TYPE
+               LOG_BKWRD_PROP(topo_ptr->gu.log_id,
+                              in_port_ptr,
+                              (gen_topo_output_port_t *)in_port_ptr->gu.conn_out_port_ptr,
+                              PORT_PROPERTY_TOPO_STATE,
+                              &bkwrd_prop_payload);
+   #endif
+               // propagate to prev module's output port.
+               // if module supports ds-state extension then Capi will be informed in this call.
+               gen_topo_set_get_propagated_property_on_the_output_port(topo_ptr,
+                                                                     (gen_topo_output_port_t *)
+                                                                        in_port_ptr->gu.conn_out_port_ptr,
+                                                                     PORT_PROPERTY_TOPO_STATE,
+                                                                     &bkwrd_prop_payload,
+                                                                     &temp_can_propagate_backwards);
+            }
          }
       }
    }

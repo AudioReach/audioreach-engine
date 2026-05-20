@@ -34,7 +34,7 @@ extern "C" {
  */
 // #define DEBUG_POSAL_MEMORY 1
 // #define DEBUG_POSAL_MEM_PROF 1
-//#define HEAP_PROFILING 1
+// #define HEAP_PROFILING 1
 
 //#define DEBUG_POSAL_MALLOC_CALLSTACK
 

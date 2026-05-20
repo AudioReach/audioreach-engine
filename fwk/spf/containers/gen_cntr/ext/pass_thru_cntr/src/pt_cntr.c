@@ -45,6 +45,10 @@ ar_result_t pt_cntr_stm_fwk_extn_handle_enable(pt_cntr_t *me_ptr, gu_module_list
    uint32_t    bit_mask = 0;
    INIT_EXCEPTION_HANDLING
 
+#ifdef ENABLE_CNTR_PROC_TIME_PROFILING
+   memset(&me_ptr->gc.ts_stats, 0, sizeof(me_ptr->gc.ts_stats));
+#endif
+
    for (; NULL != stm_mod_list_ptr; LIST_ADVANCE(stm_mod_list_ptr))
    {
       pt_cntr_module_t *module_ptr = (pt_cntr_module_t *)stm_mod_list_ptr->module_ptr;
@@ -101,6 +105,10 @@ ar_result_t pt_cntr_stm_fwk_extn_handle_enable(pt_cntr_t *me_ptr, gu_module_list
          // set trigger only for the last module in FEF container
          stm_trigger.trigger.signal_ptr              = (void *)me_ptr->gc.st_module.trigger_signal_ptr;
          stm_trigger.trigger.raised_intr_counter_ptr = &me_ptr->gc.st_module.raised_interrupt_counter;
+#ifdef ENABLE_CNTR_PROC_TIME_PROFILING
+         me_ptr->gc.st_module.isr_callback_ts =0;
+         stm_trigger.trigger.isr_callback_ts_ptr     = &me_ptr->gc.st_module.isr_callback_ts;
+#endif
       }
 
       capi_prop_t set_props[] = {
@@ -272,6 +280,10 @@ ar_result_t pt_cntr_stm_fwk_extn_handle_disable(pt_cntr_t *me_ptr, gu_module_lis
       }
    }
 
+#ifdef ENABLE_CNTR_PROC_TIME_PROFILING
+   gen_cntr_print_all_cached_cntr_proc_time_stats(&me_ptr->gc);
+#endif
+
    return result;
 }
 
@@ -288,13 +300,13 @@ bool_t pt_cntr_is_module_active(gen_topo_module_t *module_ptr, bool_t need_to_ig
    // zero.
    bool_t atleast_one_output_trigger_satisfied =
       (0 == module_ptr->gu.max_output_ports) ||
-      ((0 == module_ptr->gu.num_output_ports) && (0 == module_ptr->gu.min_output_ports));
+      ((0 == module_ptr->gu.num_output_ports) && (0 == module_ptr->gu.min_output_ports) && (0 == module_ptr->gu.num_ipc_output_ports));
 
    // if module cannot have inputs, or if module currently doesnt have any inputs connected and its min inputs are
    // zero.
    bool_t atleast_one_input_trigger_satisfied =
       (0 == module_ptr->gu.max_input_ports) ||
-      ((0 == module_ptr->gu.num_input_ports) && (0 == module_ptr->gu.min_input_ports));
+      ((0 == module_ptr->gu.num_input_ports) && (0 == module_ptr->gu.min_input_ports) && (0 == module_ptr->gu.num_ipc_input_ports));
 
    if (!need_to_ignore_state)
    {
@@ -328,6 +340,23 @@ bool_t pt_cntr_is_module_active(gen_topo_module_t *module_ptr, bool_t need_to_ig
          }
       }
 
+      for (gu_input_port_list_t *ipc_in_port_list_ptr = module_ptr->gu.ipc_input_port_list_ptr; (NULL != ipc_in_port_list_ptr);
+           LIST_ADVANCE(ipc_in_port_list_ptr))
+      {
+         gen_topo_input_port_t *ipc_in_port_ptr = (gen_topo_input_port_t *)ipc_in_port_list_ptr->ip_port_ptr;
+         // If the input port is not started or doesn't have a buffer (media-fmt prop didn't happen)
+         // then process cannot be called on the module.
+         if ((TOPO_PORT_STATE_STARTED != ipc_in_port_ptr->common.state))
+         {
+            continue;
+         }
+         else
+         {
+            atleast_one_input_trigger_satisfied = TRUE;
+            break;
+         }
+      }
+
       for (gu_output_port_list_t *out_port_list_ptr = module_ptr->gu.output_port_list_ptr; (NULL != out_port_list_ptr);
            LIST_ADVANCE(out_port_list_ptr))
       {
@@ -338,6 +367,22 @@ bool_t pt_cntr_is_module_active(gen_topo_module_t *module_ptr, bool_t need_to_ig
             continue;
          }
          else if (FALSE == out_port_ptr->common.flags.is_mf_valid)
+         {
+            continue;
+         }
+         else
+         {
+            atleast_one_output_trigger_satisfied = TRUE;
+            break;
+         }
+      }
+
+      for (gu_output_port_list_t *ipc_out_port_list_ptr = module_ptr->gu.ipc_output_port_list_ptr; (NULL != ipc_out_port_list_ptr);
+           LIST_ADVANCE(ipc_out_port_list_ptr))
+      {
+         gen_topo_output_port_t *ipc_out_port_ptr = (gen_topo_output_port_t *)ipc_out_port_list_ptr->op_port_ptr;
+
+         if (TOPO_PORT_STATE_STARTED != ipc_out_port_ptr->common.state)
          {
             continue;
          }
@@ -419,7 +464,7 @@ ar_result_t pt_cntr_update_module_process_list(pt_cntr_t *me_ptr)
          continue;
       }
 
-      if (module_ptr->gc.topo.gu.flags.is_sink)
+      if (module_ptr->gc.topo.gu.flags.is_sink || (MODULE_ID_IPC_TX == module_ptr->gc.topo.gu.module_id))
       {
          // add to list of sink modules
          TRY(result,
@@ -433,7 +478,7 @@ ar_result_t pt_cntr_update_module_process_list(pt_cntr_t *me_ptr)
                       "module 0x%lx added to the sink module process list",
                       module_ptr->gc.topo.gu.module_instance_id);
       }
-      else if (module_ptr->gc.topo.gu.flags.is_source)
+      else if (module_ptr->gc.topo.gu.flags.is_source || (MODULE_ID_IPC_RX == module_ptr->gc.topo.gu.module_id))
       {
          // add to list of src modules
          TRY(result,
@@ -624,7 +669,6 @@ capi_err_t pt_cntr_capi_event_callback(void *context_ptr, capi_event_id_t id, ca
    {
       /** Events ignored by Pass thru container */
       case CAPI_EVENT_METADATA_AVAILABLE:
-      case CAPI_EVENT_DYNAMIC_INPLACE_CHANGE:
       case CAPI_EVENT_ISLAND_VOTE:
       {
          GEN_CNTR_MSG(topo_ptr->gu.log_id,
@@ -648,6 +692,7 @@ capi_err_t pt_cntr_capi_event_callback(void *context_ptr, capi_event_id_t id, ca
       case CAPI_EVENT_PROCESS_STATE:
       case CAPI_EVENT_DATA_TO_DSP_CLIENT:
       case CAPI_EVENT_DATA_TO_DSP_CLIENT_V2:
+      case CAPI_EVENT_DYNAMIC_INPLACE_CHANGE:
       {
          return gen_topo_capi_callback(context_ptr, id, event_info_ptr);
       }
@@ -689,7 +734,9 @@ capi_err_t pt_cntr_capi_event_callback(void *context_ptr, capi_event_id_t id, ca
             case INTF_EXTN_EVENT_ID_PORT_DS_STATE:
             case INTF_EXTN_EVENT_ID_IS_RT_PORT_PROPERTY:
             case INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE:
+            case INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE_V2:
             case FWK_EXTN_DM_EVENT_ID_DISABLE_DM:
+            case FWK_EXTN_EVENT_ID_IPC_DATA_LINK_INFO:
             {
                return gen_topo_capi_callback(context_ptr, id, event_info_ptr);
             }
@@ -742,14 +789,12 @@ ar_result_t pt_cntr_handle_module_buffer_access_event(gen_topo_t        *topo_pt
       return AR_EFAILED;
    }
 
-   intf_extn_event_id_module_buffer_access_enable_t *cfg_ptr =
-      (intf_extn_event_id_module_buffer_access_enable_t *)dsp_event_ptr->payload.data_ptr;
-   bool_t is_enable = (TRUE == cfg_ptr->enable);
-
+   gen_topo_input_port_t *input_port_ptr = NULL;
+   gen_topo_output_port_t *output_port_ptr = NULL;
    if (event_info_ptr->port_info.is_input_port)
    {
       // get output port id by the port index
-      gen_topo_input_port_t *input_port_ptr =
+      input_port_ptr =
          (gen_topo_input_port_t *)gu_find_input_port_by_index((gu_module_t *)module_ptr,
                                                               event_info_ptr->port_info.port_index);
       if (!input_port_ptr)
@@ -761,21 +806,11 @@ ar_result_t pt_cntr_handle_module_buffer_access_event(gen_topo_t        *topo_pt
                   event_info_ptr->port_info.port_index);
          return AR_EFAILED;
       }
-
-      intf_extn_input_buffer_manager_cb_info_t *ip_cb_info_ptr =
-         (intf_extn_input_buffer_manager_cb_info_t *)(dsp_event_ptr->payload.data_ptr +
-                                                      sizeof(intf_extn_event_id_module_buffer_access_enable_t));
-
-      input_port_ptr->common.flags.supports_buffer_resuse_extn =
-         is_enable ? GEN_TOPO_MODULE_INPUT_BUF_ACCESS : GEN_TOPO_MODULE_BUF_ACCESS_INVALID;
-
-      module_ptr->buffer_mgr_cb_handle = (TRUE == is_enable) ? ip_cb_info_ptr->buffer_mgr_cb_handle : (uint32_t)NULL;
-      module_ptr->get_input_buf_fn     = (TRUE == is_enable) ? ip_cb_info_ptr->get_input_buf_fn : NULL;
    }
    else
    {
       // get output port id by the port index
-      gen_topo_output_port_t *output_port_ptr =
+      output_port_ptr =
          (gen_topo_output_port_t *)gu_find_output_port_by_index((gu_module_t *)module_ptr,
                                                                 event_info_ptr->port_info.port_index);
       if (!output_port_ptr)
@@ -788,15 +823,76 @@ ar_result_t pt_cntr_handle_module_buffer_access_event(gen_topo_t        *topo_pt
          return AR_EFAILED;
       }
 
+   }
+
+   bool_t is_enable = FALSE;
+   if(INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE == dsp_event_ptr->param_id)
+   {
+      intf_extn_event_id_module_buffer_access_enable_t *cfg_ptr =
+         (intf_extn_event_id_module_buffer_access_enable_t *)dsp_event_ptr->payload.data_ptr;
+      is_enable = (TRUE == cfg_ptr->enable);
+
+      if (event_info_ptr->port_info.is_input_port)
+      {
+         intf_extn_input_buffer_manager_cb_info_t *ip_cb_info_ptr =
+            (intf_extn_input_buffer_manager_cb_info_t *)(dsp_event_ptr->payload.data_ptr +
+                                                         sizeof(intf_extn_event_id_module_buffer_access_enable_t));
+
+         input_port_ptr->common.flags.supports_buffer_reuse_extn =
+            is_enable ? GEN_TOPO_MODULE_INPUT_BUF_ACCESS : GEN_TOPO_MODULE_BUF_ACCESS_INVALID;
+
+         module_ptr->buffer_mgr_cb_handle = (TRUE == is_enable) ? ip_cb_info_ptr->buffer_mgr_cb_handle : NULL;
+         module_ptr->get_input_buf_fn     = (TRUE == is_enable) ? ip_cb_info_ptr->get_input_buf_fn : NULL;
+      }
+      else
+      {
       intf_extn_output_buffer_manager_cb_info_t *op_cb_info_ptr =
          (intf_extn_output_buffer_manager_cb_info_t *)(dsp_event_ptr->payload.data_ptr +
                                                        sizeof(intf_extn_event_id_module_buffer_access_enable_t));
 
-      output_port_ptr->common.flags.supports_buffer_resuse_extn =
+      output_port_ptr->common.flags.supports_buffer_reuse_extn =
          (TRUE == is_enable) ? GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS : GEN_TOPO_MODULE_BUF_ACCESS_INVALID;
 
-      module_ptr->buffer_mgr_cb_handle = (TRUE == is_enable) ? op_cb_info_ptr->buffer_mgr_cb_handle : (uint32_t)NULL;
+      module_ptr->buffer_mgr_cb_handle = (TRUE == is_enable) ? op_cb_info_ptr->buffer_mgr_cb_handle : NULL;
       module_ptr->return_output_buf_fn = (TRUE == is_enable) ? op_cb_info_ptr->return_output_buf_fn : NULL;
+   }
+   }
+   else if(INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE_V2 == dsp_event_ptr->param_id)
+   {
+      intf_extn_event_id_module_buffer_access_enable_v2_t *cfg_ptr =
+         (intf_extn_event_id_module_buffer_access_enable_v2_t *)dsp_event_ptr->payload.data_ptr;
+      is_enable = (TRUE == cfg_ptr->enable);
+
+      if (event_info_ptr->port_info.is_input_port)
+      {
+         input_port_ptr->common.flags.supports_buffer_reuse_extn =
+            is_enable ? GEN_TOPO_MODULE_INPUT_BUF_ACCESS : GEN_TOPO_MODULE_BUF_ACCESS_INVALID;
+
+         module_ptr->buffer_mgr_cb_handle = (TRUE == is_enable) ? cfg_ptr->buffer_mgr_cb_handle : NULL;
+
+         module_ptr->get_input_buf_fn =
+                  (intf_extn_get_module_input_buf_func_t)((TRUE == is_enable) ? cfg_ptr->get_port_buf_fn : NULL);
+
+         // optional for PTC because PTC always returns through process
+         module_ptr->return_output_buf_fn =
+                  (intf_extn_return_module_output_buf_func_t)((TRUE == is_enable) ? cfg_ptr->return_port_buf_fn : NULL);
+      }
+      else
+      {
+         output_port_ptr->common.flags.supports_buffer_reuse_extn =
+            (TRUE == is_enable) ? GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS : GEN_TOPO_MODULE_BUF_ACCESS_INVALID;
+
+         module_ptr->buffer_mgr_cb_handle = (TRUE == is_enable) ? cfg_ptr->buffer_mgr_cb_handle : NULL;
+
+         module_ptr->return_output_buf_fn = (intf_extn_return_module_output_buf_func_t)((TRUE == is_enable) ? cfg_ptr->return_port_buf_fn : NULL);
+
+         // optional for PTC because PTC always gets buffer through process
+         module_ptr->get_input_buf_fn     = (intf_extn_get_module_input_buf_func_t)((TRUE == is_enable) ? cfg_ptr->get_port_buf_fn : NULL);
+      }
+   }
+   else // unknown param id
+   {
+      return AR_EFAILED;
    }
 
    TOPO_MSG(topo_ptr->gu.log_id,

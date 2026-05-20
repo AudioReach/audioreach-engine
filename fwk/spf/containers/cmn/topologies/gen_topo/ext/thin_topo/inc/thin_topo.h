@@ -26,6 +26,7 @@ extern "C" {
 #define THIN_TOPO_SAFE_MODE
 #define THIN_TOPO_PROCESS_BUF_DEBUG
 #define THIN_TOPO_BUF_ASSIGNMENT_DEBUG
+#define THIN_TOPO_PROCESS_DEBUG
 
 #endif
 
@@ -101,11 +102,17 @@ typedef struct thin_topo_t
    gu_ext_in_port_list_t             *active_ext_in_list_ptr; /**< only started ext in ports */
    gu_ext_out_port_list_t            *active_ext_out_list_ptr; /**< only started ext out ports */
 
+   gu_ext_in_port_list_t             *active_ipc_ext_in_list_ptr; /**< only started IPC ext in ports */
+   gu_ext_out_port_list_t            *active_ipc_ext_out_list_ptr; /**< only started IPC ext out ports */
+
    thin_topo_state_t                 state; /** indicates at what point of thin topo processing thin topo was exited. */
    gu_module_list_t                 *gen_topo_proc_next_module_list_ptr;
    /**< Whenever Thin topo is exited, this variable caches the next module that needs to processed from gen topo. Important to note that the list
         ptrs are different for thin topo and gen topo since they maintain separate module list's, hence this variable must be updated only with the
         gen topo's module list ptr. */
+
+   gu_input_port_list_t             *active_input_buf_access_port_list_ptr; /**< only started inputs with buf extn enabled */
+   gu_output_port_list_t            *active_output_buf_access_port_list_ptr; /**< only started output with buf extn enabled  */
 }thin_topo_t;
 
 ar_result_t thin_topo_init_handle(gen_topo_t *topo_ptr);

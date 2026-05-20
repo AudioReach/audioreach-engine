@@ -468,6 +468,12 @@ ar_result_t gen_cntr_flush_output_data_queue(gen_cntr_t              *me_ptr,
       return AR_EOK;
    }
 
+   // nothing to do for IPC ext output ports
+   if(gu_is_ipc_ext_output_port(&ext_out_port_ptr->gu))
+   {
+      return AR_EOK;
+   }
+
    if (ext_out_port_ptr->vtbl_ptr && ext_out_port_ptr->vtbl_ptr->flush)
    {
       ext_out_port_ptr->vtbl_ptr->flush(me_ptr, ext_out_port_ptr, is_client_cmd);
@@ -553,11 +559,17 @@ ar_result_t gen_cntr_ext_in_port_reset(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_
 ar_result_t gen_cntr_ext_out_port_reset(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr)
 {
    ar_result_t result = AR_EOK;
+   gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
+
+   // if IPC output port just do an algo reset
+   if(gu_is_ipc_ext_output_port(&ext_out_port_ptr->gu))
+   {
+      gen_topo_output_port_algo_reset((gen_topo_module_t*)out_port_ptr->gu.cmn.module_ptr, out_port_ptr, me_ptr->topo.gu.log_id);
+      return result;
+   }
 
    if (ext_out_port_ptr->flags.is_not_reset)
    {
-      gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
-
       if (ext_out_port_ptr->md_list_ptr)
       {
          // ext out port has old metadata compared to the one in out_port_ptr, so free it first
@@ -674,7 +686,7 @@ static ar_result_t gen_cntr_stm_fwk_extn_handle_disable(gen_cntr_t *me_ptr, gen_
    return result;
 }
 
-static ar_result_t gen_cntr_stm_fwk_extn_handle_enable(gen_cntr_t *me_ptr, gen_topo_module_t *module_ptr)
+ar_result_t gen_cntr_stm_fwk_extn_handle_enable(gen_cntr_t *me_ptr, gen_topo_module_t *module_ptr)
 {
    ar_result_t result   = AR_EOK;
    uint32_t    bit_mask = 0;
@@ -729,7 +741,10 @@ static ar_result_t gen_cntr_stm_fwk_extn_handle_enable(gen_cntr_t *me_ptr, gen_t
       stm_trigger.cust_prop.secondary_prop_id     = FWK_EXTN_PROPERTY_ID_STM_TRIGGER;
       stm_trigger.trigger.signal_ptr              = (void *)me_ptr->st_module.trigger_signal_ptr;
       stm_trigger.trigger.raised_intr_counter_ptr = &me_ptr->st_module.raised_interrupt_counter;
-
+#ifdef ENABLE_CNTR_PROC_TIME_PROFILING
+      me_ptr->st_module.isr_callback_ts =0;
+      stm_trigger.trigger.isr_callback_ts_ptr     = &me_ptr->st_module.isr_callback_ts;
+#endif
       /* Enable the stm*/
       typedef struct
       {
@@ -839,28 +854,19 @@ ar_result_t gen_cntr_fwk_extn_handle_at_start(gen_cntr_t *me_ptr, gu_module_list
       }
    }
 
-   // handle STM module enable
-   if (st_module_list_ptr)
+   // cache the STM modules in the pending start list and start them at the end of the container cmd handling.
+   // for subms frame size, starting STM here itself caused signal misses due to fwk event handling taking significant
+   // time. event handling can trigger MF propgation and algo inits which can take more time.
+   spf_list_merge_lists((spf_list_node_t **)&me_ptr->st_module.pending_start_stm_list_ptr, (spf_list_node_t **)&st_module_list_ptr);
+   if (FALSE == check_if_pass_thru_container(me_ptr))
    {
-      // pass thru container allows enabling multiple HW instances in one container.
-      if (check_if_pass_thru_container(me_ptr))
+      // if more than one STM module is found in generic container return error
+      if (me_ptr->st_module.pending_start_stm_list_ptr && me_ptr->st_module.pending_start_stm_list_ptr->next_ptr)
       {
-         result |= pt_cntr_stm_fwk_extn_handle_enable((pt_cntr_t *)me_ptr, st_module_list_ptr);
+         spf_list_delete_list((spf_list_node_t **)&me_ptr->st_module.pending_start_stm_list_ptr, TRUE);
+         GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, "more than 1 STM modules found.");
+         result = AR_EFAILED;
       }
-      else
-      {
-         if (NULL == st_module_list_ptr->next_ptr)
-         {
-            result |= gen_cntr_stm_fwk_extn_handle_enable(me_ptr, (gen_topo_module_t *)st_module_list_ptr->module_ptr);
-         }
-         else // if more than one STM module is found in generic container return error
-         {
-            GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, "more than 1 STM modules found.");
-            result = AR_EFAILED;
-         }
-      }
-
-      spf_list_delete_list((spf_list_node_t **)&st_module_list_ptr, TRUE);
    }
 
    return result;
@@ -890,7 +896,9 @@ ar_result_t gen_cntr_fwk_extn_handle_at_stop(gen_cntr_t *me_ptr, gu_module_list_
    {
       if (check_if_pass_thru_container(me_ptr))
       {
+         //pt_cntr_t *pt_ptr = (pt_cntr_t *)me_ptr;
          result = pt_cntr_stm_fwk_extn_handle_disable((pt_cntr_t *)me_ptr, st_module_list_ptr);
+         spf_list_delete_list((spf_list_node_t **)&me_ptr->st_module.pending_start_stm_list_ptr, TRUE);
       }
       else
       {
@@ -1136,10 +1144,13 @@ ar_result_t gen_cntr_set_propagated_prop_on_ext_output(gen_topo_t               
          ext_out_port_ptr->cu.icb_info.flags.is_real_time = *is_rt_ptr;
 
          // For ICB: forward prop from this containers input (or RT module) to output
-         gen_cntr_ext_out_port_recreate_bufs((void *)&me_ptr->cu, gu_out_port_ptr);
+         if (FALSE == gu_is_ipc_ext_output_port(gu_out_port_ptr))
+         {
+            gen_cntr_ext_out_port_recreate_bufs((void *)&me_ptr->cu, gu_out_port_ptr);
 
-         // downstream message is sent at the end
-         // cu_inform_downstream_about_upstream_property
+            // downstream message is sent at the end
+            // cu_inform_downstream_about_upstream_property
+         }
       }
    }
 
@@ -1370,13 +1381,31 @@ ar_result_t gen_cntr_apply_downgraded_state_on_input_port(cu_base_t        *cu_p
       if ((ext_in_port_ptr->cu.connected_port_state == TOPO_PORT_STATE_STOPPED) &&
           ((TOPO_PORT_STATE_STOPPED == downgraded_state) || (TOPO_PORT_STATE_SUSPENDED == downgraded_state)))
       {
-         gen_cntr_flush_input_data_queue(me_ptr, ext_in_port_ptr, TRUE /* keep data msg */);
+         if(gu_is_ipc_ext_input_port(&ext_in_port_ptr->gu))
+         {
+            // flush out the data buffers
+            cu_ipc_ext_input_flush_data_queue(&me_ptr->cu, &ext_in_port_ptr->gu);
+         }
+         else
+         {
+            gen_cntr_flush_input_data_queue(me_ptr, ext_in_port_ptr, TRUE /* keep data msg */);
+         }
       }
 
       if ((TOPO_PORT_STATE_STOPPED) == downgraded_state)
       {
-         // resets both internal and external port structure.
-         gen_cntr_ext_in_port_reset(me_ptr, ext_in_port_ptr);
+         if(gu_is_ipc_ext_input_port(&ext_in_port_ptr->gu))
+         {
+            // do reset to the module to ensure any held input IPC buffer is returned
+            gen_topo_module_t * module_ptr = (gen_topo_module_t *)gu_in_port_ptr->cmn.module_ptr;
+            gen_topo_input_port_algo_reset(module_ptr, in_port_ptr, me_ptr->topo.gu.log_id);
+         }
+         else
+         {
+            // resets both internal and external port structure.
+            gen_cntr_ext_in_port_reset(me_ptr, ext_in_port_ptr);
+         }
+
          ext_in_port_ptr->flags.is_not_reset = FALSE;
       }
       else if ((TOPO_PORT_STATE_STARTED) == downgraded_state)
@@ -1396,7 +1425,16 @@ ar_result_t gen_cntr_apply_downgraded_state_on_input_port(cu_base_t        *cu_p
       // Reset input port, if stopped
       if (TOPO_PORT_STATE_STOPPED == downgraded_state)
       {
-         gen_topo_reset_input_port(&me_ptr->topo, in_port_ptr);
+         if(gu_is_ipc_ext_input_port(&ext_in_port_ptr->gu))
+         {
+            // do reset to the module to ensure any held input IPC buffer is returned
+            gen_topo_module_t * module_ptr = (gen_topo_module_t *)gu_in_port_ptr->cmn.module_ptr;
+            gen_topo_input_port_algo_reset(module_ptr, in_port_ptr, me_ptr->topo.gu.log_id);
+         }
+         else
+         {
+            gen_topo_reset_input_port(&me_ptr->topo, in_port_ptr);
+         }
       }
    }
 
@@ -1441,13 +1479,33 @@ ar_result_t gen_cntr_apply_downgraded_state_on_output_port(cu_base_t        *cu_
       if ((ext_out_port_ptr->cu.connected_port_state == TOPO_PORT_STATE_STOPPED) &&
           (TOPO_PORT_STATE_STOPPED == downgraded_state))
       {
-         gen_cntr_flush_output_data_queue(me_ptr, ext_out_port_ptr, FALSE);
+         if(FALSE == gu_is_ipc_ext_output_port(&ext_out_port_ptr->gu))
+         {
+            gen_cntr_flush_output_data_queue(me_ptr, ext_out_port_ptr, FALSE);
+         }
+         else
+         {
+            // Flush handling:
+            // no need to flush output queue since buffers are owned by the ipc output port.
+            // todo: if operating in the Rd shm mode, it still needs to flush the buffers to HLOS client
+            // since buffers are owned by HLOS.
+         }
       }
 
       if ((TOPO_PORT_STATE_STOPPED == downgraded_state))
       {
-         // resets both internal and external port structure.
-         (void)gen_cntr_ext_out_port_reset(me_ptr, ext_out_port_ptr);
+         // if IPC output port just do an algo reset
+         if(gu_is_ipc_ext_output_port(&ext_out_port_ptr->gu))
+         {
+            gen_topo_module_t      *module_ptr   = (gen_topo_module_t *)(out_port_ptr->gu.cmn.module_ptr);
+            gen_topo_output_port_algo_reset(module_ptr, out_port_ptr, me_ptr->topo.gu.log_id);
+         }
+         else
+         {
+            // resets both internal and external port structure.
+            (void)gen_cntr_ext_out_port_reset(me_ptr, ext_out_port_ptr);
+         }
+
          ext_out_port_ptr->flags.is_not_reset = FALSE;
       }
       else if ((TOPO_PORT_STATE_STARTED) == downgraded_state)
@@ -1464,7 +1522,16 @@ ar_result_t gen_cntr_apply_downgraded_state_on_output_port(cu_base_t        *cu_
    {
       if (TOPO_PORT_STATE_STOPPED == downgraded_state)
       {
-         gen_topo_reset_output_port(&me_ptr->topo, out_port_ptr);
+         // if IPC output port just do an algo reset
+         if(gu_is_ipc_ext_output_port(&ext_out_port_ptr->gu))
+         {
+            gen_topo_module_t      *module_ptr   = (gen_topo_module_t *)(out_port_ptr->gu.cmn.module_ptr);
+            gen_topo_output_port_algo_reset(module_ptr, out_port_ptr, me_ptr->topo.gu.log_id);
+         }
+         else
+         {
+            gen_topo_reset_output_port(&me_ptr->topo, out_port_ptr);
+         }
       }
    }
 

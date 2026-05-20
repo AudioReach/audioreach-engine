@@ -210,6 +210,12 @@ ar_result_t amdb_route_cmd_to_satellite(amdb_thread_t *amdb_info_ptr,
       memscpy(curr_cmd_ctrl_ptr->loaned_mem_ptr, amdb_payload_size, amdb_payload_ptr, amdb_payload_size);
       posal_cache_flush_v2(&curr_cmd_ctrl_ptr->loaned_mem_ptr, amdb_payload_size);
 
+      // replace the mem handle with the peer DSP handle
+      new_apm_header_ptr->mem_map_handle      = curr_cmd_ctrl_ptr->ret_info.sat_handle;
+      new_apm_header_ptr->payload_address_lsw = curr_cmd_ctrl_ptr->ret_info.offset; // offset mode mapped
+      new_apm_header_ptr->payload_address_msw = 0;
+      curr_cmd_ctrl_ptr->is_out_of_band       = TRUE;
+
 #ifdef AMDB_OFFLOAD_DBG
       AR_MSG(DBG_HIGH_PRIO,
              "Copied payload of size %lu, into loaned mem for sat ID %lu. Sat mem handle is %lu",

@@ -48,6 +48,7 @@ typedef struct spf_thread_pool_job_t
    void                    *job_context_ptr; // callback context for the job
    ar_result_t              job_result;      // result returned by the callback function
    posal_signal_t           job_signal_ptr;  // signal which is set by the thread pool after completing the job.
+   bool_t                   job_handle_freed_in_job_context;
 } spf_thread_pool_job_t;
 
 /*==============================================================================

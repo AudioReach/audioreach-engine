@@ -1484,6 +1484,7 @@ capi_err_t gen_topo_capi_callback_non_island(void *context_ptr, capi_event_id_t 
                break;
             }
             case INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE:
+            case INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE_V2:
             {
                if (topo_ptr->topo_to_cntr_vtable_ptr->module_buffer_access_event)
                {
@@ -1506,6 +1507,20 @@ capi_err_t gen_topo_capi_callback_non_island(void *context_ptr, capi_event_id_t 
             case FWK_EXTN_EVENT_ID_IS_SIGNAL_TRIGGERED_ACTIVE:
             {
                result = gen_topo_event_is_signal_triggered_active_change(module_ptr, &dsp_event_ptr->payload);
+               break;
+            }
+            case FWK_EXTN_EVENT_ID_IPC_DATA_LINK_INFO:
+            {
+               if (topo_ptr->topo_to_cntr_vtable_ptr->handle_ipc_data_link_info_event)
+               {
+                  result = topo_ptr->topo_to_cntr_vtable_ptr->handle_ipc_data_link_info_event(topo_ptr,
+                                                                                              module_ptr,
+                                                                                              event_info_ptr);
+               }
+               else
+               {
+                  return CAPI_EUNSUPPORTED;
+               }
                break;
             }
             default:

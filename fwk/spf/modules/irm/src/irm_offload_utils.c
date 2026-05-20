@@ -291,6 +291,8 @@ ar_result_t irm_route_cmd_to_satellite(irm_t     *irm_ptr,
       memscpy(curr_cmd_ctrl_ptr->loaned_mem_ptr, irm_payload_size, irm_payload_ptr, irm_payload_size);
       posal_cache_flush_v2((posal_mem_addr_t)curr_cmd_ctrl_ptr->loaned_mem_ptr, irm_payload_size);
 
+      new_apm_header_ptr->mem_map_handle      = curr_cmd_ctrl_ptr->ret_info.sat_handle;
+
 #ifdef IRM_OFFLOAD_DBG
       AR_MSG(DBG_HIGH_PRIO,
              "Copied payload of size %lu, into loaned mem for sat ID %lu. Sat mem handle is %lu",

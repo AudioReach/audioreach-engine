@@ -17,7 +17,7 @@ $Header:
 #include "thin_topo_cntr_utils_i.h"
 #include "irm_cntr_prof_util.h"
 
-THIN_TOPO_STATIC ar_result_t thin_topo_output_buf_set_up_peer_cntr(gen_cntr_t              *me_ptr,
+THIN_TOPO_STATIC ar_result_t thin_topo_prepare_ext_outputs(gen_cntr_t              *me_ptr,
                                                                    gen_cntr_ext_out_port_t *ext_out_port_ptr,
                                                                    gen_topo_output_port_t  *out_port_ptr);
 
@@ -113,7 +113,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_copy_data_from_prev_to_next(gen_topo_t   
    }
 #endif
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    TOPO_MSG_ISLAND(topo_ptr->gu.log_id,
                    DBG_LOW_PRIO,
                    " copy_data_from_prev_to_next - same buf: next module 0x%lX: in-port-id 0x%lx: "
@@ -166,7 +166,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_copy_data_from_prev_to_next(gen_topo_t   
       next_sdata_ptr->timestamp = prev_sdata_ptr->timestamp;
    }
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    gen_topo_module_t *prev_module_ptr  = (gen_topo_module_t *)prev_out_port_ptr->gu.cmn.module_ptr;
    uint32_t           prev_sdata_flags = prev_sdata_ptr->flags.word;
    uint32_t           next_sdata_flags = next_sdata_ptr->flags.word; // for debug
@@ -461,7 +461,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_setup_internal_input_port_and_preprocess(
    ar_result_t            result      = AR_EOK;
    gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                        DBG_HIGH_PRIO,
                        "Setup ext input port 0x%lx of Module 0x%lX ",
@@ -469,7 +469,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_setup_internal_input_port_and_preprocess(
                        in_port_ptr->gu.cmn.module_ptr->module_instance_id);
 #endif
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    uint32_t bytes_in_int_inp_md_prop = gen_topo_get_actual_len_for_md_prop(&in_port_ptr->common);
    bool_t   sufficient_bytes_copied  = TRUE; /*always true for ST cntrs*/
    bool_t   is_input_discontinuity =
@@ -588,7 +588,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_setup_internal_input_port_and_preprocess(
       }
    }
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    {
       uint32_t force_process    = 1;
       bool_t   ext_cond_not_met = TRUE;
@@ -616,14 +616,14 @@ THIN_TOPO_STATIC ar_result_t thin_topo_setup_internal_input_port_and_preprocess(
    return result;
 }
 
-THIN_TOPO_STATIC ar_result_t thin_topo_poll_and_setup_ext_inputs(gen_cntr_t             *me_ptr,
+THIN_TOPO_STATIC ar_result_t thin_topo_prepare_ext_inputs(gen_cntr_t             *me_ptr,
                                                                  gen_cntr_ext_in_port_t *ext_in_port_ptr,
                                                                  gen_topo_input_port_t  *in_port_ptr)
 {
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    uint32_t num_polled_buffers = 0;
 #endif
 
@@ -656,7 +656,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_poll_and_setup_ext_inputs(gen_cntr_t     
                              in_port_ptr->gu.cmn.module_ptr->module_instance_id);
       }
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
       num_polled_buffers++;
 
       GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
@@ -672,7 +672,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_poll_and_setup_ext_inputs(gen_cntr_t     
    {
       if (TOPO_DATA_FLOW_STATE_AT_GAP == in_port_ptr->common.data_flow_state)
       {
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
          GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                              DBG_HIGH_PRIO,
                              "Ext input port 0x%lx of Module 0x%lX is AT_GAP, skipping underrun",
@@ -700,7 +700,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_poll_and_setup_ext_inputs(gen_cntr_t     
             THROW(result, AR_EFAILED);
          }
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
          GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                              DBG_HIGH_PRIO,
                              "Underrun ext input port 0x%lx of Module 0x%lX ext buffer not present, assing and "
@@ -747,6 +747,15 @@ THIN_TOPO_STATIC void thin_topo_handle_input_sdata_after_process_per_port(gen_to
                               topo_ptr->proc_context.proc_result,
                               "input",
                               "after");
+#endif
+
+#ifdef ERROR_CHECK_MODULE_PROCESS
+   gen_topo_validate_port_sdata(topo_ptr->gu.log_id,
+                                 &in_port_ptr->common,
+                                 TRUE /**is_input*/,
+                                 in_port_ptr->gu.cmn.index,
+                                 module_ptr,
+                                 TRUE);
 #endif
 
 #ifdef THIN_TOPO_SAFE_MODE
@@ -809,7 +818,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_post_process_peer_ext_output(gen_cntr_t  
    ar_result_t result = AR_EOK;
 
    uint32_t bytes_produced_by_pp = out_port_ptr->common.bufs_ptr[0].actual_data_len;
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                        DBG_LOW_PRIO,
                        "postprocess output: before module (%lu of %lu), ext out (%lu of %lu), "
@@ -888,7 +897,7 @@ THIN_TOPO_STATIC capi_err_t thin_topo_process_attached_module_to_output(gen_topo
 
    if (out_attached_module_ptr->flags.disabled)
    {
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
       TOPO_MSG_ISLAND(topo_ptr->gu.log_id,
                       DBG_MED_PRIO,
                       "Skipping process on attached elementary module miid 0x%lx for input port idx %ld id 0x%lx - "
@@ -907,7 +916,7 @@ THIN_TOPO_STATIC capi_err_t thin_topo_process_attached_module_to_output(gen_topo
       return AR_EOK;
    }
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    TOPO_MSG_ISLAND(topo_ptr->gu.log_id,
                    DBG_MED_PRIO,
                    "Before process attached elementary module miid 0x%lx for output port idx %ld id 0x%lx",
@@ -927,7 +936,7 @@ THIN_TOPO_STATIC capi_err_t thin_topo_process_attached_module_to_output(gen_topo
    );
    // clang-format on
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    TOPO_MSG_ISLAND(topo_ptr->gu.log_id,
                    DBG_MED_PRIO,
                    "After process attached elementary module miid 0x%lx for output port idx %ld id 0x%lx",
@@ -936,7 +945,7 @@ THIN_TOPO_STATIC capi_err_t thin_topo_process_attached_module_to_output(gen_topo
                    module_ptr->gu.module_instance_id);
 #endif
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    // Don't ignore need more for attached modules.
    if (CAPI_FAILED(attached_proc_result))
    {
@@ -960,17 +969,23 @@ THIN_TOPO_STATIC capi_err_t thin_topo_process_attached_module_to_output(gen_topo
  */
 THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr)
 {
-   ar_result_t                 result                       = AR_EOK;
-   capi_err_t                  proc_result                  = CAPI_EOK;
-   gen_topo_t                 *topo_ptr                     = &me_ptr->topo;
-   gen_topo_process_context_t *pc                           = &topo_ptr->proc_context;
-   gen_topo_process_info_t    *proc_info_ptr                = &topo_ptr->proc_context.process_info;
-   gu_module_list_t           *module_list_ptr              = me_ptr->topo.thin_topo_ptr->active_module_list_ptr;
-   gu_ext_in_port_list_t      *active_ext_in_port_list_ptr  = topo_ptr->thin_topo_ptr->active_ext_in_list_ptr;
-   gu_ext_out_port_list_t     *active_ext_out_port_list_ptr = topo_ptr->thin_topo_ptr->active_ext_out_list_ptr;
+   ar_result_t                 result                           = AR_EOK;
+   capi_err_t                  proc_result                      = CAPI_EOK;
+   gen_topo_t                 *topo_ptr                         = &me_ptr->topo;
+   gen_topo_process_context_t *pc                               = &topo_ptr->proc_context;
+   gen_topo_process_info_t    *proc_info_ptr                    = &topo_ptr->proc_context.process_info;
+   gu_module_list_t           *module_list_ptr                  = me_ptr->topo.thin_topo_ptr->active_module_list_ptr;
+   gu_ext_in_port_list_t      *active_ext_in_port_list_ptr      = topo_ptr->thin_topo_ptr->active_ext_in_list_ptr;
+   gu_ext_out_port_list_t     *active_ext_out_port_list_ptr     = topo_ptr->thin_topo_ptr->active_ext_out_list_ptr;
+   gu_ext_in_port_list_t      *active_ipc_ext_in_port_list_ptr  = topo_ptr->thin_topo_ptr->active_ipc_ext_in_list_ptr;
+   gu_ext_out_port_list_t     *active_ipc_ext_out_port_list_ptr = topo_ptr->thin_topo_ptr->active_ipc_ext_out_list_ptr;
+   gu_input_port_list_t       *active_input_buf_access_port_list_ptr =
+      topo_ptr->thin_topo_ptr->active_input_buf_access_port_list_ptr;
+   gu_output_port_list_t *active_output_buf_access_port_list_ptr =
+      topo_ptr->thin_topo_ptr->active_output_buf_access_port_list_ptr;
    INIT_EXCEPTION_HANDLING
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    gen_topo_module_t *module_ptr = (gen_topo_module_t *)module_list_ptr->module_ptr;
    if (module_list_ptr)
    {
@@ -997,7 +1012,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
       gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
       gen_topo_input_port_t  *in_port_ptr     = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
       GEN_CNTR_MSG_ISLAND(topo_ptr->gu.log_id,
                           DBG_HIGH_PRIO,
                           "Module 0x%lX external Input 0x%lx int buf: (%p %lu %lu) ",
@@ -1008,7 +1023,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
                           in_port_ptr->common.bufs_ptr[0].max_data_len);
 #endif
 
-      TRY(result, thin_topo_poll_and_setup_ext_inputs(me_ptr, ext_in_port_ptr, in_port_ptr));
+      TRY(result, thin_topo_prepare_ext_inputs(me_ptr, ext_in_port_ptr, in_port_ptr));
    }
 
    /** -------- PRE-PROCESS EXTERNAL OUTPUTS ---------------
@@ -1021,9 +1036,9 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
       gen_cntr_ext_out_port_t *ext_out_port_ptr = (gen_cntr_ext_out_port_t *)ext_out_port_list_ptr->ext_out_port_ptr;
       gen_topo_output_port_t  *out_port_ptr     = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
 
-      TRY(result, thin_topo_output_buf_set_up_peer_cntr(me_ptr, ext_out_port_ptr, out_port_ptr));
+      TRY(result, thin_topo_prepare_ext_outputs(me_ptr, ext_out_port_ptr, out_port_ptr));
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
       GEN_CNTR_MSG_ISLAND(topo_ptr->gu.log_id,
                           DBG_HIGH_PRIO,
                           "Module 0x%lX external output 0x%lx int buf: (%p %lu %lu) ",
@@ -1033,6 +1048,37 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
                           out_port_ptr->common.bufs_ptr[0].actual_data_len,
                           out_port_ptr->common.bufs_ptr[0].max_data_len);
 #endif
+   }
+
+   /* Iterate through all IPC input and output ports, poll and setup the buffers. */
+   for (gu_ext_in_port_list_t *ipc_in_port_list_ptr = active_ipc_ext_in_port_list_ptr; (NULL != ipc_in_port_list_ptr);
+        LIST_ADVANCE(ipc_in_port_list_ptr))
+   {
+      TRY(result,
+          cu_poll_and_setup_ipc_input_port_buffer(&me_ptr->cu,
+                                                  ipc_in_port_list_ptr->ext_in_port_ptr,
+                                                  NULL,
+                                                  ALLOW_UNDERRUN));
+   }
+
+   for (gu_ext_out_port_list_t *ipc_out_port_list_ptr = active_ipc_ext_out_port_list_ptr;
+        (NULL != ipc_out_port_list_ptr);
+        LIST_ADVANCE(ipc_out_port_list_ptr))
+   {
+      TRY(result,
+          cu_poll_and_setup_ipc_output_port_buffer(&me_ptr->cu,
+                                                   ipc_out_port_list_ptr->ext_out_port_ptr,
+                                                   NULL,
+                                                   ALLOW_OVERRUN));
+   }
+
+   // if the module supports buffer access extension get and assign buffer to input port
+   // buffer will be assigned to upstream ports in the module process context
+   for (gu_input_port_list_t *in_port_list_ptr = active_input_buf_access_port_list_ptr; (NULL != in_port_list_ptr);
+        LIST_ADVANCE(in_port_list_ptr))
+   {
+      gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
+      result |= gen_topo_query_n_assign_capi_input_port_util(topo_ptr, in_port_ptr);
    }
 
    /** ------------- MODULE PROCESS LOOP ---------------------
@@ -1057,13 +1103,53 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
          gen_topo_input_port_t *in_port_ptr  = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
          capi_stream_data_v2_t *in_sdata_ptr = &in_port_ptr->common.sdata;
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
          GEN_CNTR_MSG_ISLAND(topo_ptr->gu.log_id,
                              DBG_HIGH_PRIO,
                              "setup thin topo process from Module 0x%lX input 0x%lx ",
                              module_ptr->gu.module_instance_id,
                              in_port_ptr->gu.cmn.id);
 #endif
+
+         // get buffer if static buffer is not assigned. usually this happens only if the port is supporting module
+         // buffer access extension or if the port in the NBLC inplace path of the port supporting the extension.
+         if (NULL == in_port_ptr->common.bufs_ptr[0].data_ptr)
+         {
+            ar_result_t result =
+               gen_topo_check_get_in_buf_from_buf_mgr(topo_ptr,
+                                                      in_port_ptr,
+                                                      (gen_topo_output_port_t *)in_port_ptr->gu.conn_out_port_ptr);
+            if (AR_DID_FAIL(result))
+            {
+               TOPO_MSG(topo_ptr->gu.log_id,
+                        DBG_ERROR_PRIO,
+                        " Module 0x%lX: Input port id 0x%lx, error getting buffer in process context",
+                        module_ptr->gu.module_instance_id,
+                        in_port_ptr->gu.cmn.id);
+            }
+            else
+            {
+               TOPO_MSG(topo_ptr->gu.log_id,
+                        DBG_LOW_PRIO,
+                        " Warning! Module 0x%lX: Input port id 0x%lx, assigning buffer in process context",
+                        module_ptr->gu.module_instance_id,
+                        in_port_ptr->gu.cmn.id);
+            }
+
+            // fix lens for the v1 buffers
+            if (GEN_TOPO_MF_PCM_UNPACKED_V1 == in_port_ptr->common.flags.is_pcm_unpacked)
+            {
+               // for unpacked V1 set sdata lengths for all the channels
+               // uint32_t actual_data_len = in_port_ptr->common.sdata.buf_ptr[0].actual_data_len;
+               uint32_t max_data_len = in_port_ptr->common.sdata.buf_ptr[0].max_data_len;
+               for (uint32_t b = 1; b < in_port_ptr->common.sdata.bufs_num; b++)
+               {
+                  // actual len is expected to be zero at this point, hence not updating it
+                  // in_port_ptr->common.sdata.buf_ptr[b].actual_data_len = actual_data_len;
+                  in_port_ptr->common.sdata.buf_ptr[b].max_data_len = max_data_len;
+               }
+            }
+         }
 
          // do this only for internal ports.
          if (in_port_ptr->gu.conn_out_port_ptr)
@@ -1109,6 +1195,16 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
                                     "input",
                                     "before");
 #endif
+
+#ifdef ERROR_CHECK_MODULE_PROCESS
+         TRY(result,
+             gen_topo_validate_port_sdata(topo_ptr->gu.log_id,
+                                          &in_port_ptr->common,
+                                          TRUE /**is_input*/,
+                                          in_port_ptr->gu.cmn.index,
+                                          module_ptr,
+                                          FALSE));
+#endif
       }
 
       for (gu_output_port_list_t *out_port_list_ptr = module_ptr->gu.output_port_list_ptr; (NULL != out_port_list_ptr);
@@ -1117,7 +1213,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
          gen_topo_output_port_t *out_port_ptr  = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
          capi_stream_data_v2_t  *out_sdata_ptr = &out_port_ptr->common.sdata;
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
          GEN_CNTR_MSG_ISLAND(topo_ptr->gu.log_id,
                              DBG_HIGH_PRIO,
                              "Setup thin topo process from Module 0x%lX output 0x%lx ",
@@ -1153,6 +1249,41 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
 
             gen_topo_set_all_bufs_len_to_zero(&out_port_ptr->common);
          }
+         // get buffer if static buffer is not assigned. usually this happens only if the port is supporting module
+         // buffer access extension or if the port in the NBLC inplace path of the port supporting the extension.
+         else if (NULL == out_port_ptr->common.bufs_ptr[0].data_ptr)
+         {
+            ar_result_t result = gen_topo_check_get_out_buf_from_buf_mgr(topo_ptr, module_ptr, out_port_ptr);
+            if (AR_DID_FAIL(result))
+            {
+               TOPO_MSG(topo_ptr->gu.log_id,
+                        DBG_ERROR_PRIO,
+                        " Module 0x%lX: Output port id 0x%lx, error getting buffer in process context",
+                        module_ptr->gu.module_instance_id,
+                        out_port_ptr->gu.cmn.id);
+            }
+            else
+            {
+               TOPO_MSG(topo_ptr->gu.log_id,
+                        DBG_LOW_PRIO,
+                        " Warning! Module 0x%lX: Output port id 0x%lx, assigning buffer in process context",
+                        module_ptr->gu.module_instance_id,
+                        out_port_ptr->gu.cmn.id);
+            }
+
+            // fix lens for the v1 buffers
+            if (GEN_TOPO_MF_PCM_UNPACKED_V1 == out_port_ptr->common.flags.is_pcm_unpacked)
+            {
+               // for unpacked V1 set sdata lengths for all the channels
+               uint32_t actual_data_len = out_port_ptr->common.sdata.buf_ptr[0].actual_data_len;
+               uint32_t max_data_len    = out_port_ptr->common.sdata.buf_ptr[0].max_data_len;
+               for (uint32_t b = 1; b < out_port_ptr->common.sdata.bufs_num; b++)
+               {
+                  out_port_ptr->common.sdata.buf_ptr[b].actual_data_len = actual_data_len;
+                  out_port_ptr->common.sdata.buf_ptr[b].max_data_len    = max_data_len;
+               }
+            }
+         }
 
          pc->out_port_sdata_pptr[out_port_ptr->gu.cmn.index] = out_sdata_ptr;
 
@@ -1163,6 +1294,16 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
                                     topo_ptr->proc_context.proc_result,
                                     "output",
                                     "before");
+#endif
+
+#ifdef ERROR_CHECK_MODULE_PROCESS
+         TRY(result,
+             gen_topo_validate_port_sdata(topo_ptr->gu.log_id,
+                                          &out_port_ptr->common,
+                                          FALSE /**is_input*/,
+                                          out_port_ptr->gu.cmn.index,
+                                          module_ptr,
+                                          FALSE));
 #endif
       }
 
@@ -1209,7 +1350,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
          THROW(result, AR_ENOTREADY);
       }
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
       pc->proc_result = proc_result;
       GEN_CNTR_MSG_ISLAND(topo_ptr->gu.log_id,
                           DBG_HIGH_PRIO,
@@ -1231,6 +1372,16 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
                                     topo_ptr->proc_context.proc_result,
                                     "output",
                                     "after");
+#endif
+
+#ifdef ERROR_CHECK_MODULE_PROCESS
+         TRY(result,
+             gen_topo_validate_port_sdata(topo_ptr->gu.log_id,
+                                          &out_port_ptr->common,
+                                          FALSE /**is_input*/,
+                                          out_port_ptr->gu.cmn.index,
+                                          module_ptr,
+                                          TRUE));
 #endif
 
 #ifdef THIN_TOPO_SAFE_MODE
@@ -1330,11 +1481,15 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
       if (THIN_TOPO_EXITED_AT_OUTPUT_POST_PROCESS == topo_ptr->thin_topo_ptr->state)
       {
          gen_topo_exit_island_temporarily(topo_ptr);
+
+         // get current modules list ptr from gen topo.
+         gu_module_list_t *cur_mod_gen_topo_list_ptr =
+            thin_topo_get_gen_topo_module_list_ptr(topo_ptr, module_list_ptr->module_ptr);
+
          // process from the next module in gen topo
-         if (module_list_ptr->next_ptr)
+         if (cur_mod_gen_topo_list_ptr->next_ptr)
          {
-            topo_ptr->thin_topo_ptr->gen_topo_proc_next_module_list_ptr =
-               thin_topo_get_gen_topo_module_list_ptr(topo_ptr, module_list_ptr->next_ptr->module_ptr);
+            topo_ptr->thin_topo_ptr->gen_topo_proc_next_module_list_ptr = cur_mod_gen_topo_list_ptr->next_ptr;
          }
          else
          {
@@ -1393,6 +1548,55 @@ THIN_TOPO_STATIC ar_result_t thin_topo_data_process_one_frame(gen_cntr_t *me_ptr
       proc_info_ptr->atleast_one_inp_holds_ext_buffer = FALSE;
    }
 
+   // After module process
+   for (gu_input_port_list_t *in_port_list_ptr = active_input_buf_access_port_list_ptr; (NULL != in_port_list_ptr);
+        LIST_ADVANCE(in_port_list_ptr))
+   {
+      /* Assume a single input port per module (typical for this container). */
+      gen_topo_input_port_t *cur_in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
+
+      // clear the buffer that was propagated from the current input to upstream NBLC
+      // ensure all the borrowed buffer references are removed.
+      if (GEN_TOPO_BUF_ORIGIN_CAPI_MODULE != cur_in_port_ptr->common.flags.buf_origin)
+      {
+         continue;
+      }
+
+#ifdef MOD_BUF_ACCESS_DEBUG
+      TOPO_MSG(topo_ptr->gu.log_id,
+               DBG_LOW_PRIO,
+               "MOD_BUF_ACCESS_DEBUG: Module 0x%lx input port 0x%lx has capi internal buffer",
+               cur_in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+               cur_in_port_ptr->gu.cmn.id);
+#endif
+      result =
+         gen_topo_clear_and_replace_capi_input_buffers_util(topo_ptr, cur_in_port_ptr, TRUE /*drop pending data*/);
+   }
+
+   for (gu_output_port_list_t *out_port_list_ptr = active_output_buf_access_port_list_ptr; (NULL != out_port_list_ptr);
+        LIST_ADVANCE(out_port_list_ptr))
+   {
+      /* Assume a single input port per module (typical for this container). */
+      gen_topo_output_port_t *curr_out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
+
+      // check if output port got the capi buffer
+      if (GEN_TOPO_BUF_ORIGIN_CAPI_MODULE != curr_out_port_ptr->common.flags.buf_origin)
+      {
+         continue;
+      }
+
+#ifdef MOD_BUF_ACCESS_DEBUG
+      TOPO_MSG(topo_ptr->gu.log_id,
+               DBG_LOW_PRIO,
+               "MOD_BUF_ACCESS_DEBUG: Module 0x%lx output port 0x%lx has capi internal buffer.",
+               curr_out_port_ptr->gu.cmn.module_ptr->module_instance_id,
+               curr_out_port_ptr->gu.cmn.id);
+#endif
+
+      result =
+         gen_topo_clear_and_replace_capi_output_buffers_util(topo_ptr, curr_out_port_ptr, TRUE /*drop pending data*/);
+   }
+
    gen_cntr_handle_fwk_events_in_data_path(me_ptr);
 
    /** Poll control channel and check for incoming ctrl msgs.
@@ -1421,7 +1625,7 @@ ar_result_t thin_topo_signal_trigger_handler(cu_base_t *cu_ptr, uint32_t channel
    ar_result_t result = AR_EOK;
    gen_cntr_t *me_ptr = (gen_cntr_t *)cu_ptr;
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id, DBG_LOW_PRIO, "thin_topo_trigger: Received signal trigger");
 #endif
 
@@ -1514,7 +1718,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_ext_output_setup_overrun_buf(gen_cntr_t  
    // only by gen topo.
    if ((FALSE == out_port_ptr->common.flags.is_mf_valid) || (0 == out_port_ptr->common.max_buf_len))
    {
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
       GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                           DBG_ERROR_PRIO,
                           " Module 0x%lX: Ext output port id 0x%lx buffer is unavailable, assigning topo buffer to "
@@ -1557,7 +1761,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_ext_output_setup_overrun_buf(gen_cntr_t  
  *
  * any of the output port can trigger this.
  */
-THIN_TOPO_STATIC ar_result_t thin_topo_output_buf_set_up_peer_cntr(gen_cntr_t              *me_ptr,
+THIN_TOPO_STATIC ar_result_t thin_topo_prepare_ext_outputs(gen_cntr_t              *me_ptr,
                                                                    gen_cntr_ext_out_port_t *ext_out_port_ptr,
                                                                    gen_topo_output_port_t  *out_port_ptr)
 {
@@ -1627,7 +1831,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_send_data_to_downstream_peer_cntr(gen_cnt
    }
 #endif
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    spf_msg_data_buffer_t *out_buf_ptr = (spf_msg_data_buffer_t *)&out_buf_header->payload_start;
    gen_topo_module_t     *module_ptr  = (gen_topo_module_t *)ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr;
    GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
@@ -1688,7 +1892,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_send_data_to_downstream_peer_cntr(gen_cnt
    }
    else
    {
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
       GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                           DBG_LOW_PRIO,
                           "pushed buffer downstream 0x%p. Current bit mask 0x%x",
@@ -1759,7 +1963,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_send_peer_cntr_out_buffers(gen_cntr_t    
                   DATA_BUFFER_FLAG_TIMESTAMP_VALID_SHIFT);
 
       out_buf_ptr->timestamp = out_port_ptr->common.sdata.timestamp;
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
       GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                           DBG_LOW_PRIO,
                           "Outgoing timestamp: setting STM module's trigger ts msw %lu, lsw %lu",
@@ -1768,7 +1972,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_send_peer_cntr_out_buffers(gen_cntr_t    
 #endif
    }
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                        DBG_LOW_PRIO,
                        "Outgoing timestamp: %lu (0x%lx%lx), flag=0x%lx, size=%lu",
@@ -1879,7 +2083,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_input_data_set_up_peer_cntr(gen_cntr_t   
    {
       me_ptr->topo.thin_topo_ptr->state = THIN_TOPO_EXITED_AT_EXT_IN_BUFFER_SETUP;
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
       GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                           DBG_HIGH_PRIO,
                           "Exiting thin topo from MID 0x%lX, Ext Inp 0x%lX since data flow is starting?%lu or "
@@ -1983,7 +2187,7 @@ THIN_TOPO_STATIC ar_result_t thin_topo_input_dataQ_trigger_peer_cntr(gen_cntr_t 
    }
 #endif
 
-#ifdef VERBOSE_DEBUGGING
+#ifdef THIN_TOPO_PROCESS_DEBUG
    GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                        DBG_LOW_PRIO,
                        "Popped an input msg buffer 0x%lx with opcode 0x%x from (miid,port-id) (0x%lX, 0x%lx) queue",

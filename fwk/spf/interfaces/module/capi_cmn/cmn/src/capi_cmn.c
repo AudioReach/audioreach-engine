@@ -1914,7 +1914,7 @@ capi_err_t capi_cmn_intf_extn_event_module_output_buffer_reuse(
    typedef struct
    {
       intf_extn_event_id_module_buffer_access_enable_t cfg;
-      intf_extn_output_buffer_manager_cb_info_t           cb_info;
+      intf_extn_output_buffer_manager_cb_info_t        cb_info;
    } payload_def;
 
    payload_def payload;
@@ -1950,6 +1950,74 @@ capi_err_t capi_cmn_intf_extn_event_module_output_buffer_reuse(
                    "event 0x%lX is_input: %lu raised to container",
                    INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE,
                    FALSE);
+   }
+   return result;
+}
+
+capi_err_t capi_cmn_intf_extn_event_module_port_buffer_reuse_v2(
+   uint32_t                                             log_id,
+   capi_event_callback_info_t                          *cb_info_ptr,
+   uint32_t                                             port_index,
+   bool_t                                               is_input,
+   intf_extn_event_id_module_buffer_access_enable_v2_t *cfg_ptr)
+{
+   capi_err_t result = CAPI_EOK;
+   if ((NULL == cb_info_ptr->event_cb) || (NULL == cfg_ptr->buffer_mgr_cb_handle) || (NULL == cfg_ptr))
+   {
+      CAPI_CMN_MSG(log_id,
+                   DBG_ERROR_PRIO,
+                   "Event callback is not set:%lu or event payload is NULL: (cb_handle:%lu, cfg_ptr: %lu)",
+                   (NULL == cb_info_ptr),
+                   (NULL == cfg_ptr->buffer_mgr_cb_handle),
+                   (NULL == cfg_ptr));
+      return CAPI_EBADPARAM;
+   }
+
+   capi_event_info_t event_info;
+   event_info.port_info.port_index    = port_index;
+   event_info.port_info.is_valid      = TRUE;
+   event_info.port_info.is_input_port = is_input;
+
+   // Package the fwk event within the data_to_dsp capi event.
+   capi_event_data_to_dsp_service_t evt = { 0 };
+
+   typedef struct
+   {
+      intf_extn_event_id_module_buffer_access_enable_v2_t cfg;
+   } payload_def;
+
+   payload_def payload;
+   memset(&payload, 0, sizeof(payload));
+
+   // copy the payload
+   payload.cfg = *cfg_ptr;
+
+   evt.param_id                = INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE_V2;
+   evt.token                   = 0;
+   evt.payload.actual_data_len = sizeof(payload);
+   evt.payload.data_ptr        = (int8_t *)(&payload);
+   evt.payload.max_data_len    = sizeof(payload);
+
+   event_info.payload.actual_data_len = sizeof(capi_event_data_to_dsp_service_t);
+   event_info.payload.data_ptr        = (int8_t *)&evt;
+   event_info.payload.max_data_len    = sizeof(capi_event_data_to_dsp_service_t);
+   result = cb_info_ptr->event_cb(cb_info_ptr->event_context, CAPI_EVENT_DATA_TO_DSP_SERVICE, &event_info);
+   if (CAPI_FAILED(result))
+   {
+      CAPI_CMN_MSG(log_id,
+                   DBG_ERROR_PRIO,
+                   "Failed to raise event 0x%lX is_input: %lu to container with 0x%lx",
+                   INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE_V2,
+                   TRUE,
+                   result);
+   }
+   else
+   {
+      CAPI_CMN_MSG(log_id,
+                   DBG_LOW_PRIO,
+                   "event 0x%lX is_input: %lu raised to container",
+                   INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE_V2,
+                   TRUE);
    }
    return result;
 }

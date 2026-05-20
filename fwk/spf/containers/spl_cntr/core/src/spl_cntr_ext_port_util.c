@@ -1316,10 +1316,13 @@ ar_result_t spl_cntr_set_propagated_prop_on_ext_output(gen_topo_t *             
       {
          ext_out_port_ptr->cu.icb_info.flags.is_real_time = *is_rt_ptr;
 
-         spl_cntr_recreate_ext_out_buffers((void *)&me_ptr->cu, gu_out_port_ptr);
+         if (FALSE == gu_is_ipc_ext_output_port(gu_out_port_ptr))
+         {
+            spl_cntr_recreate_ext_out_buffers((void *)&me_ptr->cu, gu_out_port_ptr);
 
-         // downstream message is sent at the end
-         // cu_inform_downstream_about_upstream_property
+            // downstream message is sent at the end
+            // cu_inform_downstream_about_upstream_property
+         }
       }
    }
 
