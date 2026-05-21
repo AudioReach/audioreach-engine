@@ -1105,7 +1105,13 @@ capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], cap
          }
       }
 
-      if(is_batch_completed)
+       /* Skip batch header finalization if no header was written for this batch.
+        * is_update_header == TRUE indicates the header is still pending (not yet written).
+        * Invoking push_mode_end_header_batch in this state corrupts the previous batch's
+          actual_size field in DDR, since pcm_param_actual_size_ptr still points to it.
+        * This occurs on 0-byte EOS/DFG frames triggered by timestamp discontinuities. */
+
+      if(is_batch_completed && !capi_ptr->is_update_header)
       {
          push_mode_end_header_batch(capi_ptr, timestamp);
       }
