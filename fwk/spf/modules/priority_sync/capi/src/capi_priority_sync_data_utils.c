@@ -504,7 +504,7 @@ capi_err_t capi_priority_sync_buffer_new_data(capi_priority_sync_t *me_ptr,
          uint32_t copy_size = memscpy(write_ptr,
                                       write_size,
                                       input_v2_ptr->buf_ptr[ch].data_ptr,
-                                      input_v2_ptr->buf_ptr[ch].actual_data_len);
+                                      input_v2_ptr->buf_ptr[0].actual_data_len);
 
          in_port_ptr->int_stream.buf_ptr[ch].actual_data_len += copy_size;
 
