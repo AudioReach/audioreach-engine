@@ -4,7 +4,7 @@
 ## VARIABLES:
 #
 # ARCH: Specify SoC Architecture
-#    Supported Values: "hexagon, linux"
+#    Supported Values: "hexagon, linux, zephyr"
 # V_ARCH: Arch variant
 # CONFIG: config file to use
 #
@@ -16,6 +16,8 @@ set(AR_VERSION "AR-${AR_MAJOR_VERSION}.${AR_MINOR_VERSION}-${AR_PATCHLEVEL}")
 cmake_minimum_required(VERSION 3.24)  
 
 if (CONFIG_ARCH_ZEPHYR)
+set(ARCH "zephyr")
+set(CONFIG "prj.conf")
 include(scripts/cmake/zephyr-toolchain.cmake)
 endif()
 
