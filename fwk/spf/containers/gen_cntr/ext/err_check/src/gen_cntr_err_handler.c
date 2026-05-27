@@ -41,7 +41,7 @@ static ar_result_t gen_cntr_err_handler_for_signal_miss(gen_cntr_t *me_ptr)
 
    for (gu_sg_list_t *sg_list_ptr = me_ptr->topo.gu.sg_list_ptr; (NULL != sg_list_ptr); LIST_ADVANCE(sg_list_ptr))
    {
-      if (AR_EOK != (result = gen_cntr_fwk_extn_handle_at_start(me_ptr, sg_list_ptr->sg_ptr->module_list_ptr)))
+      if (AR_EOK != (result = gen_cntr_fwk_extn_handle_at_start(me_ptr, sg_list_ptr->sg_ptr->module_list_ptr, FALSE /*DEFER STM ENABLE FLAG*/)))
       {
          GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
                       DBG_ERROR_PRIO,

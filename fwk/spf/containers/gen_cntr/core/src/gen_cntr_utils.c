@@ -831,7 +831,9 @@ ar_result_t gen_cntr_stm_fwk_extn_handle_enable(gen_cntr_t *me_ptr, gen_topo_mod
    return result;
 }
 
-ar_result_t gen_cntr_fwk_extn_handle_at_start(gen_cntr_t *me_ptr, gu_module_list_t *module_list_ptr)
+// in the signal miss context when end points are restarted, defer_stm_enable_until_endof_cmd should be set to FALSE, to allow restarting
+// the hw interfaces int the process context as soon as signal miss is detected.
+ar_result_t gen_cntr_fwk_extn_handle_at_start(gen_cntr_t *me_ptr, gu_module_list_t *module_list_ptr, uint32_t defer_stm_enable_until_endof_cmd)
 {
    ar_result_t result = AR_EOK;
 
@@ -853,22 +855,61 @@ ar_result_t gen_cntr_fwk_extn_handle_at_start(gen_cntr_t *me_ptr, gu_module_list
          spf_list_insert_tail((spf_list_node_t **)&st_module_list_ptr, module_ptr, me_ptr->cu.heap_id, TRUE);
       }
    }
-
-   // cache the STM modules in the pending start list and start them at the end of the container cmd handling.
-   // for subms frame size, starting STM here itself caused signal misses due to fwk event handling taking significant
-   // time. event handling can trigger MF propgation and algo inits which can take more time.
-   spf_list_merge_lists((spf_list_node_t **)&me_ptr->st_module.pending_start_stm_list_ptr, (spf_list_node_t **)&st_module_list_ptr);
+   
+   // Error if GC container has more than one STM modules. currently supported only in PTC
    if (FALSE == check_if_pass_thru_container(me_ptr))
    {
       // if more than one STM module is found in generic container return error
-      if (me_ptr->st_module.pending_start_stm_list_ptr && me_ptr->st_module.pending_start_stm_list_ptr->next_ptr)
+      if (st_module_list_ptr && st_module_list_ptr->next_ptr)
       {
-         spf_list_delete_list((spf_list_node_t **)&me_ptr->st_module.pending_start_stm_list_ptr, TRUE);
+         spf_list_delete_list((spf_list_node_t **)&st_module_list_ptr, TRUE);
          GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, "more than 1 STM modules found.");
          result = AR_EFAILED;
       }
    }
+   
+   // no stm modules found, nothing to do
+   if(NULL == st_module_list_ptr)
+   {
+	   return result;
+   }
 
+   // check if the STM enable needs to be defered
+   if(defer_stm_enable_until_endof_cmd)
+   {
+	   // cache the STM modules in the pending start list and start them at the end of the container cmd handling.
+	   // for subms frame size, starting STM here itself caused signal misses due to fwk event handling taking significant
+	   // time. event handling can trigger MF propgation and algo inits which can take more time.
+	   spf_list_merge_lists((spf_list_node_t **)&me_ptr->st_module.pending_start_stm_list_ptr, (spf_list_node_t **)&st_module_list_ptr);
+	   
+	   GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+					DBG_LOW_PRIO,
+					"Defered enablement of CAPI signal triggered modules to the end of start cmd handling");
+   }
+   else // enable STM modules
+   {
+	   GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+					DBG_LOW_PRIO,
+					"Not deferring enablement of CAPI signal triggered modules.");
+					
+	  if (check_if_pass_thru_container(me_ptr))
+      {
+         pt_cntr_t *pt_ptr = (pt_cntr_t *)me_ptr;
+         if (AR_EOK !=
+             (result = pt_cntr_stm_fwk_extn_handle_enable(pt_ptr, st_module_list_ptr)))
+         {
+            GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, "Failed enabling PTC cntr");
+         }
+      }
+      else
+      {
+         result |= gen_cntr_stm_fwk_extn_handle_enable(me_ptr,
+                                                       (gen_topo_module_t *)st_module_list_ptr->module_ptr);
+      }
+
+      spf_list_delete_list((spf_list_node_t **)&st_module_list_ptr, TRUE);
+   }
+   
    return result;
 }
 
@@ -1105,7 +1146,7 @@ ar_result_t gen_cntr_handle_fwk_extn_post_subgraph_op(gen_cntr_t       *me_ptr,
    ar_result_t result = AR_EOK;
    if (sg_op & TOPO_SG_OP_START)
    {
-      result = gen_cntr_fwk_extn_handle_at_start(me_ptr, module_list_ptr);
+      result = gen_cntr_fwk_extn_handle_at_start(me_ptr, module_list_ptr, TRUE /*defer start until end of start hdling*/);
    }
 
    return result;
