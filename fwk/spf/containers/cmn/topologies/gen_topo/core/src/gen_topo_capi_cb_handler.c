@@ -1010,6 +1010,10 @@ capi_err_t gen_topo_capi_callback_base(gen_topo_module_t *module_ptr,
             {
                module_ptr->bypass_ptr->in_thresh_bytes_all_ch = new_threshold;
 
+               // Reset threshold flags to prevent stale threshold usage during LCM calculation
+               // when module is bypassed (new threshold is cached separately in bypass_ptr).
+                in_port_ptr->common.threshold_raised = 0;
+                in_port_ptr->common.port_event_new_threshold = 0;
                TOPO_MSG(topo_ptr->gu.log_id,
                         DBG_HIGH_PRIO,
                         "Module 0x%lX: Input port id 0x%lx event with new port-threshold = %lu raised while module is "
@@ -1072,7 +1076,10 @@ capi_err_t gen_topo_capi_callback_base(gen_topo_module_t *module_ptr,
             if (module_ptr->bypass_ptr)
             {
                module_ptr->bypass_ptr->out_thresh_bytes_all_ch = new_threshold;
-
+               // Reset threshold flags to prevent stale threshold usage during LCM calculation
+               // when module is bypassed (new threshold is cached separately in bypass_ptr).
+                out_port_ptr->common.threshold_raised = 0;
+                out_port_ptr->common.port_event_new_threshold = 0;
                TOPO_MSG(topo_ptr->gu.log_id,
                         DBG_HIGH_PRIO,
                         "Module 0x%lX: Output port id 0x%lx event with new port-threshold = %lu raised while module is "
