@@ -601,11 +601,24 @@ capi_err_t capi_ipc_tx_process_set_properties(capi_ipc_tx_t *me_ptr, capi_propli
       {
          case CAPI_EVENT_CALLBACK_INFO:
          case CAPI_HEAP_ID:
-         case CAPI_ALGORITHMIC_RESET:
          case CAPI_CUSTOM_INIT_DATA:
          case CAPI_INTERFACE_EXTENSIONS:
          case CAPI_OUTPUT_MEDIA_FORMAT_V2:
          {
+            break;
+         }
+         case CAPI_ALGORITHMIC_RESET:
+         {
+            // increment session ID
+            if (prop_array[i].port_info.is_valid && prop_array[i].port_info.is_input_port)
+            {
+               me_ptr->logging_info.session_id++;
+               IPC_TX_MSG(me_ptr->miid,
+                          DBG_HIGH_PRIO,
+                          "Updated session ID 0x%lx due to algo reset",
+                          me_ptr->logging_info.session_id);
+            }
+
             break;
          }
          case CAPI_PORT_NUM_INFO:
@@ -756,6 +769,31 @@ capi_err_t capi_ipc_tx_process_set_param(capi_t                 *_pif,
 
    switch (param_id)
    {
+      case PARAM_ID_IPC_DATA_LOGGING_CONFIG:
+      {
+         if (params_ptr->actual_data_len < sizeof(param_id_ipc_data_logging_config_t))
+         {
+            IPC_TX_MSG(me_ptr->miid,
+                       DBG_ERROR_PRIO,
+                       "Capi IPC TX : Param id 0x%lx Bad param size %lu",
+                       (uint32_t)param_id,
+                       params_ptr->actual_data_len);
+            capi_result |= CAPI_ENEEDMORE;
+            break;
+         }
+         param_id_ipc_data_logging_config_t *payload_ptr = (param_id_ipc_data_logging_config_t *)params_ptr->data_ptr;
+
+         me_ptr->logging_info.cfg = *payload_ptr;
+         if(me_ptr->logging_info.cfg.log_code)
+         {
+            IPC_TX_MSG(me_ptr->miid,
+                        DBG_ERROR_PRIO,
+                        "Capi IPC TX : Enabling data logging log_code 0x%lx",
+                        me_ptr->logging_info.cfg.log_code);
+         }
+
+         break;
+      }
       case FWK_EXTN_PARAM_ID_IPC_BUFFER_INFO:
       {
          if (params_ptr->actual_data_len < sizeof(fwk_extn_param_id_ipc_buffer_info_t))

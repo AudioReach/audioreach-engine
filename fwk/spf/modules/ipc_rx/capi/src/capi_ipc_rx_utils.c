@@ -21,6 +21,7 @@ SPDX-License-Identifier: BSD-3-Clause
  * Static Function Definitions
  * -----------------------------------------------------------------------*/
 
+static void ipc_rx_data_logging(capi_ipc_rx_t *me_ptr, int8_t *log_buf_ptr, uint32_t log_buf_fill_size);
 
 static capi_err_t capi_ipc_raise_data_link_info_event(uint32_t                             miid,
                                                       capi_event_callback_info_t          *cb_info_ptr,
@@ -946,6 +947,11 @@ ar_result_t ipc_rx_input_data_buffer_set_up_gpr_client_v2(capi_ipc_rx_t *me_ptr,
   if (NULL != me_ptr->ipc_buf_virtual_addr && me_ptr->ipc_buf_size > 0)
   {
      posal_cache_invalidate_v2(&me_ptr->ipc_buf_virtual_addr, me_ptr->ipc_buf_size);
+
+     if(me_ptr->logging_info.cfg.log_code)
+     {
+        ipc_rx_data_logging(me_ptr, me_ptr->ipc_buf_virtual_addr, me_ptr->ipc_buf_actual_data_len);
+     }
   }
 
   /* Store the GPR packet pointer for later acknowledgement */
@@ -1681,6 +1687,17 @@ capi_err_t capi_ipc_rx_process_set_properties(capi_ipc_rx_t *me_ptr, capi_propli
             {
                IPC_RX_MSG(miid, DBG_ERROR_PRIO, "Error: Algorithmic reset flush handling failed: %lu.", capi_result);
             }
+
+            // increment session ID
+            if (prop_array[i].port_info.is_valid && !prop_array[i].port_info.is_input_port)
+            {
+               me_ptr->logging_info.session_id++;
+               IPC_RX_MSG(miid,
+                          DBG_HIGH_PRIO,
+                          "Updated session ID 0x%lx due to algo reset",
+                          me_ptr->logging_info.session_id);
+            }
+
             break;
          }
          default:
@@ -1752,6 +1769,32 @@ capi_err_t capi_ipc_rx_process_set_param(capi_t                 *_pif,
 
    switch (param_id)
    {
+      case PARAM_ID_IPC_DATA_LOGGING_CONFIG:
+      {
+         if (params_ptr->actual_data_len < sizeof(param_id_ipc_data_logging_config_t))
+         {
+            IPC_RX_MSG(me_ptr->miid,
+                       DBG_ERROR_PRIO,
+                       "Param id 0x%lx Bad param size %lu",
+                       (uint32_t)param_id,
+                       params_ptr->actual_data_len);
+            capi_result |= CAPI_ENEEDMORE;
+            break;
+         }
+         param_id_ipc_data_logging_config_t *payload_ptr = (param_id_ipc_data_logging_config_t *)params_ptr->data_ptr;
+
+         me_ptr->logging_info.cfg = *payload_ptr;
+
+         if(me_ptr->logging_info.cfg.log_code)
+         {
+            IPC_RX_MSG(me_ptr->miid,
+                        DBG_ERROR_PRIO,
+                        "Enabling data logging log_code 0x%lx",
+                        me_ptr->logging_info.cfg.log_code);
+         }
+
+         break;
+      }
       /* IPC TX sends control path media format through set cfg */
       case PARAM_ID_MEDIA_FORMAT:
       {
@@ -2399,4 +2442,90 @@ ar_result_t ipc_rx_populate_metadata_from_ipc_buffer(capi_ipc_rx_t *me_ptr, gpr_
    // if in
 
    return result;
+}
+
+/* Utility function to populate logging header and log data to diag */
+static void ipc_rx_data_logging(capi_ipc_rx_t *me_ptr, int8_t *log_buf_ptr, uint32_t log_buf_fill_size)
+{
+   // skip calling data logger if log code is disabled
+   uint32_t status = posal_data_log_code_status(me_ptr->logging_info.cfg.log_code);
+   if (0 == status)
+   {
+      return;
+   }
+
+   posal_data_log_info_t log_info_var = {0};
+
+   log_info_var.log_code       = me_ptr->logging_info.cfg.log_code;
+   log_info_var.buf_ptr        = log_buf_ptr;
+   log_info_var.buf_size       = log_buf_fill_size;
+   log_info_var.session_id     = ((me_ptr->logging_info.session_id << 16) | (me_ptr->miid & 0xFFFF));
+   log_info_var.log_tap_id     = me_ptr->miid & 0x0FFF;
+   log_info_var.log_time_stamp = posal_timer_get_time();
+
+   if (!log_info_var.buf_size)
+   {
+      return;
+   }
+
+   switch (me_ptr->input_media_fmt.header.format_header.data_format)
+   {
+      case CAPI_FIXED_POINT:
+      case CAPI_FLOATING_POINT:
+      {
+         log_info_var.data_fmt = LOG_DATA_FMT_PCM;
+#ifdef DEBUG_IPC_RX
+         IPC_RX_MSG(me_ptr->miid, DBG_HIGH_PRIO, " Logging as PCM");
+#endif
+         break;
+      }
+      case CAPI_DEINTERLEAVED_RAW_COMPRESSED:
+      {
+         log_info_var.data_fmt = LOG_DATA_FMT_PCM;
+         IPC_RX_MSG(me_ptr->miid, DBG_HIGH_PRIO, " Logging Deinterleaved Raw Compressed as PCM");
+         break;
+      }
+      case CAPI_RAW_COMPRESSED:
+      default:
+      {
+         log_info_var.data_fmt = LOG_DATA_FMT_BITSTREAM;
+#ifdef DEBUG_IPC_RX
+         IPC_RX_MSG(me_ptr->miid, DBG_HIGH_PRIO, " Logging as BIN");
+#endif
+         break;
+      }
+   }
+
+   log_info_var.seq_number_ptr = &(me_ptr->logging_info.seq_number);
+
+   switch (me_ptr->input_media_fmt.header.format_header.data_format)
+   {
+      case CAPI_RAW_COMPRESSED:
+      {
+         log_info_var.data_info.media_fmt_id = me_ptr->input_media_fmt.format.bitstream_format;
+         break;
+      }
+      default:
+      {
+         log_info_var.data_info.media_fmt_id = me_ptr->input_media_fmt.format.bitstream_format;;
+         posal_data_log_pcm_info_t *pcm_data = &(log_info_var.data_info.pcm_data_fmt);
+         pcm_data->q_factor                  = me_ptr->input_media_fmt.format.q_factor;
+         pcm_data->data_format               = me_ptr->input_media_fmt.header.format_header.data_format;
+         pcm_data->num_channels              = me_ptr->input_media_fmt.format.num_channels;
+         pcm_data->sampling_rate             = me_ptr->input_media_fmt.format.sampling_rate;
+         pcm_data->bits_per_sample           = me_ptr->input_media_fmt.format.bits_per_sample;
+         pcm_data->interleaved               = me_ptr->input_media_fmt.format.data_interleaving;
+         pcm_data->channel_mapping           = (uint16_t *)(me_ptr->input_media_fmt.channel_type);
+         break;
+      }
+   }
+
+#ifdef DEBUG_IPC_RX
+   IPC_RX_MSG(me_ptr->miid, DBG_HIGH_PRIO, " logging one packet of data");
+#endif
+
+   /* Switch between Static or Dynamic PD */
+   posal_data_log_alloc_commit(&log_info_var);
+
+   return;
 }
