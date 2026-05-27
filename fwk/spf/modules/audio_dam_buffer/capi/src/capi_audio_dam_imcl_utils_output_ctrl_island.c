@@ -28,14 +28,37 @@ capi_err_t capi_audio_dam_imcl_handle_gate_open(capi_audio_dam_t *              
 {
    capi_err_t result = CAPI_EOK;
 
-   // return if gate is not ready to open
-   if (me_ptr->out_port_info_arr[op_arr_index].is_gate_opened || !is_dam_output_port_initialized(me_ptr, op_arr_index))
+   /* When VAD stop-start occurs rapidly, gate open request for a new VAD chunk may arrive
+    * before pending gate close request is processed. Without clearing pending gate close flag,
+    * new gate open request would be rejected, resulting in data loss of new VAD chunk.
+    * To prevent this, clear pending gate close flag, then proceed with new gate open request. */
+   if (me_ptr->out_port_info_arr[op_arr_index].is_gate_opened)
+   {
+      if (me_ptr->out_port_info_arr[op_arr_index].is_pending_gate_close)
+      {
+         DAM_MSG_ISLAND(me_ptr->miid,
+                        DBG_HIGH_PRIO,
+                        "capi_audio_dam: Port 0x%lx has pending gate close, clearing pending close for new open request.",
+                        me_ptr->out_port_info_arr[op_arr_index].port_id);
+         me_ptr->out_port_info_arr[op_arr_index].is_pending_gate_close = FALSE;
+      }
+      else
+      {
+         DAM_MSG_ISLAND(me_ptr->miid,
+                        DBG_HIGH_PRIO,
+                        "capi_audio_dam: Warning! Gate already open for port 0x%lx",
+                        me_ptr->out_port_info_arr[op_arr_index].port_id);
+         return CAPI_EOK;
+      }
+   }
+
+   /* Verify output port stream reader is initialized */
+   if (!is_dam_output_port_initialized(me_ptr, op_arr_index))
    {
       DAM_MSG_ISLAND(me_ptr->miid,
                      DBG_HIGH_PRIO,
-                     "capi_audio_dam: Warning! Not opening the gate for port_id0x%lx, is_already_open%lu",
-                     me_ptr->out_port_info_arr[op_arr_index].port_id,
-                     me_ptr->out_port_info_arr[op_arr_index].is_gate_opened);
+                     "capi_audio_dam: Warning! Cannot open gate for port 0x%lx, not initialized",
+                     me_ptr->out_port_info_arr[op_arr_index].port_id);
       return CAPI_EOK;
    }
 
