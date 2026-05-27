@@ -26,6 +26,8 @@ SPDX-License-Identifier: BSD-3-Clause
 ** Function Definitions
 ** -------------------------------------------------------------------------*/
 
+static void ipc_tx_data_logging(capi_ipc_tx_t *me_ptr, int8_t *log_buf_ptr, uint32_t log_buf_fill_size);
+
 /**
  * \brief Writes data from the input buffer to the shared buffer, handling different data interleaving formats.
  * This function checks the data interleaving format of the input buffer and writes the data to the shared buffer
@@ -347,5 +349,96 @@ capi_err_t capi_ipc_tx_write_data(capi_ipc_tx_t *me_ptr, capi_stream_data_t *inp
       //return CAPI_EFAILED;
    }
 
+   if(me_ptr->logging_info.cfg.log_code)
+   {
+      ipc_tx_data_logging(me_ptr, (int8_t *)me_ptr->sh_buf_info.curr_buff, me_ptr->sh_buf_info.actual_data_filled);
+   }
+
    return CAPI_EOK;
+}
+
+/* Utility function to populate logging header and log data to diag */
+static void ipc_tx_data_logging(capi_ipc_tx_t *me_ptr, int8_t *log_buf_ptr, uint32_t log_buf_fill_size)
+{
+   posal_data_log_info_t log_info_var;
+
+   // skip calling data logger if log code is disabled
+   uint32_t status = posal_data_log_code_status(me_ptr->logging_info.cfg.log_code);
+   if (0 == status)
+   {
+      return;
+   }
+
+   log_info_var.log_code       = me_ptr->logging_info.cfg.log_code;
+   log_info_var.buf_ptr        = log_buf_ptr;
+   log_info_var.buf_size       = log_buf_fill_size;
+   log_info_var.session_id     = ((me_ptr->logging_info.session_id << 16) | (me_ptr->miid & 0xFFFF));
+   log_info_var.log_tap_id     = me_ptr->miid & 0x0FFF;
+   log_info_var.log_time_stamp = posal_timer_get_time();
+
+   if (!log_info_var.buf_size)
+   {
+      return;
+   }
+
+   switch (me_ptr->inp_media_fmt.header.format_header.data_format)
+   {
+      case CAPI_FIXED_POINT:
+      case CAPI_FLOATING_POINT:
+      {
+         log_info_var.data_fmt = LOG_DATA_FMT_PCM;
+#ifdef DEBUG_IPC_TX
+         IPC_TX_MSG(me_ptr->miid, DBG_HIGH_PRIO, " Logging as PCM");
+#endif
+         break;
+      }
+      case CAPI_DEINTERLEAVED_RAW_COMPRESSED:
+      {
+         log_info_var.data_fmt = LOG_DATA_FMT_PCM;
+         IPC_TX_MSG(me_ptr->miid, DBG_HIGH_PRIO, " Logging Deinterleaved Raw Compressed as PCM");
+         break;
+      }
+      case CAPI_RAW_COMPRESSED:
+      default:
+      {
+         log_info_var.data_fmt = LOG_DATA_FMT_BITSTREAM;
+#ifdef DEBUG_IPC_TX
+         IPC_TX_MSG(me_ptr->miid, DBG_HIGH_PRIO, " Logging as BIN");
+#endif
+         break;
+      }
+   }
+
+   log_info_var.seq_number_ptr = &(me_ptr->logging_info.seq_number);
+
+   switch (me_ptr->inp_media_fmt.header.format_header.data_format)
+   {
+      case CAPI_RAW_COMPRESSED:
+      {
+         log_info_var.data_info.media_fmt_id = me_ptr->inp_media_fmt.format.bitstream_format;
+         break;
+      }
+      default:
+      {
+         log_info_var.data_info.media_fmt_id = me_ptr->inp_media_fmt.format.bitstream_format;;
+         posal_data_log_pcm_info_t *pcm_data = &(log_info_var.data_info.pcm_data_fmt);
+         pcm_data->q_factor                  = me_ptr->inp_media_fmt.format.q_factor;
+         pcm_data->data_format               = me_ptr->inp_media_fmt.header.format_header.data_format;
+         pcm_data->num_channels              = me_ptr->inp_media_fmt.format.num_channels;
+         pcm_data->sampling_rate             = me_ptr->inp_media_fmt.format.sampling_rate;
+         pcm_data->bits_per_sample           = me_ptr->inp_media_fmt.format.bits_per_sample;
+         pcm_data->interleaved               = me_ptr->inp_media_fmt.format.data_interleaving;
+         pcm_data->channel_mapping           = (uint16_t *)(me_ptr->inp_media_fmt.channel_type);
+         break;
+      }
+   }
+
+#ifdef DEBUG_IPC_TX
+   IPC_TX_MSG(me_ptr->miid, DBG_HIGH_PRIO, " logging one packet of data");
+#endif
+
+   /* Switch between Static or Dynamic PD */
+   posal_data_log_alloc_commit(&log_info_var);
+
+   return;
 }

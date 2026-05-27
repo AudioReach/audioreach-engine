@@ -35,7 +35,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include "spf_inter_proc_md_utils.h"
 
 // Enable macro for verbose logging
-//#define DEBUG_IPC_RX
+#define DEBUG_IPC_RX
 
 /**<
  * \brief Bandwidth in bytes/second required for the IPC_RX module.
@@ -96,6 +96,70 @@ SPDX-License-Identifier: BSD-3-Clause
  * Type definitions
  * -----------------------------------------------------------------------*/
 
+/** @ingroup ar_spf_mod_data_log_macros
+    ID of the parameter used to set configuration for Data logging inside IPC modules. */
+#define PARAM_ID_IPC_DATA_LOGGING_CONFIG      0x08001BEE
+
+/*==============================================================================
+   Param structure defintions
+==============================================================================*/
+
+/** @h2xmlp_parameter   {"PARAM_ID_IPC_DATA_LOGGING_CONFIG", PARAM_ID_IPC_DATA_LOGGING_CONFIG}
+   @h2xmlp_description  {Configures the data logging module. \n}
+   @h2xmlp_toolPolicy   {Calibration; RTC} */
+
+#include "spf_begin_pack.h"
+
+/** @ingroup ar_spf_mod_data_log_macros
+    Configures the data logging module. */
+struct param_id_ipc_data_logging_config_t
+{
+   uint32_t log_code;
+   /**< Logging code for this module instance.
+
+        @valuesbul
+		- 0 -- Disabled (Default)
+   		- 0x152E
+		- 0x152F
+		- 0x1531
+		- 0x1534
+		- 0x1532
+		- 0x1530
+		- 0x1533
+        - 0x1535
+        - 0x1536
+		- 0x1586
+        - 0x19AF
+	    - 0x19B0
+        - 0x19B1
+        - 0x158A
+		- 0x158B
+		*/
+   /**< @h2xmle_description {logging code}
+        @h2xmle_default     {0}
+         @h2xmle_rangeList    {"Default"=0;
+                              "0x152E"=0x152E;
+							  "0x152F"=0x152F;
+							  "0x1531"=0x1531;
+							  "0x1534"=0x1534;
+							  "0x1532"=0x1532;
+							  "0x1530"=0x1530;
+							  "0x1533"=0x1533;
+							  "0x1535"=0x1535;
+							  "0x1536"=0x1536;
+							  "0x1586"=0x1586;
+							  "0x19AF"=0x19AF;
+							  "0x19B0"=0x19B0;
+							  "0x19B1"=0x19B1;
+							  "0x158A"=0x158A;
+							  "0x158B"=0x158B
+							  }
+        @h2xmle_policy      {Advanced} */
+}
+#include "spf_end_pack.h"
+;
+/* Structure type def for above payload. */
+typedef struct param_id_ipc_data_logging_config_t param_id_ipc_data_logging_config_t;
 
 typedef struct mem_map_handle_info_t
 {
@@ -167,6 +231,13 @@ typedef struct ipc_rx_md_buf_info_t
    /**< Status of the metadata buffer processing. */
    module_cmn_md_list_t *md_list_ptr;
 } ipc_rx_md_buf_info_t;
+
+typedef struct ipc_rx_logging_info_t
+{
+   uint32_t seq_number;
+   uint32_t session_id;
+   param_id_ipc_data_logging_config_t cfg;
+} ipc_rx_logging_info_t;
 
 /**<
  * \brief Main structure for the CAPI IPC_RX module instance.
@@ -283,6 +354,7 @@ typedef struct capi_ipc_rx_t
    int8_t *curr_shared_buf_ptr;
    /** Currently shared buffer with the fwk*/
 
+   ipc_rx_logging_info_t logging_info;
 } capi_ipc_rx_t;
 
 /*------------------------------------------------------------------------
