@@ -1,0 +1,51 @@
+From fe8edee366fc5ad4cb362790df5e1d4dee5e32bb Mon Sep 17 00:00:00 2001
+From: Aditya Rathi <aditrath@qti.qualcomm.com>
+Date: Mon, 18 May 2026 16:22:24 +0530
+Subject: [PATCH] posal: Work around missing TIMER_ABSTIME support on Zephyr
+
+Zephyr's POSIX layer does not correctly implement TIMER_ABSTIME in
+timer_settime(). Passing it causes the oneshot absolute timer to
+not fire as expected.
+
+Under __ZEPHYR__, convert the absolute expiry time to a relative
+duration by subtracting the current time via ar_timer_get_time_in_us(),
+clamping to zero if the deadline has already passed, and arming the
+timer without TIMER_ABSTIME. The generic Linux path is unchanged.
+
+Signed-off-by: Aditya Rathi <aditrath@qti.qualcomm.com>
+---
+ fwk/platform/posal/src/linux/posal_timer.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/fwk/platform/posal/src/linux/posal_timer.c b/fwk/platform/posal/src/linux/posal_timer.c
+index 3bc835edc..d21fc1abb 100644
+--- a/fwk/platform/posal/src/linux/posal_timer.c
++++ b/fwk/platform/posal/src/linux/posal_timer.c
+@@ -341,11 +341,24 @@ int32_t posal_timer_oneshot_start_absolute(posal_timer_t p_obj, int64_t time)
+    its.it_interval.tv_sec = 0;
+    its.it_interval.tv_nsec = 0;
+ 
++#ifdef __ZEPHYR__
++   // Zephyr POSIX does not implement TIMER_ABSTIME correctly in timer_settime().
++   // Convert the absolute expiry time to a relative duration by subtracting
++   // the current time, then arm the timer without TIMER_ABSTIME.
++   int64_t duration_us = time - (int64_t)posal_timer_get_time();
++   if (duration_us < 0)
++      duration_us = 0;
++   its.it_value.tv_sec = duration_us / 1000000;
++   its.it_value.tv_nsec = (duration_us % 1000000) * 1000;
++
++   nStatus = timer_settime(*timer, 0, &its, NULL);
++#else
+    //Indicates when the timer will fire next
+    its.it_value.tv_sec = time / 1000000;
+    its.it_value.tv_nsec = (time % 1000000) * 1000;
+ 
+    nStatus = timer_settime(*timer, TIMER_ABSTIME, &its, NULL);
++#endif
+    if (nStatus != 0)
+    {
+       AR_MSG(DBG_ERROR_PRIO, "Failed to start oneshot absolute timer for time: %lld", time);
+-- 
+2.44.3
+
