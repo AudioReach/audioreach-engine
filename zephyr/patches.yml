@@ -22,5 +22,26 @@ patches:
 
       Applies to: fwk/platform/posal/src/linux/posal_timer.c
 
+  - path: 0001-soc-nxp-fix-zero-newlib-sbrk-heap-on-i.MX8M-ADSP-with-audioreach-engine.patch
+    sha256sum: a9410ca45e3e29ccd516dfab78f6ce3727d158806e1b2036b95d79c6c72cf7b8
+    module: zephyr
+    author: Aditya Rathi
+    email: aditrath@qti.qualcomm.com
+    date: 2026-05-21
+    upstreamable: false
+    apply-command: git apply
+    comments: |
+      Fix zero newlib sbrk() heap on i.MX8M ADSP with audioreach-engine.
+
+      audioreach-engine uses POSIX memory APIs (malloc/free) backed by the
+      newlib sbrk() arena. _heap_sentry was assigned to '.' immediately after
+      the NOLOAD .heap_mem section, collapsing MAX_HEAP_SIZE to 0 when
+      .heap_mem has no input objects. Fix by anchoring _heap_sentry to
+      __stack (SDRAM1_BASE + SDRAM1_SIZE = 0x93400000).
+
+      Applies to: soc/nxp/imx/imx8m/adsp/linker.ld
+      Tested on: imx8mp_evk_mimx8ml8_adsp
+      Zephyr base: 5eecc55398708d6944046a0379343fea1279c831
+
 checkout-command: git checkout .
 clean-command: git clean -d -f -x
