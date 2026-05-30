@@ -92,6 +92,12 @@ if (CONFIG_DLS_DATA_LOGGING)
    )
 endif()
 
+if (CONFIG_POSAL_MMAP_NO_MMU)
+   list (APPEND lib_defs_list
+      POSAL_MMAP_NO_MMU
+   )
+endif()
+
 #Set the libraries to link with the target
 if(ARSPF_WIN_PORTING)
    set (lib_link_libs_list

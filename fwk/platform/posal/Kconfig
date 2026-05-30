@@ -15,4 +15,13 @@ config DLS_DATA_LOGGING
            Enable Data Logging using Data Logging Service (DLS). DLS service is used on
            platform where DIAG is not supported.
 
+config POSAL_MMAP_NO_MMU
+        bool "Identity PA==VA shared memory mapping (no mmap required)"
+        default n
+        help
+           Enable on targets where physical and virtual address spaces are
+           identical for shared memory regions. When set, mmap() is skipped
+           and the physical address is used directly as the virtual pointer.
+           Applicable on targets such as NXP i.MX8 ADSP running Zephyr.
+
 endmenu
