@@ -1,0 +1,26 @@
+# West patch manifest for AudioReach Engine Zephyr application
+# Apply with: west patch apply
+# Clean with: west patch clean
+
+patches:
+  - path: 0001-posal-workaround-TIMER_ABSTIME-on-zephyr.patch
+    sha256sum: 20cc926e4eb3c427ace1232ce61ca42362b5cdff75ff764c6dcd43db7ab5aeb7
+    module: audioreach-engine
+    author: Aditya Rathi
+    email: aditrath@qti.qualcomm.com
+    date: 2026-05-29
+    upstreamable: false
+    apply-command: git apply
+    comments: |
+      Work around missing TIMER_ABSTIME support in Zephyr POSIX timer_settime().
+
+      Zephyr's POSIX layer does not correctly implement TIMER_ABSTIME, causing
+      the oneshot absolute timer to not fire as expected. Under __ZEPHYR__,
+      convert the absolute expiry time to a relative duration by subtracting
+      the current time via posal_timer_get_time(), clamp to zero if the deadline
+      has already passed, and arm the timer without TIMER_ABSTIME.
+
+      Applies to: fwk/platform/posal/src/linux/posal_timer.c
+
+checkout-command: git checkout .
+clean-command: git clean -d -f -x
