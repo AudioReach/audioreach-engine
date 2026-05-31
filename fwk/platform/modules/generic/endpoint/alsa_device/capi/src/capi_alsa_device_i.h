@@ -33,6 +33,8 @@ Note: this module is not defined as Signal Triggered Module */
 #define ALSA_DEVICE_NUM_FRAMEWORK_EXTENSIONS_SOURCE 1
 #define ALSA_DEVICE_NUM_FRAMEWORK_EXTENSIONS_SINK 0
 
+#define ALSA_DEVICE_DMA_THREAD_STACK_SIZE 8192
+
 /* Number of milliseconds in a second*/
 #define NUM_MS_PER_SEC 1000
 
