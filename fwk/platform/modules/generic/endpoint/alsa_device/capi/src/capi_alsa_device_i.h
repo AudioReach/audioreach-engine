@@ -16,6 +16,8 @@
 #include "alsa_device_api.h"
 #include "capi_cmn.h"
 #include "alsa_device_driver.h"
+#include "posal_nmutex.h"
+#include "posal_condvar.h"
 
 /*=====================================================================
   Macros
@@ -116,6 +118,10 @@ typedef struct capi_alsa_device
    int8_t *read_buffer;               // Buffer to hold one period of captured data
    uint32_t read_buffer_size;         // Size of read buffer in bytes
    bool_t data_ready;                 // Flag: data available in read buffer
+
+   /* Synchronization between DMA thread and process_source */
+   posal_nmutex_t  buf_lock;          // Protects read_buffer and data_ready
+   posal_condvar_t buf_consumed_cond; // Signaled by process_source when data_ready cleared
 } capi_alsa_device_t;
 
 /*------------------------------------------------------------------------
