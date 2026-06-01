@@ -1660,8 +1660,7 @@ ar_result_t olc_graph_close(cu_base_t *base_ptr)
    OLC_MSG(log_id,
            DBG_HIGH_PRIO,
            "CMD:CLOSE:Done executing close command, "
-           "current channel mask=0x%x. result=0x%lx.",
-           me_ptr ? base_ptr->curr_chan_mask : 0,
+           "result=0x%lx.",
            result);
 
    // Catch here so we don't print an error on AR_ETERMINATED.
@@ -1809,8 +1808,7 @@ ar_result_t olc_destroy_container(cu_base_t *base_ptr)
    OLC_MSG(log_id,
            DBG_HIGH_PRIO,
            "CMD:DESTROY:Done destroy to down stream service. "
-           "current channel mask=0x%x. result=0x%lx.",
-           me_ptr->cu.curr_chan_mask,
+           "result=0x%lx.",
            result);
 
    // send AR_ETERMINATED so calling routine knows the destroyer has been invoked.
