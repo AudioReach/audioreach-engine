@@ -30,16 +30,6 @@ config MSIIR
         tristate "Enable MSIIR Library"
         default y
 
-config PCM_CNV
-        tristate "Enable PCM_CNV Library"
-        select CH_MIXER
-        select MSIIR
-        default y
-
-config IIR_MBDRC
-        tristate "Enable IIR_MBDRC Library"
-        default y
-
 config GAIN
         tristate "Enable GAIN Library"
         default n
@@ -60,21 +50,4 @@ config SAL
         tristate "Enable SAL library"
         default n
 
-config SHOEBOX
-        tristate "Enable SHOEBOX library"
-        default n
-
-config REVERB
-        tristate "Enable REVERB library"
-        default n
-
-config VIRTUALIZER
-        tristate "Enable VIRTUALIZER library"
-        select MSIIR
-        default n
-
-config BASS_BOOST
-        tristate "Enable BASS_BOOST Library"
-        select MSIIR
-        default n
 endmenu
