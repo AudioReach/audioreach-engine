@@ -11,6 +11,7 @@
 /* =======================================================================
 INCLUDE FILES FOR MODULE
 ========================================================================== */
+#define _GNU_SOURCE
 #include "posal.h"
 #include "posal_internal.h"
 #include "posal_rtld.h"
