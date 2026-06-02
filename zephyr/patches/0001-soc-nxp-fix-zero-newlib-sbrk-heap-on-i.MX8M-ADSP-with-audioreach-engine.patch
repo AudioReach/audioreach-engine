@@ -1,0 +1,49 @@
+From 427325146386f82f9c1827b3c1dcfa839efb1e87 Mon Sep 17 00:00:00 2001
+From: Aditya Rathi <aditrath@qti.qualcomm.com>
+Date: Thu, 21 May 2026 15:02:12 +0530
+Subject: [PATCH] soc/nxp: Fix zero newlib sbrk() heap on i.MX8M ADSP with
+ audioreach-engine
+
+audioreach-engine uses POSIX memory APIs (malloc/free) backed by the
+newlib sbrk() arena rather than Zephyr's native heap allocator. On
+Xtensa targets, Zephyr's newlib libc-hooks computes the arena size as:
+
+  MAX_HEAP_SIZE = &_heap_sentry - &_end
+
+_heap_sentry was assigned to '.' immediately after the NOLOAD
+.heap_mem section in sdram1. When .heap_mem has no input objects
+(e.g. a minimal Zephyr-only build alongside audioreach-engine),
+_heap_mem_end == _end == _heap_sentry, collapsing MAX_HEAP_SIZE to 0.
+
+Every malloc() call then returns NULL, causing a cascade of init
+failures across the audioreach-engine stack:
+  - posal_memorymap_global_init() -> AR_ENOMEMORY
+  - posal_mutex_create() / ar_osal_mutex_create() -> AR_ENOMEMORY
+  - posal_bufpool pool and node allocation -> AR_ENOMEMORY
+
+Fix by anchoring _heap_sentry to __stack (SDRAM1_BASE + SDRAM1_SIZE =
+0x93400000), which is the top of the 8 MB sdram1 region. This gives
+the newlib sbrk() arena the full remaining sdram1 space above _end,
+regardless of .heap_mem occupancy.
+
+Tested-on: imx8mp_evk_mimx8ml8_adsp
+Signed-off-by: Aditya Rathi <aditrath@qti.qualcomm.com>
+---
+ soc/nxp/imx/imx8m/adsp/linker.ld | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/soc/nxp/imx/imx8m/adsp/linker.ld b/soc/nxp/imx/imx8m/adsp/linker.ld
+index 6feb6a99b29..8ed623d3f34 100644
+--- a/soc/nxp/imx/imx8m/adsp/linker.ld
++++ b/soc/nxp/imx/imx8m/adsp/linker.ld
+@@ -463,7 +463,7 @@ SECTIONS
+   PROVIDE(end = ALIGN (8));
+ 
+   /* Mostly unused, though newlib likes them */
+-  _heap_sentry = .;
++  _heap_sentry = __stack;
+   __stack = SDRAM1_BASE + SDRAM1_SIZE;
+   .comment  0 :  { *(.comment) }
+   .debug  0 :  { *(.debug) }
+-- 
+2.17.1
