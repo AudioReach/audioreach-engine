@@ -35,8 +35,8 @@ message(STATUS "Preparing Hexagon ${V_ARCH} build with\n\tToolchain: ${CONFIG_HE
 
 set(HEXAGON_SDK_INCLUDES ${HEXAGON_SDK_ROOT}/incs)
 set(HEXAGON_SDK_STDDEF_INCLUDES ${HEXAGON_SDK_ROOT}/incs/stddef)
-set(HEXAGON_SDK_REMOTE_INCLUDES ${HEXAGON_SDK_ROOT}/libs/common/remote/ship/hexagon_Debug_dynamic_toolv81_v65)
-set(HEXAGON_SDK_RPCMEM_INCLUDES ${HEXAGON_SDK_ROOT}/libs/common/rpcmem/hexagon_Debug_dynamic_toolv81_v65/ship)
+set(HEXAGON_SDK_REMOTE_INCLUDES ${HEXAGON_SDK_ROOT}/ipc/fastrpc/remote/ship)
+set(HEXAGON_SDK_RPCMEM_INCLUDES ${HEXAGON_SDK_ROOT}/ipc/fastrpc/rpcmem/inc)
 set(HEXAGON_SDK_QURT_INCLUDES ${HEXAGON_SDK_ROOT}/rtos/qurt/computev65/include/qurt)
 set(HEXAGON_SDK_AUDIO_INCLUDES ${HEXAGON_SDK_ROOT}/incs/audio)
 set(HEXAGON_LIB_DIR ${HEXAGON_TOOLS_ROOT}/Tools/target/hexagon/lib)
