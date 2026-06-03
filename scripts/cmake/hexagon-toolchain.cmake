@@ -2,7 +2,7 @@
 # VARIABLES:
 #
 # V_ARCH: Hexagon Architecture version number
-# 	Supported Values: v5, v55, v60, v61, v62, v65, v66
+# 	Supported Values: v5, v55, v60, v61, v62, v65, v66, v68, v69, v73, v75, v79, v81
 #
 # HEXAGON_TOOLS_ROOT: Path to Hexagon Toolchain
 #
@@ -26,7 +26,7 @@ if (NOT HEXAGON_TOOLS_ROOT AND CONFIG_HEXAGON_TOOLS_ROOT)
 	set(HEXAGON_TOOLS_ROOT ${CONFIG_HEXAGON_TOOLS_ROOT})
 endif()
 
-if (NOT V_ARCH MATCHES "^(v5|v55|v60|v61|v62|v65|v66)")
+if (NOT V_ARCH MATCHES "^(v5|v55|v60|v61|v62|v65|v66|v68|v69|v73|v75|v79|v81)")
 	message(FATAL_ERROR
 		" Please specify valid Hexagon processor version.\n")
 endif()
