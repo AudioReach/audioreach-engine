@@ -2,7 +2,7 @@
 # VARIABLES:
 #
 # V_ARCH: Hexagon Architecture version number
-# 	Supported Values: v5, v55, v60, v61, v62, v65, v66
+# 	Supported Values: v5, v55, v60, v61, v62, v65, v66, v68, v69, v73, v75, v79, v81
 #
 # HEXAGON_TOOLS_ROOT: Path to Hexagon Toolchain
 #
@@ -26,7 +26,7 @@ if (NOT HEXAGON_TOOLS_ROOT AND CONFIG_HEXAGON_TOOLS_ROOT)
 	set(HEXAGON_TOOLS_ROOT ${CONFIG_HEXAGON_TOOLS_ROOT})
 endif()
 
-if (NOT V_ARCH MATCHES "^(v5|v55|v60|v61|v62|v65|v66)")
+if (NOT V_ARCH MATCHES "^(v5|v55|v60|v61|v62|v65|v66|v68|v69|v73|v75|v79|v81)")
 	message(FATAL_ERROR
 		" Please specify valid Hexagon processor version.\n")
 endif()
@@ -35,9 +35,10 @@ message(STATUS "Preparing Hexagon ${V_ARCH} build with\n\tToolchain: ${CONFIG_HE
 
 set(HEXAGON_SDK_INCLUDES ${HEXAGON_SDK_ROOT}/incs)
 set(HEXAGON_SDK_STDDEF_INCLUDES ${HEXAGON_SDK_ROOT}/incs/stddef)
-set(HEXAGON_SDK_REMOTE_INCLUDES ${HEXAGON_SDK_ROOT}/libs/common/remote/ship/hexagon_Debug_dynamic_toolv81_v65)
-set(HEXAGON_SDK_RPCMEM_INCLUDES ${HEXAGON_SDK_ROOT}/libs/common/rpcmem/hexagon_Debug_dynamic_toolv81_v65/ship)
-set(HEXAGON_SDK_QURT_INCLUDES ${HEXAGON_SDK_ROOT}/rtos/qurt/computev65/include/qurt)
+set(HEXAGON_SDK_REMOTE_INCLUDES ${HEXAGON_SDK_ROOT}/ipc/fastrpc/remote/ship)
+set(HEXAGON_SDK_RPCMEM_INCLUDES ${HEXAGON_SDK_ROOT}/ipc/fastrpc/rpcmem/inc)
+string(REGEX REPLACE "^v" "" V_ARCH_NUM "${V_ARCH}")
+set(HEXAGON_SDK_QURT_INCLUDES ${HEXAGON_SDK_ROOT}/rtos/qurt/computev${V_ARCH_NUM}/include/qurt)
 set(HEXAGON_SDK_AUDIO_INCLUDES ${HEXAGON_SDK_ROOT}/incs/audio)
 set(HEXAGON_LIB_DIR ${HEXAGON_TOOLS_ROOT}/Tools/target/hexagon/lib)
 set(HEXAGON_ISS_DIR ${HEXAGON_TOOLS_ROOT}/Tools/lib/iss)
