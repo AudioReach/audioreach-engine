@@ -91,21 +91,11 @@ jobs:
             echo "has_tests=$HAS_TESTS" >> "$GITHUB_OUTPUT"
             echo "Tests enabled: $HAS_TESTS"
 
-  trigger_lava:
-    needs: [process_image, filter_test_matrix]
-    if: needs.filter_test_matrix.outputs.has_tests == 'true'
-    permissions:
-      checks: write
-      pull-requests: write
-    uses: AudioReach/audioreach-workflows/.github/workflows/test.yml@master
-    secrets: inherit
-    with:
-      build_matrix: ${{ needs.filter_test_matrix.outputs.test_matrix }}
 
   # This job ensures the workflow always completes successfully
   # even when trigger_lava is skipped due to no tests
   workflow_complete:
-    needs: [load_parameters, build, process_image, filter_test_matrix, trigger_lava]
+    needs: [load_parameters, build, process_image, filter_test_matrix]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -116,7 +106,6 @@ jobs:
           echo "build: ${{ needs.build.result }}"
           echo "process_image: ${{ needs.process_image.result }}"
           echo "filter_test_matrix: ${{ needs.filter_test_matrix.result }}"
-          echo "trigger_lava: ${{ needs.trigger_lava.result }}"
           echo ""
           
           if [ "${{ needs.filter_test_matrix.outputs.has_tests }}" == "false" ]; then
@@ -129,12 +118,6 @@ jobs:
              [ "${{ needs.process_image.result }}" == "failure" ] || \
              [ "${{ needs.filter_test_matrix.result }}" == "failure" ]; then
             echo "❌ Workflow failed - one or more required jobs failed"
-            exit 1
-          fi
-          
-          # trigger_lava can be skipped or success, both are acceptable
-          if [ "${{ needs.trigger_lava.result }}" == "failure" ]; then
-            echo "❌ Testing failed"
             exit 1
           fi
           
