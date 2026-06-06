@@ -39,7 +39,7 @@ static void capi_alsa_device_dma_wait_thread(void *arg)
 
    while (!me_ptr->exit_thread)
    {
-      /* Wait until process_source completes before calling pcm_wait or
+      /* Wait until process_sink/source completes before calling pcm_wait or
        * pcm_prepare. Ensures no concurrent PCM operations on the same handle. */
       posal_nmutex_lock(me_ptr->data_ready_lock);
       while (me_ptr->data_ready && !me_ptr->exit_thread)
@@ -388,8 +388,7 @@ static capi_err_t capi_alsa_device_process_set_properties(capi_alsa_device_t *me
                   AR_MSG(DBG_HIGH_PRIO,
                          "FWK_EXTN_PROPERTY_ID_STM_CTRL enable_stm %d", me_ptr->enable_stm);
 
-                  if (ALSA_DEVICE_SOURCE == me_ptr->direction &&
-                     me_ptr->enable_stm && me_ptr->state != ALSA_DEVICE_INTERFACE_START)
+                  if (me_ptr->enable_stm && me_ptr->state != ALSA_DEVICE_INTERFACE_START)
                   {
                      if (!me_ptr->ep_mf_received)
                      {
@@ -431,17 +430,20 @@ static capi_err_t capi_alsa_device_process_set_properties(capi_alsa_device_t *me
                         return CAPI_EFAILED;
                      }
 
-                     capi_result = alsa_device_driver_start(&me_ptr->alsa_device_driver);
-                     if (capi_result != AR_EOK)
+                     if (ALSA_DEVICE_SOURCE == me_ptr->direction)
                      {
-                        AR_MSG(DBG_ERROR_PRIO,
-                              "CAPI_ALSA_DEVICE: alsa_device_driver_start failed with error code %d",
-                              capi_result);
-                        alsa_device_driver_close(&me_ptr->alsa_device_driver);
-                        return CAPI_EFAILED;
+                        capi_result = alsa_device_driver_start(&me_ptr->alsa_device_driver);
+                        if (capi_result != AR_EOK)
+                        {
+                           AR_MSG(DBG_ERROR_PRIO,
+                                 "CAPI_ALSA_DEVICE: alsa_device_driver_start failed with error code %d",
+                                 capi_result);
+                           alsa_device_driver_close(&me_ptr->alsa_device_driver);
+                           return CAPI_EFAILED;
+                        }
                      }
 
-                     if (NULL == me_ptr->read_buffer)
+                     if (ALSA_DEVICE_SOURCE == me_ptr->direction && NULL == me_ptr->read_buffer)
                      {
                         struct pcm_config *config = &me_ptr->alsa_device_driver.config;
                         me_ptr->read_buffer_size = config->period_size * config->channels * me_ptr->bytes_per_channel;
@@ -551,15 +553,9 @@ static capi_err_t capi_alsa_device_process_get_properties(capi_alsa_device_t *me
    mod_prop.init_memory_req = sizeof(capi_alsa_device_t);
    mod_prop.stack_size = ALSA_DEVICE_STACK_SIZE;
 
-   if (ALSA_DEVICE_SOURCE == dir)
-   {
-      num_intf_extns  = ALSA_DEVICE_NUM_FRAMEWORK_EXTENSIONS_SOURCE;
-      fwk_extn_ids[0] = FWK_EXTN_STM;
-   }
-   else
-   {
-      num_intf_extns  = ALSA_DEVICE_NUM_FRAMEWORK_EXTENSIONS_SINK;
-   }
+   num_intf_extns  = ALSA_DEVICE_NUM_FRAMEWORK_EXTENSIONS;
+   /* Both source and sink declare FWK_EXTN_STM for signal-triggered operation. */
+   fwk_extn_ids[0] = FWK_EXTN_STM;
 
    mod_prop.num_fwk_extns      = num_intf_extns;
    mod_prop.fwk_extn_ids_arr   = fwk_extn_ids;
@@ -826,7 +822,7 @@ capi_err_t capi_alsa_device_end(capi_t *_pif)
          capi_result = CAPI_EFAILED;
       }
 
-      /* Unblock DMA thread if it is waiting on process_done_cond for process_source.
+      /* Unblock DMA thread if it is waiting on process_done_cond for process_sink/source.
        * pcm_stop() handles the case where it is blocked inside pcm_wait(). */
       posal_nmutex_lock(me_ptr->data_ready_lock);
       me_ptr->data_ready = FALSE;
@@ -1206,30 +1202,18 @@ capi_err_t capi_alsa_device_process_sink(capi_t *_pif, capi_stream_data_t *input
 
    if (me_ptr->state != ALSA_DEVICE_INTERFACE_START)
    {
-      ar_result = alsa_device_driver_open(&me_ptr->alsa_device_driver, me_ptr->direction);
-      if (ar_result != AR_EOK)
-      {
-         AR_MSG(DBG_ERROR_PRIO, "alsa_device_driver_open failed with error code %d", ar_result);
-         return CAPI_EFAILED;
-      }
-      AR_MSG(DBG_HIGH_PRIO,
-             "CAPI_ALSA_DEVICE: alsa_device_driver_open success rc: %d",
-             ar_result);
-
-      ar_result = alsa_device_driver_prepare(&me_ptr->alsa_device_driver);
-      if (ar_result != AR_EOK)
-      {
-         AR_MSG(DBG_ERROR_PRIO,
-                "CAPI_ALSA_DEVICE: alsa_device_driver_prepare failed with error code %d",
-                ar_result);
-         return CAPI_EFAILED;
-      }
-      AR_MSG(DBG_HIGH_PRIO,
-             "CAPI_ALSA_DEVICE: alsa_device_driver_prepare success rc: %d",
-             ar_result);
-
-      me_ptr->state =ALSA_DEVICE_INTERFACE_START;
+      AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: Sink not started");
+      return CAPI_EFAILED;
    }
+
+   posal_nmutex_lock(me_ptr->data_ready_lock);
+   if (!me_ptr->data_ready)
+   {
+      posal_nmutex_unlock(me_ptr->data_ready_lock);
+      AR_MSG(DBG_LOW_PRIO, "CAPI_ALSA_DEVICE: Spurious trigger, no data ready");
+      return CAPI_EOK;
+   }
+   posal_nmutex_unlock(me_ptr->data_ready_lock);
 
    // Size checks
    is_input_available = capi_alsa_device_check_data_sufficiency(*input,
@@ -1313,8 +1297,17 @@ capi_err_t capi_alsa_device_process_sink(capi_t *_pif, capi_stream_data_t *input
    if (ar_result != AR_EOK)
    {
       AR_MSG(DBG_ERROR_PRIO, "alsa_device_driver_write failed with error code %d", ar_result);
+      posal_nmutex_lock(me_ptr->data_ready_lock);
+      me_ptr->data_ready = FALSE;
+      posal_nmutex_unlock(me_ptr->data_ready_lock);
+      posal_condvar_signal(me_ptr->process_done_cond);
       return CAPI_EFAILED;
    }
+
+   posal_nmutex_lock(me_ptr->data_ready_lock);
+   me_ptr->data_ready = FALSE;
+   posal_nmutex_unlock(me_ptr->data_ready_lock);
+   posal_condvar_signal(me_ptr->process_done_cond);
 
    AR_MSG(DBG_LOW_PRIO, "CAPI: alsa_device_driver_write successful, total bytes copied: %d", total_bytes_copied);
 
