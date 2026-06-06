@@ -332,7 +332,7 @@ static ar_result_t gen_cntr_check_output_space_availability(gen_cntr_t *        
 
                      GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                                          DBG_ERROR_PRIO,
-                                         "Output buffer is too small (%lu - %lu) < (%lu) ",
+                                         "Output buffer is too small (%u - %u) < (%u) ",
                                          max_data_len,
                                          actual_data_len,
                                          actual_len);
@@ -387,7 +387,7 @@ static ar_result_t gen_cntr_check_output_space_availability(gen_cntr_t *        
             {
                GEN_CNTR_MSG_ISLAND(me_ptr->topo.gu.log_id,
                                    DBG_ERROR_PRIO,
-                                   "Output buffer is too small (%lu - %lu) < (%lu) ",
+                                   "Output buffer is too small (%u - %u) < (%u) ",
                                    ext_out_port_ptr->buf.max_data_len,
                                    ext_out_port_ptr->buf.actual_data_len,
                                    *total_len_ptr);
