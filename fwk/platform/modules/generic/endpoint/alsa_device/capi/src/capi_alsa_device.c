@@ -28,54 +28,69 @@ capi_err_t capi_alsa_device_process_source(capi_t *_pif, capi_stream_data_t *inp
 
 capi_err_t capi_alsa_device_process_sink(capi_t *_pif, capi_stream_data_t *input[], capi_stream_data_t *output[]);
 
-/* Thread function that performs blocking reads into read_buffer and signals framework */
+/* Thread function that polls for hardware buffer availability and signals framework */
 static void capi_alsa_device_dma_wait_thread(void *arg)
 {
    capi_alsa_device_t *me_ptr = (capi_alsa_device_t *)arg;
 
    AR_MSG(DBG_HIGH_PRIO, "CAPI_ALSA_DEVICE: DMA wait thread started for instance 0x%lx", me_ptr->iid);
 
+   bool_t needs_recovery = FALSE;
+
    while (!me_ptr->exit_thread)
    {
-      /*
-       * TODO: Ideally this thread should use alsa_device_driver_wait() to only poll
-       * for hardware buffer availability and signal the framework, while the actual
-       * alsa_device_driver_read() is done in process_source. However, the
-       * alsa_device_driver_wait() based approach was found to be unreliable in
-       * practice. Until this is investigated and resolved, a blocking
-       * alsa_device_driver_read() is used here as a safe and functional workaround —
-       * it blocks until the data is available.
-       */
-      ar_result_t result = alsa_device_driver_read(&me_ptr->alsa_device_driver,
-                                                    me_ptr->read_buffer,
-                                                    me_ptr->read_buffer_size);
+      /* Wait until process_source completes before calling pcm_wait or
+       * pcm_prepare. Ensures no concurrent PCM operations on the same handle. */
+      posal_nmutex_lock(me_ptr->data_ready_lock);
+      while (me_ptr->data_ready && !me_ptr->exit_thread)
+      {
+         posal_condvar_wait(me_ptr->process_done_cond, me_ptr->data_ready_lock);
+      }
+      posal_nmutex_unlock(me_ptr->data_ready_lock);
+
+      if (me_ptr->exit_thread) break;
+
+      /* Recover from XRUN here — after confirming process_source is not
+       * concurrently executing pcm_read on the same PCM handle. */
+      if (needs_recovery)
+      {
+         needs_recovery = FALSE;
+         if (AR_EOK == alsa_device_driver_prepare(&me_ptr->alsa_device_driver))
+         {
+            /* Source (capture): pcm_start required to restart DMA.
+             * Sink (playback): stream restarts automatically on next pcm_write. */
+            if (ALSA_DEVICE_SOURCE == me_ptr->direction)
+            {
+               alsa_device_driver_start(&me_ptr->alsa_device_driver);
+            }
+         }
+      }
+
+      ar_result_t result = alsa_device_driver_wait(&me_ptr->alsa_device_driver);
       if (result != AR_EOK)
       {
-         AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: Read failed in DMA thread, result=%d", result);
+         if (!me_ptr->exit_thread)
+         {
+            AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: pcm_wait failed in DMA thread, result=%d", result);
+            /* Set recovery flag for non-timeout errors (XRUN etc.).
+             * Timeout means no data yet — just retry pcm_wait. */
+            if (AR_ETIMEOUT != result)
+            {
+               needs_recovery = TRUE;
+            }
+         }
          continue;
       }
 
-      AR_MSG(DBG_LOW_PRIO, "CAPI_ALSA_DEVICE: DMA thread read %d bytes", me_ptr->read_buffer_size);
-
-      /* Mark data as ready and signal the framework */
-      posal_nmutex_lock(me_ptr->buf_lock);
+      /* Mark hardware data available and signal the framework */
+      posal_nmutex_lock(me_ptr->data_ready_lock);
       me_ptr->data_ready = TRUE;
-      posal_nmutex_unlock(me_ptr->buf_lock);
+      posal_nmutex_unlock(me_ptr->data_ready_lock);
 
       if (me_ptr->signal_ptr && me_ptr->enable_stm)
       {
-         AR_MSG(DBG_LOW_PRIO, "CAPI_ALSA_DEVICE: signaling the container");
          posal_signal_send(me_ptr->signal_ptr);
       }
-
-      /* Block until process_source consumes read_buffer before issuing next pcm_read.
-       * This prevents overwriting read_buffer while process_source is still copying it. */
-      posal_nmutex_lock(me_ptr->buf_lock);
-      while (me_ptr->data_ready && !me_ptr->exit_thread)
-      {
-         posal_condvar_wait(me_ptr->buf_consumed_cond, me_ptr->buf_lock);
-      }
-      posal_nmutex_unlock(me_ptr->buf_lock);
    }
 
    me_ptr->is_thread_running = FALSE;
@@ -176,16 +191,16 @@ static capi_err_t capi_alsa_device_common_init(capi_t *_pif, capi_proplist_t *in
       return capi_result;
    }
 
-   if (AR_EOK != posal_nmutex_create(&me_ptr->buf_lock, (POSAL_HEAP_ID)me_ptr->heap_mem.heap_id))
+   if (AR_EOK != posal_nmutex_create(&me_ptr->data_ready_lock, (POSAL_HEAP_ID)me_ptr->heap_mem.heap_id))
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: Failed to create buf_lock");
+      AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: Failed to create data_ready_lock");
       return CAPI_EFAILED;
    }
 
-   if (AR_EOK != posal_condvar_create(&me_ptr->buf_consumed_cond, (POSAL_HEAP_ID)me_ptr->heap_mem.heap_id))
+   if (AR_EOK != posal_condvar_create(&me_ptr->process_done_cond, (POSAL_HEAP_ID)me_ptr->heap_mem.heap_id))
    {
-      posal_nmutex_destroy(&me_ptr->buf_lock);
-      AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: Failed to create buf_consumed_cond");
+      posal_nmutex_destroy(&me_ptr->data_ready_lock);
+      AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: Failed to create process_done_cond");
       return CAPI_EFAILED;
    }
 
@@ -462,8 +477,12 @@ static capi_err_t capi_alsa_device_process_set_properties(capi_alsa_device_t *me
                         if (AR_EOK != thread_result)
                         {
                            AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: Failed to create DMA wait thread");
-                           posal_memory_free(me_ptr->read_buffer);
-                           me_ptr->read_buffer = NULL;
+                           if (me_ptr->read_buffer)
+                           {
+                              posal_memory_free(me_ptr->read_buffer);
+                              me_ptr->read_buffer = NULL;
+                           }
+                           alsa_device_driver_stop(&me_ptr->alsa_device_driver);
                            alsa_device_driver_close(&me_ptr->alsa_device_driver);
                            return CAPI_EFAILED;
                         }
@@ -599,7 +618,6 @@ static capi_err_t capi_alsa_device_process_get_properties(capi_alsa_device_t *me
             {
                AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: Not valid media format size %d", payload_ptr->actual_data_len);
                return CAPI_ENEEDMORE;
-               break;
             }
 
             capi_media_fmt_v2_t *media_fmt_ptr = (capi_media_fmt_v2_t *)(payload_ptr->data_ptr);
@@ -799,14 +817,6 @@ capi_err_t capi_alsa_device_end(capi_t *_pif)
          me_ptr->exit_thread = TRUE;
       }
 
-      /* Wake the DMA thread if it is blocked on buf_consumed_cond waiting for
-       * process_source to consume. pcm_stop() handles the case where it is
-       * blocked inside pcm_read(). Both are needed to cover either scenario. */
-      posal_nmutex_lock(me_ptr->buf_lock);
-      me_ptr->data_ready = FALSE;
-      posal_nmutex_unlock(me_ptr->buf_lock);
-      posal_condvar_signal(me_ptr->buf_consumed_cond);
-
       ar_result = alsa_device_driver_stop(&me_ptr->alsa_device_driver);
       if (ar_result != AR_EOK)
       {
@@ -816,8 +826,14 @@ capi_err_t capi_alsa_device_end(capi_t *_pif)
          capi_result = CAPI_EFAILED;
       }
 
-      /* pcm_stop() above unblocks the DMA thread from pcm_read(). Join it now so
-       * read_buffer is not freed while the thread is still writing into it. */
+      /* Unblock DMA thread if it is waiting on process_done_cond for process_source.
+       * pcm_stop() handles the case where it is blocked inside pcm_wait(). */
+      posal_nmutex_lock(me_ptr->data_ready_lock);
+      me_ptr->data_ready = FALSE;
+      posal_nmutex_unlock(me_ptr->data_ready_lock);
+      posal_condvar_signal(me_ptr->process_done_cond);
+
+      /* Join the DMA thread now that both blocking paths are unblocked. */
       if (me_ptr->dma_wait_thread != NULL)
       {
          ar_result_t thread_result = AR_EOK;
@@ -844,8 +860,8 @@ capi_err_t capi_alsa_device_end(capi_t *_pif)
       AR_MSG(DBG_HIGH_PRIO, "CAPI_ALSA_DEVICE: read_buffer freed");
    }
 
-   posal_condvar_destroy(&me_ptr->buf_consumed_cond);
-   posal_nmutex_destroy(&me_ptr->buf_lock);
+   posal_condvar_destroy(&me_ptr->process_done_cond);
+   posal_nmutex_destroy(&me_ptr->data_ready_lock);
 
    me_ptr->state = ALSA_DEVICE_INTERFACE_STOP;
    me_ptr->vtbl.vtbl_ptr = NULL;
@@ -1406,8 +1422,8 @@ bool_t capi_alsa_device_check_data_sufficiency(capi_stream_data_t *input,
 
 /*---------------------------------------------------------------------
   Function name: capi_alsa_device_process_source
-  DESCRIPTION: Processes capture (source) - copies data from read_buffer
-               populated by DMA thread to output buffers
+  DESCRIPTION: Processes capture (source) - reads PCM data directly
+               into output buffers via pcm_read
   -----------------------------------------------------------------------*/
 capi_err_t capi_alsa_device_process_source(capi_t *_pif, capi_stream_data_t *input[], capi_stream_data_t *output[])
 {
@@ -1431,41 +1447,27 @@ capi_err_t capi_alsa_device_process_source(capi_t *_pif, capi_stream_data_t *inp
       return CAPI_EBADPARAM;
    }
 
+   posal_nmutex_lock(me_ptr->data_ready_lock);
+   if (!me_ptr->data_ready)
+   {
+      posal_nmutex_unlock(me_ptr->data_ready_lock);
+      /* Spurious trigger: data_ready is FALSE, meaning the DMA thread has not yet
+       * returned from pcm_wait. It is therefore not blocked on process_done_cond,
+       * so no signal is needed here. */
+      AR_MSG(DBG_LOW_PRIO, "CAPI_ALSA_DEVICE: Spurious trigger, no data ready");
+      return CAPI_EOK;
+   }
+   /* data_ready is TRUE: DMA thread has completed pcm_wait and is now blocked on
+    * process_done_cond waiting for this function to complete pcm_read. The lock
+    * is released before pcm_read since the DMA thread cannot proceed until
+    * process_done_cond is signaled at the end of this function. */
+   posal_nmutex_unlock(me_ptr->data_ready_lock);
+
    num_channels = me_ptr->num_channels;
    bytes_per_sample = me_ptr->bytes_per_channel;
    word_size = bytes_per_sample << 3;
    total_bytes = me_ptr->read_buffer_size;
 
-   posal_nmutex_lock(me_ptr->buf_lock);
-
-   if (!me_ptr->data_ready)
-   {
-      posal_nmutex_unlock(me_ptr->buf_lock);
-
-      // Data not ready - this is an underrun condition
-      AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: Underrun - no data available in read_buffer");
-
-      // Fill output with zeros
-      if (CAPI_DEINTERLEAVED_UNPACKED == me_ptr->gen_cntr_alsa_device_media_fmt.format.data_interleaving)
-      {
-         uint32_t bytes_per_ch = total_bytes / num_channels;
-         for (uint32_t ch = 0; ch < num_channels; ch++)
-         {
-            uint32_t fill_bytes = min(bytes_per_ch, output[port]->buf_ptr[ch].max_data_len);
-            memset(output[port]->buf_ptr[ch].data_ptr, 0, fill_bytes);
-            output[port]->buf_ptr[ch].actual_data_len = fill_bytes;
-         }
-      }
-      else // CAPI_INTERLEAVED
-      {
-         uint32_t fill_bytes = min(total_bytes, output[port]->buf_ptr[0].max_data_len);
-         memset(output[port]->buf_ptr[0].data_ptr, 0, fill_bytes);
-         output[port]->buf_ptr[0].actual_data_len = fill_bytes;
-      }
-      return CAPI_EOK;
-   }
-
-   // Data is ready - copy from read_buffer under lock to prevent DMA thread overwrite
    if (CAPI_DEINTERLEAVED_UNPACKED == me_ptr->gen_cntr_alsa_device_media_fmt.format.data_interleaving)
    {
       uint32_t bytes_per_ch = total_bytes / num_channels;
@@ -1477,11 +1479,25 @@ capi_err_t capi_alsa_device_process_source(capi_t *_pif, capi_stream_data_t *inp
             AR_MSG(DBG_ERROR_PRIO,
                    "CAPI_ALSA_DEVICE: Output buffer too small ch %d. Required: %d, Available: %d",
                    ch, bytes_per_ch, output[port]->buf_ptr[ch].max_data_len);
+            posal_nmutex_lock(me_ptr->data_ready_lock);
             me_ptr->data_ready = FALSE;
-            posal_nmutex_unlock(me_ptr->buf_lock);
-            posal_condvar_signal(me_ptr->buf_consumed_cond);
+            posal_nmutex_unlock(me_ptr->data_ready_lock);
+            posal_condvar_signal(me_ptr->process_done_cond);
             return CAPI_ENOMEMORY;
          }
+      }
+
+      ar_result_t result = alsa_device_driver_read(&me_ptr->alsa_device_driver,
+                                                   me_ptr->read_buffer,
+                                                   total_bytes);
+      if (result != AR_EOK)
+      {
+         AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: pcm_read failed in process_source, result=%d", result);
+         posal_nmutex_lock(me_ptr->data_ready_lock);
+         me_ptr->data_ready = FALSE;
+         posal_nmutex_unlock(me_ptr->data_ready_lock);
+         posal_condvar_signal(me_ptr->process_done_cond);
+         return CAPI_EFAILED;
       }
 
       capi_buf_t intlv_buf;
@@ -1495,9 +1511,10 @@ capi_err_t capi_alsa_device_process_source(capi_t *_pif, capi_stream_data_t *inp
                                          word_size))
       {
          AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: Failed to deinterleave data");
+         posal_nmutex_lock(me_ptr->data_ready_lock);
          me_ptr->data_ready = FALSE;
-         posal_nmutex_unlock(me_ptr->buf_lock);
-         posal_condvar_signal(me_ptr->buf_consumed_cond);
+         posal_nmutex_unlock(me_ptr->data_ready_lock);
+         posal_condvar_signal(me_ptr->process_done_cond);
          return CAPI_EFAILED;
       }
 
@@ -1514,22 +1531,33 @@ capi_err_t capi_alsa_device_process_source(capi_t *_pif, capi_stream_data_t *inp
                 "CAPI_ALSA_DEVICE: Output buffer too small. Required: %d, Available: %d",
                 total_bytes,
                 output[port]->buf_ptr[0].max_data_len);
+         posal_nmutex_lock(me_ptr->data_ready_lock);
          me_ptr->data_ready = FALSE;
-         posal_nmutex_unlock(me_ptr->buf_lock);
-         posal_condvar_signal(me_ptr->buf_consumed_cond);
+         posal_nmutex_unlock(me_ptr->data_ready_lock);
+         posal_condvar_signal(me_ptr->process_done_cond);
          return CAPI_ENOMEMORY;
       }
 
-      memscpy(output[port]->buf_ptr[0].data_ptr,
-              output[port]->buf_ptr[0].max_data_len,
-              me_ptr->read_buffer,
-              total_bytes);
+      ar_result_t result = alsa_device_driver_read(&me_ptr->alsa_device_driver,
+                                                   output[port]->buf_ptr[0].data_ptr,
+                                                   total_bytes);
+      if (result != AR_EOK)
+      {
+         AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: pcm_read failed in process_source, result=%d", result);
+         posal_nmutex_lock(me_ptr->data_ready_lock);
+         me_ptr->data_ready = FALSE;
+         posal_nmutex_unlock(me_ptr->data_ready_lock);
+         posal_condvar_signal(me_ptr->process_done_cond);
+         return CAPI_EFAILED;
+      }
+
       output[port]->buf_ptr[0].actual_data_len = total_bytes;
    }
 
+   posal_nmutex_lock(me_ptr->data_ready_lock);
    me_ptr->data_ready = FALSE;
-   posal_nmutex_unlock(me_ptr->buf_lock);
-   posal_condvar_signal(me_ptr->buf_consumed_cond);
+   posal_nmutex_unlock(me_ptr->data_ready_lock);
+   posal_condvar_signal(me_ptr->process_done_cond);
 
    AR_MSG(DBG_LOW_PRIO, "CAPI_ALSA_DEVICE: Process source successful, bytes: %d", total_bytes);
 

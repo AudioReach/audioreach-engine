@@ -109,19 +109,19 @@ typedef struct capi_alsa_device
    void *   signal_ptr; // Signal ptr for STM
    uint32_t enable_stm;
 
-   /* Thread management for source direction */
+   /* Thread management for DMA wait thread (used by both source and sink) */
    posal_thread_t dma_wait_thread;    // Thread handle for DMA waiting
    bool_t is_thread_running;          // Thread running state
    bool_t exit_thread;                // Thread exit flag
 
-   /* Buffer to store the data read form ALSA driver in wait thread */
-   int8_t *read_buffer;               // Buffer to hold one period of captured data
+   /* Intermediate buffer for deinterleaved capture path (interleaved staging) */
+   int8_t *read_buffer;               // Intermediate buffer for deinterleaved conversion
    uint32_t read_buffer_size;         // Size of read buffer in bytes
-   bool_t data_ready;                 // Flag: data available in read buffer
+   bool_t data_ready;                 // Flag: pcm_wait has returned, period is available
 
    /* Synchronization between DMA thread and process_source */
-   posal_nmutex_t  buf_lock;          // Protects read_buffer and data_ready
-   posal_condvar_t buf_consumed_cond; // Signaled by process_source when data_ready cleared
+   posal_nmutex_t  data_ready_lock;   // Protects data_ready
+   posal_condvar_t process_done_cond; // Signaled by process_source after pcm_read completes
 } capi_alsa_device_t;
 
 /*------------------------------------------------------------------------
