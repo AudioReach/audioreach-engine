@@ -756,7 +756,7 @@ static capi_err_t capi_data_marker_set_param(capi_t *                _pif,
                    "0x%lx",
                    me_ptr->miid,
                    payload_ptr->metadata_id);
-            return AR_EFAILED;
+            return AR_EUNSUPPORTED;
          }
 
          cfg_md_info_t *node_obj_ptr =
@@ -813,7 +813,7 @@ static capi_err_t capi_data_marker_set_param(capi_t *                _pif,
 
          fwk_extn_param_id_container_frame_duration_t *fm_dur =
             (fwk_extn_param_id_container_frame_duration_t *)params_ptr->data_ptr;
-         me_ptr->cntr_frame_dur_ms = fm_dur->duration_us/1000;
+         me_ptr->cntr_frame_dur_us = fm_dur->duration_us;
 
          break;
       }
