@@ -412,6 +412,17 @@ __bailout_set_cfg_cmd_2:
       apm_offload_memory_free(&curr_cmd_ctrl_ptr->ret_info);
    }
 __bailout_set_cfg_cmd_1:
+   /* The get_cfg tracking entry was inserted at the start of this function before the
+   * failure occurred. Since no GPR response will ever arrive for this failed request,
+   * remove the entry here to prevent a memory leak. */
+  {
+     irm_get_cfg_resp_cmd_ctrl_t *get_cfg_ctrl =
+        irm_get_get_cfg_cmd_ctrl_rsp(curr_cmd_ctrl_ptr, get_cfg_cmd_ctrl_token);
+     if (NULL != get_cfg_ctrl)
+     {
+        irm_clear_get_cfg_cmd_crtl(curr_cmd_ctrl_ptr, get_cfg_ctrl);
+     }
+  }
    // Note: caller responds to the client
    irm_clear_cmd_ctrl(irm_ptr, curr_cmd_ctrl_ptr);
    return result;
