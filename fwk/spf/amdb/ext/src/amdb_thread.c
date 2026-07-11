@@ -82,11 +82,6 @@ uint32_t amdb_gpr_call_back_f(gpr_packet_t *gpr_pkt_ptr, void *cb_ctx_ptr)
       // MDF Response from the satellite: route it to a different queue
       dst_handle_ptr->cmd_handle_ptr->cmd_q_ptr = (posal_queue_t *)g_amdb_thread_ptr->amdb_rsp_q_ptr;
    }
-   else if ((((opcode_type & AR_GUID_TYPE_CONTROL_CMD_RSP) == AR_GUID_TYPE_CONTROL_CMD_RSP)) &&
-            ((posal_queue_t *)g_amdb_thread_ptr->amdb_cmd_q_ptr == dst_handle_ptr->cmd_handle_ptr->cmd_q_ptr))
-   {
-      dst_handle_ptr->cmd_handle_ptr->cmd_q_ptr = (posal_queue_t *)g_amdb_thread_ptr->amdb_rsp_q_ptr;
-   }
 
    /** Compose the GK message payload to be routed to
     *  destination module */
