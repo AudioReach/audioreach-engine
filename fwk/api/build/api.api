@@ -1,0 +1,37 @@
+'''
+/*==============================================================================
+@file api.api
+@brief 
+================================================================================
+'''
+
+Import('env')
+
+AR_MSG_INC_PATH = '${AVS_INC_ROOT}/api/ar_utils/${TGT_SPECIFIC_FOLDER}/tgt/static'
+
+if 'USES_AVS_SHARED_LIBS' in env or 'AVS_SINGLE_SO' in env:
+	AR_MSG_INC_PATH = '${AVS_INC_ROOT}/api/ar_utils/${TGT_SPECIFIC_FOLDER}/tgt/shared'
+	
+if 'USES_AVS_TEST' in env: #
+	AR_MSG_INC_PATH = '${AVS_INC_ROOT}/api/ar_utils/${TGT_SPECIFIC_FOLDER}/sim'
+
+
+env.PublishRestrictedApi('AVS',[
+   '${AVS_INC_ROOT}/api/modules',
+   '${AVS_INC_ROOT}/api/ar_utils',
+    AR_MSG_INC_PATH,
+   '${AVS_INC_ROOT}/api/apm',
+   '${AVS_INC_ROOT}/api/apm/private',
+   '${AVS_INC_ROOT}/api/vcpm',
+   '${AVS_INC_ROOT}/api/private',
+   ])
+   
+env.PublishPublicApi('AVS',[
+   '${AVS_INC_ROOT}/api/modules',
+   '${AVS_INC_ROOT}/api/ar_utils',
+    AR_MSG_INC_PATH,
+   '${AVS_INC_ROOT}/api/apm',
+   '${AVS_INC_ROOT}/api/vcpm',
+   ])
+
+env.LoadAPIUnits()

@@ -1,0 +1,26 @@
+'''
+/*==============================================================================
+@file modules.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+import os
+
+env.Append(H2XML_INC_PATH = "${AVS_ROOT}/api/ar_utils ")
+env.Append(H2XML_INC_PATH = "${AVS_ROOT}/api/modules ")
+env.Append(H2XML_INC_PATH = "${AVS_ROOT}/api/apm ")
+if os.path.exists("${INC_ROOT}/gpr/platform"):
+	env.Append(H2XML_INC_PATH = "${INC_ROOT}/gpr/platform/qurt/osal/api ")
+else:
+	env.Append(H2XML_INC_PATH = "${INC_ROOT}/gpr/core/ar_osal/qurt/api ")
+env.Append(H2XML_INC_PATH = "${INC_ROOT}/${AVS_AU_NAME}/spm/cmn/api ")
+env.Append(H2XML_INC_PATH = "${INC_ROOT}/${AVS_AU_NAME}/spm/api ")
+
+env.RequireRestrictedApi(['AUDPROC_LIMITER', 'AUDPROC_RESAMPLER'])
+env.RequireRestrictedApi(['MODULE_INTERFACES_API', 'CAPI_APPI_WRAPPER', 'MODULE_INTERFACES_UTILS', 
+                          'APPI_CMN_LIB', 'CAPI_CMN_LIB', 'CAPI_LIBRARY_THREAD_POOL'])
+env.LoadSoftwareUnits()

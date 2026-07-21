@@ -1,0 +1,15 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+
+Import('env')
+import os
+
+if 'AUDIOSSMODE' in env:
+    pass
+else:
+    env.LoadSoftwareUnits()

@@ -1,0 +1,46 @@
+'''
+/*==============================================================================
+@file capi_gate.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+core_public_apis = [
+    'DEBUGTOOLS',
+    'SERVICES',
+    'KERNEL',
+    ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'MODULE_INTERFACES_API', 'CAPI_CMN_LIB'])
+env.RequireProtectedApi('AVS')
+
+env.PublishPrivateApi('AVS',[
+        '../inc',
+        ])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'capi_gate'
+LIBNAME_STUB = LIBNAME+'_stub'
+
+#import pdb; pdb.set_trace()
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+avs_reg_sources = env.GlobSourceFiles(['src/*.cpp', 'src/*.c'], SRCPATH,posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.cpp', 'stub_src/*.c'], SRCPATH,posix=True)
+avs_fwk_sources = []
+
+env.RequireRestrictedApi(['SHARED_LIBRARY_INC_PATHS'])
+
+#import pdb; pdb.set_trace()
+if 'USES_AVS_LIBRARY_BUILDER' in env:
+   env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,[avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+
+   
