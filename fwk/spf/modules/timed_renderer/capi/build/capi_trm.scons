@@ -1,0 +1,56 @@
+'''
+/*==============================================================================
+@file capi_trm.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+core_public_apis = [
+   'BOOT',
+   'DAL',
+   'DEBUGTOOLS',
+   'HAL',
+   'MPROC',
+   'POWER',
+   'SERVICES',
+   'SYSTEMDRIVERS',
+
+
+   # needs to be last also contains wrong comdef.h
+   'KERNEL',
+    ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS','SHARED_LIBRARY_INC_PATHS'])
+env.RequireProtectedApi('AVS')
+env.PublishPrivateApi('AVS',[
+        '../inc'
+        ])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'timed_renderer_module'
+LIBNAME_STUB = LIBNAME+'_stub'
+
+#import pdb; pdb.set_trace()
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+avs_reg_sources = env.GlobSourceFiles(['src/*.c'], SRCPATH,posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.c'], SRCPATH,posix=True)
+avs_fwk_sources = []
+
+bucket= ['AVS_ADSP','AVS_ADSP_USER']
+env.RequireRestrictedApi(['SHARED_LIBRARY_INC_PATHS'])
+
+if 'USES_AUDIO_IN_ISLAND' in env:
+    non_island_sources,island_sources = env.IslandFilter(avs_reg_sources)
+    env.AddAvsLibrary(bucket, '${BUILDPATH}/'+LIBNAME, [non_island_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+    get_island_lib = env.AddAvsLibrary(bucket, '${BUILDPATH}/'+LIBNAME+'_island', [island_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True )
+   
+else:
+    env.AddAvsLibrary(bucket, '${BUILDPATH}/'+LIBNAME, [avs_reg_sources, avs_stub_sources, avs_fwk_sources] , PACK_SRC=True)

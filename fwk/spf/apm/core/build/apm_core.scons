@@ -1,0 +1,67 @@
+'''
+/*==============================================================================
+@file apm_core.scons
+@brief 
+
+================================================================================
+
+'''
+
+Import('env')
+if 'CSMD_COSIM' in env:
+  env.Append(CFLAGS = ' -DCOSIM')
+  env.Append(CPPFLAGS = ' -DCOSIM')
+
+CBSP_API = [
+   'BOOT',
+   'DAL',
+   'DEBUGTOOLS',
+   'HAL',
+   'MPROC',
+   'POWER',
+   'SERVICES',
+   'SYSTEMDRIVERS',
+
+   # needs to be last also contains wrong comdef.h
+   'KERNEL',   
+]
+
+env.RequirePublicApi(CBSP_API,area='core')
+env.RequireRestrictedApi(['AVS'])
+env.RequireProtectedApi('AVS')
+env.RequirePrivateApi(['AVS'])
+
+platform_public_apis = [
+    'QAIC',
+    'STDDEF',
+    'HAPSDK'
+    ]
+
+env.RequirePublicApi([
+  'AMDB',
+])
+
+# This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+env.RequirePublicApi(platform_public_apis, area='platform') 
+
+   
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = ".."
+
+LIBNAME = 'APM_CORE'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+# Generate regular source file list
+
+avs_reg_sources = env.GlobSourceFiles(['src/*.c', 'src/offload/*.c'], SRCPATH, posix=True)
+
+avs_stub_sources = []
+avs_fwk_sources = []
+
+#import pdb; pdb.set_trace()
+if 'USES_AVS_LIBRARY_BUILDER' in env:
+   env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+      [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)

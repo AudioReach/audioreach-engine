@@ -1,0 +1,77 @@
+'''
+/*==============================================================================
+@file modules.api
+@brief
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+
+env.PublishPublicApi('AVS',[
+  '${AVS_ROOT}/spf/modules/sync_module/api',
+  '${AVS_ROOT}/spf/modules/duty_cycling_buf/api',
+  '${AVS_ROOT}/spf/modules/sh_mem_push_lab/api',
+  '${AVS_ROOT}/spf/modules/simple_splitter/api',
+  '${AVS_ROOT}/spf/modules/data_marker/api',
+  '${AVS_ROOT}/spf/modules/demuxer/api',
+  '${AVS_ROOT}/spf/modules/mux_demux/api',
+  '${AVS_ROOT}/spf/modules/priority_sync/api',
+  '${AVS_ROOT}/spf/modules/data_logging/api',
+  '${AVS_ROOT}/spf/modules/spr/api',
+  '${AVS_ROOT}/spf/modules/latency/api',
+  '${AVS_ROOT}/spf/modules/timed_renderer/api',
+  '${AVS_ROOT}/spf/modules/audio_dam_buffer/api',
+  '${AVS_ROOT}/spf/modules/smart_sync/api',
+  '${AVS_ROOT}/spf/modules/gate/api',
+  '${AVS_ROOT}/spf/modules/rt_proxy/api',
+  '${AVS_ROOT}/spf/modules/gapless/api',
+  '${AVS_ROOT}/spf/modules/irm/api',
+  '${AVS_ROOT}/spf/modules/rat/api',
+  '${AVS_ROOT}/spf/modules/ipc_rx/api',
+  '${AVS_ROOT}/spf/modules/ipc_tx/api',
+  '${AVS_ROOT}/spf/modules/sh_mem_pull_push_mode/api',
+  '${AVS_ROOT}/spf/modules/history_buffer/api'
+])
+
+env.PublishRestrictedApi('AVS',[
+   '${AVS_ROOT}/spf/modules/audio_dam_buffer/capi/inc',
+   '${AVS_ROOT}/spf/modules/rt_proxy/capi/inc',
+   '${AVS_ROOT}/spf/modules/spr/capi/inc',
+   '${AVS_ROOT}/spf/modules/smart_sync/capi/inc',
+   '${AVS_ROOT}/spf/modules/gapless/capi/inc',
+   '${AVS_ROOT}/spf/modules/timed_renderer/capi/inc',
+   '${AVS_ROOT}/spf/modules/sync_module/api',
+   '${AVS_ROOT}/spf/modules/duty_cycling_buf/api',
+   '${AVS_ROOT}/spf/modules/sh_mem_push_lab/api',
+   '${AVS_ROOT}/spf/modules/simple_splitter/api',
+   '${AVS_ROOT}/spf/modules/data_marker/api',
+   '${AVS_ROOT}/spf/modules/demuxer/api',
+   '${AVS_ROOT}/spf/modules/mux_demux/api',
+   '${AVS_ROOT}/spf/modules/priority_sync/api',
+   '${AVS_ROOT}/spf/modules/data_logging/api',
+   '${AVS_ROOT}/spf/modules/spr/api',
+   '${AVS_ROOT}/spf/modules/latency/api',
+   '${AVS_ROOT}/spf/modules/timed_renderer/api',
+   '${AVS_ROOT}/spf/modules/audio_dam_buffer/api',
+   '${AVS_ROOT}/spf/modules/smart_sync/api',
+   '${AVS_ROOT}/spf/modules/gate/api',
+   '${AVS_ROOT}/spf/modules/rt_proxy/api',
+   '${AVS_ROOT}/spf/modules/gapless/api',
+   '${AVS_ROOT}/spf/modules/irm/api',
+   '${AVS_ROOT}/spf/modules/irm/inc',
+   '${AVS_ROOT}/spf/modules/irm/inc/hexagon',
+   '${AVS_ROOT}/spf/modules/rat/api',
+   '${AVS_ROOT}/spf/modules/rat/capi/inc',
+   '${AVS_ROOT}/spf/modules/rat/capi/siso_rat/inc',
+   '${AVS_ROOT}/spf/modules/rat/capi/mimo_rat/inc',
+   '${AVS_ROOT}/spf/modules/ipc_rx/api',
+   '${AVS_ROOT}/spf/modules/ipc_tx/api',
+   '${AVS_ROOT}/spf/modules/sh_mem_pull_push_mode/api',
+   '${AVS_ROOT}/spf/modules/history_buffer/api',
+   '${AVS_ROOT}/spf/modules/history_buffer/capi/inc'
+])
+
+env.LoadAPIUnits()

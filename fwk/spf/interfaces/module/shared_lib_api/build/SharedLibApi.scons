@@ -1,0 +1,64 @@
+'''
+/*==============================================================================
+@file SharedLibApi.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+core_public_apis = [
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.PublishPrivateApi('AVS',[
+   '../inc',
+   '../auto_generated',
+   ])
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS'])
+env.RequireProtectedApi('AVS')
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+EXPORTSPATH = '..'
+LIBNAME = 'SharedLibApi'
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+# Generate regular source file list
+avs_reg_sources = env.GlobSourceFiles(['/src/*.cpp', '/src/*.c', '/src/*.S'], SRCPATH,posix=True)
+
+# Generate stub source file list
+avs_stub_sources = []
+
+# Genate  source file list
+avs_fwk_sources = []
+
+#import pdb; pdb.set_trace()
+if 'USES_AVS_LIBRARY_BUILDER' in env:
+   env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+      [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+
+#DLExposeFile is defined only when USES_FEATURE_DYNAMIC_LOADING is in env
+comp_name = env.subst('${AVS_AU_NAME}')
+if 'USES_FEATURE_DYNAMIC_LOADING' in env and not "AUDIOSSMODE" in env:      
+   load_folder=comp_name+"/fwk/spf"
+   exports_root = str(env.get('BUILD_ROOT', None)) + '/' + load_folder +'/interfaces/module/shared_lib_api/exports'
+
+   env.DLExposeFile(exports_root + '/shared_lib_api_exports.lst')
+
+   #for SIM expose some more symbols (mainly for logging/printf)
+   if 'USES_AVS_TEST' in env:
+      env.DLExposeFile(exports_root + '/shared_lib_api_exports_sim.lst')
+      ## as platform is not built for SIM, export from here.
+      platform_exports = str(env.get('BUILD_ROOT', None)) + '/platform/exports'
+      env.DLExposeFile(platform_exports + '/dl_base_symbols.lst')
+      #env.DLExposeFile(platform_exports + '/dl_hap_symbols.lst')
+      

@@ -1,0 +1,32 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+
+Import('env')
+
+#env.Append(CFLAGS = '-O0')
+
+env.PublishProtectedApi('AVS',[
+   '${AVS_FOLDER_ROOT}/driver/platform/core_drv/devcfg/inc',
+   '${AVS_FOLDER_ROOT}/driver/platform/core_drv/devcfg/inc/${TGT_SPECIFIC_FOLDER}',
+   '${AVS_FOLDER_ROOT}/driver/platform/core_drv/devcfg/inc/generic',
+   '${AVS_ROOT}/platform/core_drv/platform_cfg/inc',
+   '${AVS_FOLDER_ROOT}/driver/platform/core_drv/lpasshwio/inc',
+   '${AVS_FOLDER_ROOT}/driver/platform/core_drv/dma_manager/inc',
+   '${AVS_FOLDER_ROOT}/driver/platform/core_drv/${TGT_SPECIFIC_FOLDER}/audioss_dsp_mem/inc',
+   '${AVS_FOLDER_ROOT}/driver/platform/core_drv/${TGT_SPECIFIC_FOLDER}/common/inc',
+   '${AVS_FOLDER_ROOT}/driver/platform/core_drv/hw_resampler/inc',
+   '${AVS_ROOT}/platform/private/api',
+   '${AVS_FOLDER_ROOT}/driver/platform/core_drv/inc'
+   ])
+#env.RequireRestrictedApi('MODULE_INTERFACES_API')
+#env.RequireRestrictedApi('AVS')
+#-------------------------------------------------------------------------------
+# Load sub scripts
+#-------------------------------------------------------------------------------
+
+env.LoadSoftwareUnits()
