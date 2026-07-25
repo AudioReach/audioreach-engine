@@ -55,7 +55,7 @@ typedef struct imcl_param_id_bt_sideband_encoder_feedback_t
 /* Payload of IMCL_PARAM_ID_BT_SIDEBAND_ENCODER_FEEDBACK_V2*/
 typedef struct imcl_param_id_bt_sideband_encoder_feedback_v2_t
 {
-   uint8_t  num_sidebands;
+   uint32_t  num_sidebands;
    /** number of sideband payloads */
 #ifdef __H2XML__
    imcl_param_id_bt_sideband_encoder_feedback_v2_payload_t payload[0];

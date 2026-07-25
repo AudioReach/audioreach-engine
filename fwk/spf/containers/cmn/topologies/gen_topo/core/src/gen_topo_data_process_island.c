@@ -694,7 +694,8 @@ GEN_TOPO_STATIC ar_result_t gen_topo_check_copy_between_modules(gen_topo_t *    
       // Only try to propogate media fomrat if the next port state is started because MF will only be propogated if the
       // port state is started this will avoid infinite loop in GC.
       // Ref Test Case: dtmf_gen_cfg_cmd_seq_1 , dtmf_gen_cfg_cmd_seq_2 & dtmf_gen_cfg_cmd_seq_3
-      if ((0 == next_bufs_ptr[0].actual_data_len) && (TOPO_PORT_STATE_STARTED == next_in_port_ptr->common.state))
+      if ((0 == next_bufs_ptr[0].actual_data_len) && (TOPO_PORT_STATE_STARTED == next_in_port_ptr->common.state)
+          && (0 == next_module_ptr->pending_zeros_at_eos))
       {
          gen_topo_propagate_media_fmt_from_module(topo_ptr, TRUE /* is_data_path*/, module_list_ptr);
 

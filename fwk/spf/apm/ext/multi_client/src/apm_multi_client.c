@@ -1103,14 +1103,16 @@ ar_result_t apm_multi_client_update_sg_calibration_state(apm_t *apm_info_ptr)
 {
    ar_result_t      result             = AR_EOK;
    apm_sub_graph_t *sub_graph_node_ptr = NULL;
-   spf_list_node_t *temp_cached_ptr;
+
    spf_list_node_t *curr_ptr = apm_info_ptr->curr_cmd_ctrl_ptr->db_default_set_cfg_cmd_ctrl.parsed_sg_list_ptr;
 
    gpr_packet_t *packet_curr_client = (gpr_packet_t *)apm_info_ptr->curr_cmd_ctrl_ptr->cmd_msg.payload_ptr;
 
    while (NULL != curr_ptr)
    {
-      uint32_t sub_graph_id = *((uint32_t *)(curr_ptr->obj_ptr));
+	  spf_list_node_t *next_curr_ptr = curr_ptr->next_ptr;
+
+	  uint32_t sub_graph_id = *((uint32_t *)(curr_ptr->obj_ptr));
 
       result =
          apm_db_get_sub_graph_node(&apm_info_ptr->graph_info, sub_graph_id, &sub_graph_node_ptr, APM_DB_OBJ_QUERY);
@@ -1135,14 +1137,16 @@ ar_result_t apm_multi_client_update_sg_calibration_state(apm_t *apm_info_ptr)
              packet_curr_client->src_port,
              sub_graph_id);
 
-      temp_cached_ptr = curr_ptr;
+      uint32_t * temp_cached_obj_ptr = (uint32_t *)(curr_ptr->obj_ptr);
 
       apm_db_remove_node_from_list(&apm_info_ptr->curr_cmd_ctrl_ptr->db_default_set_cfg_cmd_ctrl.parsed_sg_list_ptr,
                                    (void *)(curr_ptr->obj_ptr),
                                    &apm_info_ptr->curr_cmd_ctrl_ptr->db_default_set_cfg_cmd_ctrl.num_subgraph_node);
 
-      posal_memory_free(temp_cached_ptr->obj_ptr);
-      curr_ptr = curr_ptr->next_ptr;
+      posal_memory_free((void*)temp_cached_obj_ptr);
+	  temp_cached_obj_ptr = NULL;
+
+      curr_ptr = next_curr_ptr;
    }
 
    return result;

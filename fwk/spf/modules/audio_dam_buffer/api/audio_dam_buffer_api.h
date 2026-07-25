@@ -360,6 +360,20 @@ struct param_id_audio_ctrl_to_data_port_map_t
 #include "spf_end_pack.h"
 ;
 
+/*==============================================================================
+   Constants
+==============================================================================*/
+
+ /**
+ * PARAM_ID_AUDIO_DAM_HANDLE_BATCH_END_TRACKING_EVENT
+ *
+ * DAM sends this parameter to downstream as part of the tracking metadata payload.
+ * After consuming the batch, downstream raise a GPR tracking event back to inform
+ * about batch consumption through this parameter.
+ *
+ */
+#define PARAM_ID_AUDIO_DAM_HANDLE_BATCH_END_TRACKING_EVENT         0x08001BD3
+
 
 /** @} <-- End of the module -- > */
 

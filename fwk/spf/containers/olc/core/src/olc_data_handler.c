@@ -981,12 +981,12 @@ ar_result_t olc_populate_peer_cntr_out_buf(olc_t *me_ptr, olc_ext_out_port_t *ex
                DATA_BUFFER_FLAG_TIMESTAMP_VALID_SHIFT);
    out_buf_ptr->timestamp = ts.value;
 
-   bool_t out_buf_has_flushing_eos;
+   bool_t out_buf_has_flushing_eos_dfg = FALSE;
    gen_topo_populate_metadata_for_peer_cntr(&(me_ptr->topo),
                                             &(ext_out_port_ptr->gu),
                                             &(ext_out_port_ptr->md_list_ptr),
                                             &(out_buf_ptr->metadata_list_ptr),
-                                            &out_buf_has_flushing_eos);
+                                            &out_buf_has_flushing_eos_dfg);
 
 #ifdef VERBOSE_DEBUGGING
    OLC_MSG(me_ptr->topo.gu.log_id,

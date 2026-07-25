@@ -217,21 +217,20 @@ capi_err_t capi_history_buffer_handle_intf_extn_ctrl_port_operation(capi_history
 capi_err_t capi_history_buffer_handle_incoming_imc_message(capi_history_buffer_t *me_ptr, capi_buf_t *params_ptr);
 
 /* =========================================================================
- * FUNCTION : capi_history_buffer_send_flow_ctrl_msg_to_dam
+ * FUNCTION : capi_history_buffer_send_flow_ctrl_v2_msg_to_dam
  * DESCRIPTION: Sends flow control IMC message to DAM.
- *   is_gate_open = TRUE : sends gate open, DAM will start draining the
- *                          buffered data
+ *   is_gate_open = TRUE : sends gate open with flow intent, DAM will start
+ *                         draining the buffered data
  *   is_gate_open = FALSE: sends gate close, DAM will stop draining data and
- *                          goes back to buffering mode.
+ *                         goes back to buffering mode.
  *
  * Sending a intent to the peer module involves two steps,
- *   STEP-A) Get recurring buffer from framework, for this module must have registered for
- *           recurring buffers. If not module can request for onetime buffers.
+ *   STEP-A) request one time buffer from framework.
  *   STEP-B) Populate the payload of intent buffer and raise an event to send IMC message
  *           to peer module.
  * ========================================================================= */
-capi_err_t capi_history_buffer_send_flow_ctrl_msg_to_dam(capi_history_buffer_t *            me_ptr,
-                                                    param_id_audio_dam_data_flow_ctrl_t *param_ptr);
+capi_err_t capi_history_buffer_send_flow_ctrl_v2_msg_to_dam(capi_history_buffer_t *            me_ptr,
+                                                    param_id_audio_dam_data_flow_ctrl_v2_t *param_ptr);
 
 /* =========================================================================
  * FUNCTION : capi_history_buffer_imcl_send_resize_to_dam
@@ -239,6 +238,21 @@ capi_err_t capi_history_buffer_send_flow_ctrl_msg_to_dam(capi_history_buffer_t *
  * Utility to send resize command to audio dam module
  * ========================================================================= */
 capi_err_t capi_history_buffer_imcl_send_resize_to_dam(capi_history_buffer_t *me_ptr);
+
+/* =========================================================================
+ * FUNCTION : capi_history_buffer_resize_and_batch_gate_open_to_dam
+ *
+ * Utility to send resize and batch gate open command to audio dam module
+ * ========================================================================= */
+capi_err_t capi_history_buffer_resize_and_batch_gate_open_to_dam(capi_history_buffer_t *me_ptr);
+
+/* =========================================================================
+ * FUNCTION : capi_history_buffer_send_allow_dcm_island_entry_to_dam
+ * 
+ * Sends PARAM_ID_AUDIO_DAM_ALLOW_DCM_ISLAND_ENTRY to DAM via IMCL. 
+ * Called at ctrl port connect (after gate open) to trigger island entry for the first batch. 
+ * ========================================================================= */
+capi_err_t capi_history_buffer_send_allow_dcm_island_entry_to_dam(capi_history_buffer_t *me_ptr);
 
 /* =========================================================================
  * FUNCTION : capi_history_buffer_validate_intent_id

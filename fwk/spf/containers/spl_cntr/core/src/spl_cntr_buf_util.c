@@ -1685,12 +1685,12 @@ ar_result_t spl_cntr_deliver_output_buffer(spl_cntr_t *me_ptr, spl_cntr_ext_out_
 
    // Move md from ext out port to data msg. We always deliver the entire buffer, so we can also deliver
    // all metadata.
-   bool_t OUT_BUF_HAS_FLUSHING_EOS_UNUSED = FALSE;
+   bool_t OUT_BUF_HAS_FLUSHING_EOS_DFG_UNUSED = FALSE;
    gen_topo_populate_metadata_for_peer_cntr(&(me_ptr->topo.t_base),
                                             &(ext_out_port_ptr->gu),
                                             &(int_out_port_ptr->md_list_ptr),
                                             &(out_buf_msg_ptr->metadata_list_ptr),
-                                            &OUT_BUF_HAS_FLUSHING_EOS_UNUSED);
+                                            &OUT_BUF_HAS_FLUSHING_EOS_DFG_UNUSED);
 
    // At this point, md_list is NULL so it cannot contain any flushing eos. Set marker to FALSE.
    int_out_port_ptr->t_base.common.sdata.flags.marker_eos = FALSE;

@@ -324,7 +324,8 @@ ar_result_t audio_dam_stream_read(audio_dam_stream_reader_t *reader_handle,
                                   capi_buf_t *               output_buf_arr,
                                   bool_t *                   output_buf_ts_is_valid,
                                   int64_t *                  output_buf_ts,
-                                  uint32_t *                 output_buf_len_in_us);
+                                  uint32_t *                 output_buf_len_in_us,
+                                  bool_t *                   is_batch_sent);
 
 /*
  * Adjusts the read pointer

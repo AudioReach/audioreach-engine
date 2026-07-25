@@ -98,7 +98,9 @@ ar_result_t gen_cntr_check_handle_signal_miss(gen_cntr_t *me_ptr, bool_t is_afte
       {
          GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, "Error in handling signal miss before process");
       }
-
+	  // reset the counters to make sure false interrupts during the error handling is ignored
+      me_ptr->st_module.processed_interrupt_counter = 0;
+      me_ptr->st_module.raised_interrupt_counter = 0;
       *continue_processing = FALSE;
    }
 

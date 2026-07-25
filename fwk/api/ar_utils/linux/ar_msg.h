@@ -50,11 +50,11 @@
 
 
 // Legacy debug priority messages
-#define DBG_LOW_PRIO AR_HIGH_PRIO     /**< Low priority debug message. */
-#define DBG_MED_PRIO AR_HIGH_PRIO     /**< Medium priority debug message. */
+#define DBG_LOW_PRIO AR_LOW_PRIO     /**< Low priority debug message. */
+#define DBG_MED_PRIO AR_MED_PRIO     /**< Medium priority debug message. */
 #define DBG_HIGH_PRIO AR_HIGH_PRIO   /**< High priority debug message. */
 #define DBG_ERROR_PRIO AR_ERROR_PRIO /**< Error priority debug message. */
-#define DBG_FATAL_PRIO AR_HIGH_PRIO /**< Fatal priority debug message. */
+#define DBG_FATAL_PRIO AR_FATAL_PRIO /**< Fatal priority debug message. */
 #define MSG_LEGACY_ERROR DBG_ERROR_PRIO
 #define MSG_LEGACY_HIGH DBG_HIGH_PRIO
 #define MSG_LEGACY_MED DBG_MED_PRIO
@@ -122,13 +122,25 @@
    do { \
       if (ar_log_debugmsg_enable) \
       { \
-         static const char *msg_tag = AR_MSG_TAG; \
-         static const char filename[] = LOCAL_FILE_NAME; \
-         static const uint32_t line_no = __LINE__; \
-         ar_log( xx_ss_mask, msg_tag, filename, __FUNCTION__, line_no, xx_fmt, ##__VA_ARGS__); \
          if (DBG_FATAL_PRIO == (xx_ss_mask)) \
          { \
             assert(0); \
+         } \
+         else if (DBG_ERROR_PRIO == (xx_ss_mask)) \
+         { \
+            AR_LOG_ERR(AR_MSG_TAG, xx_fmt, ##__VA_ARGS__) \
+         } \
+          else if (DBG_HIGH_PRIO == (xx_ss_mask)) \
+         { \
+            AR_LOG_INFO(AR_MSG_TAG, xx_fmt, ##__VA_ARGS__) \
+         } \
+          else if (DBG_MED_PRIO == (xx_ss_mask)) \
+         { \
+            AR_LOG_DEBUG(AR_MSG_TAG, xx_fmt, ##__VA_ARGS__) \
+         } \
+          else if (DBG_LOW_PRIO == (xx_ss_mask)) \
+         { \
+            AR_LOG_VERBOSE(AR_MSG_TAG, xx_fmt, ##__VA_ARGS__) \
          } \
       } \
    } while(0)

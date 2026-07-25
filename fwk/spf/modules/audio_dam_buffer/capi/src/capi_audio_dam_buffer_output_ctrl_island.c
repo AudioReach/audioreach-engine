@@ -139,7 +139,7 @@ capi_err_t capi_check_and_close_the_gate(capi_audio_dam_t *me_ptr, uint32_t op_a
    // For Acoustic Activity Detection usecase, we do not support best channel feature, so we dont have to revert the channel order.
    if (FALSE == me_ptr->out_port_info_arr[op_arr_index].is_peer_aad)
    {
-	  posal_island_trigger_island_exit();
+     posal_island_trigger_island_exit();
       capi_audio_dam_reorder_chs_at_gate_close(me_ptr, op_arr_index, is_destroy);
 
       // In AAD usecase, do not update KPPS in process context.
@@ -286,6 +286,104 @@ capi_err_t capi_dam_insert_flushing_eos_at_out_port(capi_audio_dam_t   *me_ptr,
                   DBG_HIGH_PRIO,
                   "DAM: Created and inserted flushing eos at output defer_voting:%lu",
                   skip_voting_on_eos);
+
+   return capi_result;
+}
+
+capi_err_t capi_dam_insert_tracking_md_at_out_port(capi_audio_dam_t   *me_ptr,
+                                                    capi_stream_data_t *output,
+                                                    uint32_t            output_port_index,
+                                                    bool_t              send_dfg_md,
+                                                    bool_t              is_eos_case)
+{
+   capi_err_t             capi_result    = CAPI_EOK;
+   capi_stream_data_v2_t *out_stream_ptr = (capi_stream_data_v2_t *)output;
+   module_cmn_md_tracking_t batch_tracking_md_info;
+   memset(&batch_tracking_md_info, 0, sizeof(batch_tracking_md_info));
+
+   if (CAPI_STREAM_V2 != out_stream_ptr->flags.stream_data_version)
+   {
+      DAM_MSG_ISLAND(me_ptr->miid, DBG_ERROR_PRIO, "capi_audio_dam: stream version must be 1");
+      return CAPI_EFAILED;
+   }
+   module_cmn_md_list_t   **md_list_pptr     =     &out_stream_ptr->metadata_list_ptr;
+   module_cmn_md_t        *new_md_ptr        =     NULL;
+   dam_batch_end_md_gen_t *md_payload_ptr    =     NULL;
+   capi_heap_id_t         heap;
+   heap.heap_id = (uint32_t)me_ptr->heap_id;
+   module_cmn_md_flags_t    flags;
+
+   batch_tracking_md_info.heap_info.heap_id              = heap.heap_id;
+   batch_tracking_md_info.tracking_payload.flags.requires_custom_event = MODULE_CMN_MD_TRACKING_USE_CUSTOM_EVENT;
+   batch_tracking_md_info.tracking_payload.dest_port      = me_ptr->miid;
+   batch_tracking_md_info.tracking_payload.src_port      = me_ptr->miid;
+
+   flags.word          = 0;
+   flags.version       = MODULE_CMN_MD_VERSION;
+   flags.tracking_mode = MODULE_CMN_MD_TRACKING_CONFIG_ENABLE_FOR_DROP_OR_CONSUME;
+   flags.tracking_policy = MODULE_CMN_MD_TRACKING_EVENT_POLICY_LAST;
+   /*if metadata splits into multiple path, DAM should be informed only when last event done*/
+
+   capi_result = me_ptr->metadata_handler.metadata_create_with_tracking(me_ptr->metadata_handler.context_ptr,
+                                                                        md_list_pptr,
+                                                                        sizeof(dam_batch_end_md_gen_t),
+                                                                        heap,
+                                                                        DAM_BATCH_END_MD_ID_MARKER,
+                                                                        flags,
+                                                                        &batch_tracking_md_info,
+                                                                        &new_md_ptr);
+
+   if (capi_result)
+   {
+      DAM_MSG_ISLAND(me_ptr->miid, DBG_ERROR_PRIO, "Failed to create metadata entry END md with error 0x%x", capi_result);
+      return CAPI_EFAILED;
+   }
+
+   new_md_ptr->metadata_id                     = DAM_BATCH_END_MD_ID_MARKER;
+   new_md_ptr->offset                          = output->buf_ptr[0].actual_data_len/me_ptr->operating_mf.bytes_per_sample;
+   md_payload_ptr                              = (dam_batch_end_md_gen_t *)&new_md_ptr->metadata_buf;
+   md_payload_ptr->output_port_idx             = output_port_index;                                    //output port index to handle Duty cycling
+   md_payload_ptr->param_id                    = PARAM_ID_AUDIO_DAM_HANDLE_BATCH_END_TRACKING_EVENT;   //Param ID to set after tracking event
+
+   /* END md is sample-associated only for EOS; buffer-associated for all other batch completions. */
+   new_md_ptr->metadata_flag.buf_sample_association = is_eos_case ? MODULE_CMN_MD_SAMPLE_ASSOCIATED : MODULE_CMN_MD_BUFFER_ASSOCIATED;
+
+
+   DAM_MSG_ISLAND(me_ptr->miid, DBG_HIGH_PRIO, "DAM: Created and inserted tracking MD at output port index:%lu with offset: %lu",
+                  output_port_index, new_md_ptr->offset);
+
+   if(send_dfg_md)
+   {
+      //Inset DFG metadata to handle the framesize mismatch only for partial batches
+
+      uint32_t         dfg_payload_size = 0; // No metadata specific payload for dfg as of now
+      bool_t           IN_BAND_PAYLOAD  = FALSE;
+      module_cmn_md_t *md_ptr_dfg       = NULL;
+
+      capi_result        = me_ptr->metadata_handler.metadata_create(me_ptr->metadata_handler.context_ptr,
+                                                                    md_list_pptr,
+                                                                    dfg_payload_size,
+                                                                    heap,
+                                                                    IN_BAND_PAYLOAD,
+                                                                    &md_ptr_dfg);
+
+      if (capi_result)
+      {
+         DAM_MSG_ISLAND(me_ptr->miid, DBG_ERROR_PRIO, "Failed to create metadata entry for DFG with error 0x%x", capi_result);
+         return CAPI_EFAILED;
+      }
+
+      md_ptr_dfg->metadata_flag.buf_sample_association = MODULE_CMN_MD_BUFFER_ASSOCIATED;
+
+      // Update the metadata parameters
+      md_ptr_dfg->metadata_id = MODULE_CMN_MD_ID_DFG;
+      DAM_MSG_ISLAND(me_ptr->miid, DBG_HIGH_PRIO, "Generated DFG MD offset %d", new_md_ptr->offset );
+      md_ptr_dfg->offset = new_md_ptr->offset;
+
+      // Update flags to denote data flow state
+      out_stream_ptr->flags.end_of_frame = 1;
+
+   }
 
    return capi_result;
 }

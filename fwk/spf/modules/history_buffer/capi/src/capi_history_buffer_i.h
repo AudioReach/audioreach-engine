@@ -132,7 +132,7 @@ typedef struct capi_history_buffer_t
    history_buffer_ctrl_port_info_t ctrl_port_info[HISTORY_BUFFER_MAX_CONTROL_PORTS];
    /* Control port info structure, currently applicable to one input port. */
 
-   param_id_history_buffer_mode_t mode;
+   uint32_t data_flow_mode;
 
 } capi_history_buffer_t;
 

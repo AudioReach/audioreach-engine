@@ -1437,13 +1437,17 @@ gen_topo_data_need_t gen_topo_in_port_needs_data(gen_topo_t *topo_ptr, gen_topo_
    else
 #endif
    {
-      // if there's a flushing EOS stuck, input is optional
-      if (in_port_ptr->common.sdata.flags.marker_eos)
+      // if there's a flushing EOS or DFG stuck, input is optional
+      /* Fix for DFG:
+         Ideally checking just for end_of_frame should be sufficient for DFG.
+         Since end_of_frame has wider scope threfore to limit the fix, DFG MD is looked up.*/
+      if (in_port_ptr->common.sdata.flags.marker_eos || 
+             (in_port_ptr->common.sdata.flags.end_of_frame && gen_topo_md_list_has_dfg(in_port_ptr->common.sdata.metadata_list_ptr)))
       {
 #ifdef TRIGGER_DEBUG_DEEP
          TOPO_MSG(topo_ptr->gu.log_id,
                   DBG_LOW_PRIO,
-                  " Module 0x%lX: Input port id:0x%lx, port has EOS. need data optionally",
+                  " Module 0x%lX: Input port id:0x%lx, port has EOS or DFG. need data optionally",
                   in_port_ptr->gu.cmn.module_ptr->module_instance_id,
                   in_port_ptr->gu.cmn.id);
 #endif

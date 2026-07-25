@@ -186,7 +186,8 @@ static ar_result_t audio_dam_stream_batch_read(audio_dam_stream_reader_t *reader
                                                capi_buf_t *               output_buf_arr,         // in/out
                                                bool_t *                   output_buf_ts_is_valid, // out
                                                int64_t *                  output_buf_ts,          // out
-                                               uint32_t *                 output_buf_len_in_us)                    // out
+                                               uint32_t *                 output_buf_len_in_us,   // out
+                                               bool_t *                   is_batch_sent)
 {
    ar_result_t result = AR_EOK;
    uint32_t    requested_batch_us = reader_handle->data_batching_us;
@@ -235,6 +236,10 @@ static ar_result_t audio_dam_stream_batch_read(audio_dam_stream_reader_t *reader
    if (AR_EOK == result)
    {
       reader_handle->pending_batch_bytes -= output_buf_arr[0].actual_data_len;
+      if(reader_handle->pending_batch_bytes == 0)
+      {
+         *is_batch_sent = true;
+      }
    }
 
    return result;
@@ -245,7 +250,8 @@ ar_result_t audio_dam_stream_read(audio_dam_stream_reader_t *reader_handle,     
                                   capi_buf_t                *output_buf_arr,         // in/out
                                   bool_t                    *output_buf_ts_is_valid, // out
                                   int64_t                   *output_buf_ts,          // out
-                                  uint32_t                  *output_buf_len_in_us)   // out
+                                  uint32_t                  *output_buf_len_in_us,   // out
+                                  bool_t                    *is_batch_sent)
 {
    ar_result_t result = AR_EOK;
 
@@ -270,7 +276,8 @@ ar_result_t audio_dam_stream_read(audio_dam_stream_reader_t *reader_handle,     
                                          output_buf_arr,
                                          output_buf_ts_is_valid,
                                          output_buf_ts,
-                                         output_buf_len_in_us);
+                                         output_buf_len_in_us,
+                                         is_batch_sent);
    }
    else
    {

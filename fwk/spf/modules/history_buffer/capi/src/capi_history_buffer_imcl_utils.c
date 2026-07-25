@@ -283,9 +283,9 @@ capi_err_t capi_history_buffer_handle_intf_extn_ctrl_port_operation(capi_history
                Module can use capi_history_buffer_imcl_send_to_peer() if it needs to send any intents. */
 
             /* Send history buffer resize command to the DAM Module, to adjust the size of circular buffer */
-            if (CAPI_FAILED(capi_history_buffer_imcl_send_resize_to_dam(me_ptr)))
+            if (CAPI_FAILED(capi_history_buffer_resize_and_batch_gate_open_to_dam(me_ptr)))
             {
-               AR_MSG(DBG_HIGH_PRIO, "Unable to send history buffer resize to DAM");
+               AR_MSG(DBG_HIGH_PRIO, "Unable to send buffer resize and gate open to DAM");
             }
          }
       }
@@ -821,75 +821,131 @@ capi_err_t capi_history_buffer_imcl_send_to_peer(capi_event_callback_info_t *eve
 }
 
 /* =========================================================================
- * FUNCTION : capi_history_buffer_send_flow_ctrl_msg_to_dam
+ * FUNCTION : capi_history_buffer_send_flow_ctrl_v2_msg_to_dam
  *
  * Refer capi_history_buffer_imcl_utils.h for function usage.
  * ========================================================================= */
-capi_err_t capi_history_buffer_send_flow_ctrl_msg_to_dam(capi_history_buffer_t *            me_ptr,
-                                                    param_id_audio_dam_data_flow_ctrl_t *param_ptr)
+capi_err_t capi_history_buffer_send_flow_ctrl_v2_msg_to_dam(capi_history_buffer_t *me_ptr, param_id_audio_dam_data_flow_ctrl_v2_t *param_ptr)
 {
    capi_err_t result = CAPI_EOK;
 
-   /* Check the control ports that are connected and check supported Intent IDs.
-      Need to check if each control port supports the intent ID INTENT_ID_AUDIO_DAM_DETECTION_ENGINE_CTRL
-      indicating its a control port to DAM */
-   for (uint32_t ctrl_port_idx = 0; ctrl_port_idx < HISTORY_BUFFER_MAX_CONTROL_PORTS; ctrl_port_idx++)
+   // define outgoing payload structure.
+   struct dam_flow_ctrl_v2_payload_t
    {
-      /* Send intents to only connected port and if control port supports intent id detection ctrl */
-      if ((me_ptr->ctrl_port_info[ctrl_port_idx].state != CTRL_PORT_PEER_CONNECTED) &&
-          capi_history_buffer_check_intent_id_support(me_ptr, ctrl_port_idx, INTENT_ID_AUDIO_DAM_DETECTION_ENGINE_CTRL))
-      {
-         continue;
-      }
+      vw_imcl_header_t                       header;
+      param_id_audio_dam_data_flow_ctrl_v2_t cfg;
+   };
 
-      AR_MSG(DBG_HIGH_PRIO,
-             "Sending IMC message through control port id 0x%lx",
-             me_ptr->ctrl_port_info[ctrl_port_idx].port_id);
+   // get the port index, can use for loop if more than one.
+   uint32_t ctrl_port_idx = 0;
 
-      // get control port id for the port index.
-      uint32_t control_port_id = me_ptr->ctrl_port_info[ctrl_port_idx].port_id;
+   /* Step A - Get buffers*/
+   // Request buffers for this particular control port id.
+   capi_buf_t buffer;
 
-      /* Step A - Get recurring buffers*/
-      // Request recurring buffers for this particular control port id.
-      capi_buf_t buffer;
-      capi_history_buffer_imcl_get_recurring_buf(&me_ptr->cb_info, control_port_id, &buffer);
-      if (NULL == buffer.data_ptr || buffer.max_data_len < sizeof(vw_imcl_header_t))
-      {
-         DE_DBG(me_ptr->miid, DBG_ERROR_PRIO, "Received NULL intent buffer or invalid size %lu", buffer.max_data_len);
-         result = CAPI_EFAILED;
-      }
-      else /* Step B- Populate and send the buffer */
-      {
-         // create the payload with outgoing param ids.
-         struct dam_flow_ctrl_payload_t
-         {
-            vw_imcl_header_t                    header;
-            param_id_audio_dam_data_flow_ctrl_t cfg;
-         };
+   result = capi_history_buffer_imcl_get_one_time_buf( &me_ptr->cb_info,
+                                                       me_ptr->ctrl_port_info[ctrl_port_idx].port_id,
+                                                       sizeof(struct dam_flow_ctrl_v2_payload_t),
+                                                       &buffer);
 
-         struct dam_flow_ctrl_payload_t *temp = (struct dam_flow_ctrl_payload_t *)buffer.data_ptr;
-
-         // populate param payload
-         uint32_t param_len =
-            sizeof(param_id_audio_dam_data_flow_ctrl_t) + (param_ptr->num_best_channels * sizeof(uint32_t));
-
-         temp->header.opcode          = PARAM_ID_AUDIO_DAM_DATA_FLOW_CTRL;
-         temp->header.actual_data_len = param_len;
-
-         // copy param struct param_id_audio_dam_data_flow_ctrl_t payload to intent buffer
-         memscpy(&temp->cfg, buffer.max_data_len - sizeof(vw_imcl_header_t), param_ptr, param_len);
-
-         buffer.actual_data_len = param_len + sizeof(vw_imcl_header_t);
-
-         /*To send data over to the IMCL peer*/
-         imcl_outgoing_data_flag_t flags;
-         flags.should_send = TRUE; // FALSE == buffer is returned to fwk and not sent to peer module.
-         flags.is_trigger  = TRUE; // FALSE == polling, refer intf extension for more details
-         result            = capi_history_buffer_imcl_send_to_peer(&me_ptr->cb_info, &buffer, control_port_id, flags);
-      }
+   if (CAPI_EOK != result)
+   {
+      AR_MSG(DBG_ERROR_PRIO,
+             "0x%lx: CAPI_HISTORY_BUFFER_IMCL: capi_cmn_imcl_get_one_time_buf() failed with result : %lu",
+             me_ptr->miid,
+             result);
+      return CAPI_EFAILED;
    }
-   return result;
+
+   /* Step B- Populate and send the buffer */
+   struct dam_flow_ctrl_v2_payload_t *temp = (struct dam_flow_ctrl_v2_payload_t *)buffer.data_ptr;
+
+   buffer.actual_data_len = sizeof(struct dam_flow_ctrl_v2_payload_t);
+
+   temp->header.opcode          = PARAM_ID_AUDIO_DAM_DATA_FLOW_CTRL_V2;
+   temp->header.actual_data_len = sizeof(param_id_audio_dam_data_flow_ctrl_v2_t);
+
+   memset(&temp->cfg, 0, sizeof(param_id_audio_dam_data_flow_ctrl_v2_t));
+
+   temp->cfg.gate_ctrl = (audio_dam_gate_ctrl_op_t) param_ptr->gate_ctrl;
+   temp->cfg.read_offset_in_us = param_ptr->read_offset_in_us;
+
+   AR_MSG(DBG_LOW_PRIO, "0x%lx: CAPI_HISTORY_BUFFER: Sending data flow msg v2 %lu to DAM", me_ptr->miid, temp->cfg.gate_ctrl);
+
+   /*To send data over to the IMCL peer*/
+   imcl_outgoing_data_flag_t flags;
+   flags.should_send = TRUE;  // FALSE == buffer is returned to fwk and not sent to peer module.
+   flags.is_trigger  = TRUE; // FALSE == polling, refer intf extension for more details
+
+   return capi_history_buffer_imcl_send_to_peer(&me_ptr->cb_info, &buffer, me_ptr->ctrl_port_info[ctrl_port_idx].port_id, flags);
 }
+
+/* =========================================================================
+ * FUNCTION : capi_history_buffer_send_allow_dcm_island_entry_to_dam
+ *
+ * Refer capi_history_buffer_imcl_utils.h for function usage.
+ * ========================================================================= */
+capi_err_t capi_history_buffer_send_allow_dcm_island_entry_to_dam(capi_history_buffer_t *me_ptr)
+{
+   /* Only one control port supported (HISTORY_BUFFER_MAX_CONTROL_PORTS = 1) */
+   uint32_t ctrl_port_idx = 0;
+
+   // Safety check: ensure ctrl port is connected before sending.
+   if (CTRL_PORT_PEER_CONNECTED != me_ptr->ctrl_port_info[ctrl_port_idx].state)
+   {
+      AR_MSG(DBG_HIGH_PRIO,
+             "0x%lx: CAPI_HISTORY_BUFFER: ctrl port not connected, skipping allow_dcm_island_entry",
+             me_ptr->miid);
+      return CAPI_EOK;
+   }
+
+   // Populate the payload
+   param_id_audio_dam_allow_dcm_island_entry_t dam_process_done;
+   dam_process_done.process_done = TRUE;
+
+   // Populate the IMCL header.
+   vw_imcl_header_t header;
+   header.opcode          = PARAM_ID_AUDIO_DAM_ALLOW_DCM_ISLAND_ENTRY;
+   header.actual_data_len = sizeof(param_id_audio_dam_allow_dcm_island_entry_t);
+
+   // Get a one-time buffer from the framework
+   capi_buf_t buffer;
+   capi_err_t result = capi_history_buffer_imcl_get_one_time_buf(&me_ptr->cb_info,
+                                                                  me_ptr->ctrl_port_info[ctrl_port_idx].port_id,
+                                                                  sizeof(header) + header.actual_data_len,
+                                                                  &buffer);
+   if (CAPI_EOK != result || NULL == buffer.data_ptr)
+   {
+      AR_MSG(DBG_ERROR_PRIO,
+             "0x%lx: CAPI_HISTORY_BUFFER: received NULL payload ptr while sending allow_dcm_island_entry to DAM",
+             me_ptr->miid);
+      return CAPI_EFAILED;
+   }
+
+   // Copy the vw_imcl_header
+   uint32_t bytes_copied = memscpy(buffer.data_ptr, buffer.max_data_len, &header, sizeof(header));
+   bytes_copied += memscpy(buffer.data_ptr + bytes_copied,
+                           buffer.max_data_len - bytes_copied,
+                           &dam_process_done,
+                           header.actual_data_len);
+
+   buffer.actual_data_len = bytes_copied;
+
+   AR_MSG(DBG_HIGH_PRIO,
+          "0x%lx: CAPI_HISTORY_BUFFER: Sending ALLOW_DCM_ISLAND_ENTRY to DAM for first batch island entry",
+          me_ptr->miid);
+   
+   // To send data over to the IMCL peer
+   imcl_outgoing_data_flag_t flags;
+   flags.should_send = TRUE;
+   flags.is_trigger  = TRUE;
+
+   return capi_history_buffer_imcl_send_to_peer(&me_ptr->cb_info,
+                                                &buffer,
+                                                me_ptr->ctrl_port_info[ctrl_port_idx].port_id,
+                                                flags);
+}
+
 
 capi_err_t capi_history_buffer_imcl_send_resize_to_dam(capi_history_buffer_t *me_ptr)
 {
@@ -958,5 +1014,51 @@ capi_err_t capi_history_buffer_imcl_send_resize_to_dam(capi_history_buffer_t *me
          result            = capi_history_buffer_imcl_send_to_peer(&me_ptr->cb_info, &buffer, control_port_id, flags);
       }
    }
+   return result;
+}
+
+capi_err_t capi_history_buffer_resize_and_batch_gate_open_to_dam(capi_history_buffer_t *me_ptr)
+{
+   capi_err_t result = CAPI_EOK;
+   /*Send the RESIZE to the DAM Module*/
+   result = capi_history_buffer_imcl_send_resize_to_dam(me_ptr);
+
+   if (CAPI_EOK != result)
+   {
+      AR_MSG(DBG_MED_PRIO, "CAPI History Buffer: Couldn't send resize to DAM ");
+      return result;
+   }
+
+   if(HISTORY_BUFFER_BATCHING == me_ptr->data_flow_mode)
+   {
+
+      /* Populate dam gate control IMC param payload. */
+      param_id_audio_dam_data_flow_ctrl_v2_t flow_ctrl_cfg;
+      memset(&flow_ctrl_cfg, 0, sizeof(param_id_audio_dam_data_flow_ctrl_v2_t));
+
+      flow_ctrl_cfg.gate_ctrl = AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING_MD_TRACKING_EVENT;
+      flow_ctrl_cfg.read_offset_in_us = me_ptr->max_dam_buffer_size_us;
+
+      result = capi_history_buffer_send_flow_ctrl_v2_msg_to_dam(me_ptr, &flow_ctrl_cfg);
+
+      if (CAPI_EOK != result)
+      {
+         AR_MSG(DBG_MED_PRIO, "0x%lx: CAPI History Buffer: Couldn't send Gate open with flow 0x%lx and batch_size 0x%lx to Cntrl Port",
+                               me_ptr->miid, flow_ctrl_cfg.gate_ctrl, me_ptr->max_dam_buffer_size_us);
+         return result;
+      }
+
+      result = capi_history_buffer_send_allow_dcm_island_entry_to_dam(me_ptr);
+      if (CAPI_EOK != result)
+      {
+         AR_MSG(DBG_MED_PRIO,
+                "0x%lx: CAPI History Buffer: Couldn't send allow_dcm_island_entry to DAM for first batch",
+                me_ptr->miid);
+         result = CAPI_EOK; /* Non-fatal: tracking mechanism handles subsequent batches */
+      }
+   }
+
+   AR_MSG(DBG_MED_PRIO, "CAPI History Buffer: DAM cfg sent successfully!");
+
    return result;
 }

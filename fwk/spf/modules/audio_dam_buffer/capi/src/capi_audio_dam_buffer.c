@@ -1456,6 +1456,62 @@ capi_err_t capi_audio_dam_buffer_set_param_non_island(capi_t                 *ca
 
          break;
       }
+      case PARAM_ID_AUDIO_DAM_HANDLE_BATCH_END_TRACKING_EVENT:
+      {
+
+         if (params_ptr->actual_data_len < sizeof(dam_batch_end_md_gen_t))
+         {
+            DAM_MSG(me_ptr->miid,
+                    DBG_ERROR_PRIO,
+                    "capi_audio_dam: Param id 0x%lx Bad param size %lu",
+                    (uint32_t)param_id,
+                    params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
+         }
+
+         dam_batch_end_md_gen_t *md_event_ptr = (dam_batch_end_md_gen_t *)params_ptr->data_ptr;
+
+         uint32_t op_port_index = md_event_ptr->output_port_idx;
+
+         uint32_t op_arr_index = get_arr_index_from_port_index(me_ptr, op_port_index, FALSE);
+
+         if(UMAX_32 == op_arr_index)
+         {
+            DAM_MSG(me_ptr->miid,
+                    DBG_ERROR_PRIO,
+                    "capi_audio_dam: Param id 0x%lx, recieved invalid port index %lu",
+                    (uint32_t)param_id,
+                    params_ptr->actual_data_len);
+            return CAPI_EBADPARAM;
+         }
+
+         // Store the flag
+         me_ptr->out_port_info_arr[op_arr_index].ready_for_island_entry = TRUE;
+
+         /* Decrease the count and check in island entry condition if this count is zero. */
+         if(0 < me_ptr->out_port_info_arr[op_arr_index].ref_count_batch_end_md)
+         {
+            --me_ptr->out_port_info_arr[op_arr_index].ref_count_batch_end_md;
+         }
+         else
+         {
+            DAM_MSG(me_ptr->miid, DBG_MED_PRIO, "Invalid Ref count of batch end md");
+         }
+
+         bool_t can_enter_island = capi_audio_dam_check_island_entry_cond(me_ptr);
+
+         // island entry conditions, pending_bytes -> 0, DCM mode enabled and port is intialized
+         if (can_enter_island)
+         {
+            result |= capi_dam_duty_cycling_buf_send_message_to_dcm(me_ptr, (uint32_t)SPF_MSG_CMD_DCM_REQ_FOR_UNBLOCK_ISLAND_ENTRY);
+         }
+         else
+         {
+            DAM_MSG(me_ptr->miid, DBG_MED_PRIO, "Island entry conditions not met.. Buffering data");
+         }
+
+         break;
+      }
       default:
       {
          DAM_MSG(me_ptr->miid, DBG_ERROR_PRIO, "capi_audio_dam: Unsupported Param id ::0x%x \n", param_id);
@@ -2391,6 +2447,9 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
                me_ptr->out_port_info_arr[arr_index].is_open = FALSE;
                me_ptr->out_port_info_arr[arr_index].gate_ctrl_op                = AUDIO_DAM_BATCH_INVALID;
                me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = FALSE;
+               me_ptr->out_port_info_arr[arr_index].handle_md_batch_tracking = FALSE;
+               me_ptr->out_port_info_arr[arr_index].is_partial_batch_drain_enabled = FALSE;
+               me_ptr->out_port_info_arr[arr_index].is_handle_partial_drain     = FALSE;
             }
 
             break;
@@ -2415,6 +2474,14 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
                if(AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING == me_ptr->out_port_info_arr[arr_index].gate_ctrl_op)
                {
                   me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = TRUE;
+               }
+
+               else if(AUDIO_DAM_BATCH_STREAM_WITH_ISLAND_DUTY_CYCLING_MD_TRACKING_EVENT == me_ptr->out_port_info_arr[arr_index].gate_ctrl_op)
+               {
+                  me_ptr->out_port_info_arr[arr_index].handle_md_batch_tracking    = TRUE;
+                  me_ptr->out_port_info_arr[arr_index].is_partial_batch_drain_enabled    = TRUE;
+                  me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = TRUE;
+                  me_ptr->out_port_info_arr[arr_index].is_handle_partial_drain     = FALSE;
                }
 
                /** for outputs trigger policy is optional present if gate is opened, other wise it is non-trigger
@@ -2470,28 +2537,53 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
                */
                for (uint32_t arr_idx = 0; arr_idx < me_ptr->max_output_ports; arr_idx++)
                {
-                  if ((!me_ptr->out_port_info_arr[arr_idx].is_gate_opened) ||
-                     (!is_dam_output_port_initialized(me_ptr, arr_idx)) ||
-                     (!me_ptr->out_port_info_arr[arr_idx].is_started) ||
-                     (!me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr->is_batch_streaming))
+                  /** reset the circ buffer if gate is closed */
+                  if ((!me_ptr->out_port_info_arr[arr_idx].is_gate_opened) &&
+                      (is_dam_output_port_initialized(me_ptr, arr_idx)))
+                  {
+
+                     // adjust rd ptr inorder to drop all the data
+                     uint32_t read_offset_in_us = 0;
+                     audio_dam_stream_read_adjust(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr,
+                                                read_offset_in_us,
+                                                NULL,
+                                                FALSE);
+
+                     continue;
+                  }
+                  else if ((!me_ptr->out_port_info_arr[arr_idx].is_gate_opened) ||
+                           (!is_dam_output_port_initialized(me_ptr, arr_idx)) ||
+                           (!me_ptr->out_port_info_arr[arr_idx].is_started) ||
+                           (!me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr->is_batch_streaming))
                   {
                      continue;
                   }
 
-                  audio_dam_force_set_pending_bytes(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr);
+                  uint32_t pending_bytes = 0;
+                  audio_dam_get_stream_reader_pending_bytes(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr, &pending_bytes);
 
-                  // check if the DCM is eneabled and pending bytes is non-zero (capture transition from 0 -> non-zero number)
-                  if (FALSE == me_ptr->out_port_info_arr[arr_idx].is_dcm_duty_cycling_enabled)
+                  /* complete the current batch first then create next batch with remaining bytes*/
+                  if ((0 < pending_bytes) && me_ptr->out_port_info_arr[arr_idx].is_partial_batch_drain_enabled)
                   {
-                     posal_island_trigger_island_exit();
-                     capi_dam_duty_cycling_buf_send_message_to_dcm(me_ptr, (uint32_t)SPF_MSG_CMD_DCM_REQ_FOR_ISLAND_EXIT);
+                     /* treat graph close as eos and drain partial data as seperate batch*/
+                     me_ptr->out_port_info_arr[arr_idx].is_handle_partial_drain = TRUE;
+                  }
+                  else
+                  {
+                     audio_dam_force_set_pending_bytes(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr);
+
+                     // check if the DCM is eneabled and pending bytes is non-zero (capture transition from 0 -> non-zero number)
+                     if (FALSE == me_ptr->out_port_info_arr[arr_idx].is_dcm_duty_cycling_enabled)
+                     {
+                        posal_island_trigger_island_exit();
+                        capi_dam_duty_cycling_buf_send_message_to_dcm(me_ptr, (uint32_t)SPF_MSG_CMD_DCM_REQ_FOR_ISLAND_EXIT);
+                     }
                   }
 
-                  uint32_t pending_bytes = 0;
-                  audio_dam_get_stream_reader_pending_bytes(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr,
-                                                         &pending_bytes);
+                  uint32_t unread_bytes = 0;
+                  audio_dam_get_stream_reader_unread_bytes(me_ptr->out_port_info_arr[arr_idx].strm_reader_ptr, &unread_bytes);
 
-                  me_ptr->out_port_info_arr[arr_idx].bytes_before_eos = pending_bytes;
+                  me_ptr->out_port_info_arr[arr_idx].bytes_before_eos = unread_bytes;
                   if (me_ptr->out_port_info_arr[arr_idx].bytes_before_eos)
                   {
                      me_ptr->out_port_info_arr[arr_idx].pending_eos = TRUE;
@@ -2508,6 +2600,21 @@ static capi_err_t capi_audio_dam_data_port_op_handler(capi_audio_dam_t *me_ptr, 
                me_ptr->out_port_info_arr[arr_index].is_started = FALSE;
                me_ptr->out_port_info_arr[arr_index].gate_ctrl_op                = AUDIO_DAM_BATCH_INVALID;
                me_ptr->out_port_info_arr[arr_index].is_dcm_duty_cycling_enabled = FALSE;
+               me_ptr->out_port_info_arr[arr_index].handle_md_batch_tracking    = FALSE;
+               me_ptr->out_port_info_arr[arr_index].is_partial_batch_drain_enabled    = FALSE;
+               me_ptr->out_port_info_arr[arr_index].is_handle_partial_drain     = FALSE;
+               me_ptr->out_port_info_arr[arr_index].pending_eos                 = FALSE;
+               me_ptr->out_port_info_arr[arr_index].bytes_before_eos            = 0;
+               
+               if (is_dam_output_port_initialized(me_ptr, arr_index))
+               {
+                  // Reset read offset to zero to drop all stale data  
+                  uint32_t read_offset_in_us = 0;                     
+                  audio_dam_stream_read_adjust(me_ptr->out_port_info_arr[arr_index].strm_reader_ptr,  
+                                             read_offset_in_us,                                        
+                                             NULL,                                                     
+                                             FALSE);                                                 
+               }
             }
 
             break;

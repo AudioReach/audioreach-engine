@@ -24,7 +24,7 @@ ALSA_DEVICE_CFLAGS_64 += -march=armv8-a+crypto
 ALSA_DEVICE_SHARED_LIBS := \
     liblx-osal \
     libar-gpr \
-    libtinyalsa
+    liboss_tinyalsa
 
 ALSA_DEVICE_HEADER_LIBS := \
     libspf_api \

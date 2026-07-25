@@ -289,6 +289,8 @@ ar_result_t apm_multi_client_free_conn(apm_t *apm_info_ptr, apm_sub_graph_t *sub
 
    while (conn_cfg_list_ptr)
    {
+	  spf_list_node_t *next_conn_cfg_list_ptr = conn_cfg_list_ptr->next_ptr;
+
       apm_module_data_port_conn_t *conn_cfg_ptr = (apm_module_data_port_conn_t *)conn_cfg_list_ptr->obj_ptr;
 
       // All the connection from this SG should be removed either originating or ending
@@ -322,7 +324,7 @@ ar_result_t apm_multi_client_free_conn(apm_t *apm_info_ptr, apm_sub_graph_t *sub
          conn_cfg_ptr = NULL;
       }
 
-      LIST_ADVANCE(conn_cfg_list_ptr);
+      conn_cfg_list_ptr = next_conn_cfg_list_ptr;
    }
 
    return result;
@@ -340,6 +342,8 @@ ar_result_t apm_multi_client_free_ctrl_link(apm_t *apm_info_ptr, apm_sub_graph_t
 
    while (ctrl_link_cfg_list_ptr)
    {
+	  spf_list_node_t *next_ctrl_link_cfg_list_ptr = ctrl_link_cfg_list_ptr->next_ptr;
+
       apm_module_ctrl_port_conn_t *ctrl_link_cfg_ptr = (apm_module_ctrl_port_conn_t *)ctrl_link_cfg_list_ptr->obj_ptr;
 
       // All the connection from this SG should be removed either originating or ending
@@ -373,7 +377,7 @@ ar_result_t apm_multi_client_free_ctrl_link(apm_t *apm_info_ptr, apm_sub_graph_t
          ctrl_link_cfg_ptr = NULL;
       }
 
-      LIST_ADVANCE(ctrl_link_cfg_list_ptr);
+      ctrl_link_cfg_list_ptr = next_ctrl_link_cfg_list_ptr;
    }
 
    return result;
