@@ -271,6 +271,7 @@ capi_err_t capi_sal_process(capi_t *_pif, capi_stream_data_t *input[], capi_stre
                         "CAPI SAL: Failed to operate in inplace mode eventhough marked inplace. "
                         "active_in_port_index: %ld",
                         active_input_port_index);
+         return CAPI_EFAILED;
       }
       else
       {
