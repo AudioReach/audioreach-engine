@@ -445,7 +445,7 @@ ________________________________________________________________________________
 
 uint32_t pc_get_fixed_out_samples(pc_lib_t *pc_ptr, uint32_t req_out_samples)
 {
-   if ((NULL != pc_ptr->hwsw_rs_lib_ptr->sw_rs_mem_ptr[STAGE_ZERO]) &&
+   if ((NULL == pc_ptr->hwsw_rs_lib_ptr->sw_rs_mem_ptr[STAGE_ZERO]) ||
        (!pc_ptr->hwsw_rs_lib_ptr->sw_rs_mem_ptr[STAGE_ZERO]->drs_mem_ptr.pStructMem))
    {
       CNV_MSG(pc_ptr->miid, DBG_ERROR_PRIO, "sw resampler struct is NULL");
