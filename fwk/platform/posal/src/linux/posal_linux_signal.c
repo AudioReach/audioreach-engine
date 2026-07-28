@@ -39,6 +39,10 @@ ar_result_t posal_linux_signal_create(posal_linux_signal_t *signal)
 #endif
 
     posal_linux_signal_internal_t *signal_handles = (posal_linux_signal_internal_t *)malloc(sizeof(posal_linux_signal_internal_t));
+    if (NULL == signal_handles)
+    {
+        return AR_ENOMEMORY;
+    }
 
     pthread_cond_t* created_signal = (pthread_cond_t *)&signal_handles->created_signal;
     pthread_condattr_t attr;
@@ -47,6 +51,7 @@ ar_result_t posal_linux_signal_create(posal_linux_signal_t *signal)
     if (rc) {
         AR_MSG(DBG_ERROR_PRIO,"%s: Failed to init cond, rc = %d\n", __func__, rc);
         status = AR_EFAILED;
+        free(signal_handles);
         return status;
     }
 
@@ -76,6 +81,7 @@ ar_result_t posal_linux_signal_create(posal_linux_signal_t *signal)
 
 fail:
     pthread_cond_destroy(created_signal);
+    free(signal_handles);
     return status;
 }
 
