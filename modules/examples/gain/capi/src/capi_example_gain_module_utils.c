@@ -421,7 +421,7 @@ capi_err_t capi_example_gain_module_process_set_properties(capi_example_gain_mod
                }
 
                /* Validate interleaving*/
-               if (media_fmt_ptr->format.data_interleaving != CAPI_DEINTERLEAVED_UNPACKED)
+               if (media_fmt_ptr->format.num_channels != 1 && media_fmt_ptr->format.data_interleaving != CAPI_DEINTERLEAVED_UNPACKED)
                {
                   AR_MSG(DBG_ERROR_PRIO, "capi_example_gain_module : Interleaved data not supported.");
                   return CAPI_EBADPARAM;
