@@ -17,3 +17,4 @@ include_directories(
 
 #Add the sub directories
 add_subdirectory(../generic/build generic)
+add_subdirectory(../nxp/build nxp)
