@@ -283,7 +283,7 @@ ar_result_t alsa_device_driver_wait(alsa_device_driver_t *alsa_device_driver_ptr
    if (ret == 0)
    {
       // Timeout - no frames available within timeout period
-      AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: pcm_wait timeout after %d ms", timeout_ms);
+      AR_MSG(DBG_LOW_PRIO, "ALSA_DEVICE_DRIVER: pcm_wait timeout after %d ms", timeout_ms);
       return AR_ETIMEOUT;
    }
    else if (ret < 0)
