@@ -65,6 +65,7 @@ elseif(CONFIG_ARCH_ZEPHYR)
    list (APPEND lib_srcs_list
       ${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_condvar.c
       ${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_timer.c
+      ${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_time.c
       #posal_rtld is not supported in zephyr.
    )
 else() # for QNX & LRH
@@ -72,6 +73,7 @@ else() # for QNX & LRH
       ${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_condvar.c
       ${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_timer.c
       ${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_rtld.c
+      ${LIB_ROOT}/src/${TGT_SPECIFIC_FOLDER}/posal_time.c
    )
 endif()
 
