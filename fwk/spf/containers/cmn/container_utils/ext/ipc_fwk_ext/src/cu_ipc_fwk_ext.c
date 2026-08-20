@@ -1589,7 +1589,6 @@ ar_result_t cu_ipc_tx_handle_icb_info_from_ds(cu_base_t         *base_ptr,
                                               cu_ext_out_port_t *ext_out_port_ptr)
 {
    ar_result_t  result        = AR_EOK;
-   uint32_t     num_ipc_buf   = 0;
    gu_module_t *gu_module_ptr = gu_ext_out_port_ptr->int_out_port_ptr->cmn.module_ptr;
 
    if (FALSE == gu_is_ipc_ext_output_port(gu_ext_out_port_ptr))
@@ -1605,7 +1604,6 @@ ar_result_t cu_ipc_tx_handle_icb_info_from_ds(cu_base_t         *base_ptr,
    }
 
    cu_determine_ext_out_buffering(base_ptr, gu_ext_out_port_ptr);
-   num_ipc_buf = ext_out_port_ptr->icb_info.icb.num_reg_bufs + ext_out_port_ptr->icb_info.icb.num_reg_prebufs;
 
    if ((void *)&dummy_var == gu_ext_out_port_ptr->downstream_handle.spf_handle_ptr)
    {
@@ -1619,7 +1617,9 @@ ar_result_t cu_ipc_tx_handle_icb_info_from_ds(cu_base_t         *base_ptr,
       fwk_extn_param_id_ipc_buffer_info_t payload;
    } set_param_payload;
 
-   set_param_payload.payload.num_ipc_bufs           = num_ipc_buf;
+   set_param_payload.payload.num_reg_bufs    = ext_out_port_ptr->icb_info.icb.num_reg_bufs;
+   set_param_payload.payload.num_reg_prebufs = ext_out_port_ptr->icb_info.icb.num_reg_prebufs;
+
    set_param_payload.module_data.module_instance_id = gu_module_ptr->module_instance_id;
    set_param_payload.module_data.param_id           = FWK_EXTN_PARAM_ID_IPC_BUFFER_INFO;
    set_param_payload.module_data.param_size =

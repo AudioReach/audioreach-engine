@@ -264,10 +264,14 @@ typedef struct fwk_extn_param_id_ipc_buffer_info_t fwk_extn_param_id_ipc_buffer_
 @{ */
 struct fwk_extn_param_id_ipc_buffer_info_t
 {
-   uint32_t num_ipc_bufs;
+   uint32_t num_reg_bufs;
    /**< number of ipc buffers that IPC module needs to create.
         This depends upon the media format and upstream and downstream
         frame length property info. */
+
+   uint32_t num_reg_prebufs;
+   /**< number of ipc prebuffers required to be pushed by TX to account for upstream
+        processing jitter in realtime path.*/
 };
 /** @} */ /* end_weakgroup weak_fwk_extn_param_id_ipc_buffer_info_t */
 

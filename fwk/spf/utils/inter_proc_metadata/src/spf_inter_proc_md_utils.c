@@ -52,7 +52,7 @@ static ar_result_t spf_ipcmd_handle_tracking_md_event_util_(uint32_t            
                                                             spf_ipcmd_node_info_t *md_node_ref_ptr,
                                                             bool_t                 is_dropped,
                                                             uint32_t               rendering_miid,
-                                                            uint32_t               rendering_src_domain_id);
+                                                            uint32_t               rendering_domain_id);
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void spf_ipcmd_return_job_obj(tp_job_info_t *job_ptr)
@@ -702,7 +702,7 @@ static ar_result_t spf_ipcmd_handle_tracking_md_event_util_(uint32_t            
                                                             spf_ipcmd_node_info_t *md_node_ref_ptr,
                                                             bool_t                 is_dropped,
                                                             uint32_t               rendering_miid,
-                                                            uint32_t               rendering_src_domain_id)
+                                                            uint32_t               rendering_domain_id)
 {
    ar_result_t result = AR_EOK;
 
@@ -718,7 +718,7 @@ static ar_result_t spf_ipcmd_handle_tracking_md_event_util_(uint32_t            
    gen_topo_raise_tracking_event(log_id, rendering_miid, md_node_ref_ptr->md_ptr, !is_dropped, NULL, FALSE);
 
    // for both dropped or consumed decrease the ref count by 1.
-   spf_ipcmd_decr_ref_count_util_(log_id, md_node_ref_ptr, rendering_src_domain_id);
+   spf_ipcmd_decr_ref_count_util_(log_id, md_node_ref_ptr, rendering_domain_id);
 
    // end tracking because the last render/drop event has been recevied for the given metadata.
    if (0 == md_node_ref_ptr->total_ref_count)
@@ -881,7 +881,7 @@ static ar_result_t spf_ipcmd_destroy_node_info(uint32_t log_id, spf_ipcmd_node_i
 {
    ar_result_t result = AR_EOK;
 
-   IPMD_MSG(log_id, DBG_ERROR_PRIO, "MD_DBG:  destorying node info 0x%p");
+   IPMD_MSG(log_id, DBG_ERROR_PRIO, "MD_DBG:  destroying node info 0x%p", md_node_ref_ptr);
 
    // free MD related memory
    if (md_node_ref_ptr->md_ptr)
@@ -988,9 +988,19 @@ ar_result_t spf_ipcmd_raise_event_to_update_ref_count(uint32_t                  
    if (is_registered)
    {
       gpr_cmd_alloc_send_t args;
-      args.src_domain_id = md_tracking_ptr->src_domain_id;
+      uint32_t             cur_domain_id = 0;
+
+      // here the source domain is considered to be the proc domain thats raising the incr/decr ref count event.
+      // since its raised by the spf tracker utility, the src port is considered as APM module instance ID.
+      //
+      // imp: the dest domain id will always match to the MD's orginating domain but src domain id changes depeneding
+      // upon the peer proc domain from which ref count update is being sent. Do not confuse this with the tracking MD
+      // creating source domain.
+      __gpr_cmd_get_host_domain_id(&cur_domain_id);
+      args.src_domain_id = cur_domain_id;
+      args.src_port      = APM_MODULE_INSTANCE_ID;
+
       args.dst_domain_id = md_tracking_ptr->dst_domain_id;
-      args.src_port      = md_tracking_ptr->src_port;
       args.dst_port      = md_tracking_ptr->dest_port;
       args.token         = md_tracking_ptr->token_msw;
       args.opcode        = opcode;
