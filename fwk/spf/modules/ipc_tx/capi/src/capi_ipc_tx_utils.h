@@ -219,7 +219,11 @@ typedef struct ipc_tx_output_port_info_t
 typedef struct data_buf_info_t
 {
    uint32_t num_ipc_bufs_needed;
-   /**< Number of ipc data buffer count received from the fwk*/
+   /**< Number of ipc data buffer count which is some of regular and prebuffers. There are total numbers of buffers
+    * created and pushed to the output queue*/
+
+   uint32_t num_ipc_prebufs_needed_to_send;
+   /**< Number of ipc data Pre buffers worth of zero buffers that needs to pushed at the time of data flow start.*/
 
    uint32_t num_ipc_bufs_created;
    /**< Number of ipc data buffers created at the moment */
@@ -276,6 +280,10 @@ typedef struct data_buf_info_t
 
    int8_t *overrun_buffer_ptr;
    uint32_t overrun_buffer_size;
+
+   bool_t   is_prebuffers_sent;
+   uint16_t num_pending_prebuffers;
+   uint8_t *pending_prebuf_index_arr;
 
 } data_buf_info_t;
 

@@ -200,8 +200,10 @@ capi_err_t capi_ipc_tx_write_metadata(capi_ipc_tx_t *me_ptr, capi_stream_data_t 
       md_data_header_ptr->metadata_id = md_ptr->metadata_id;
       md_data_header_ptr->offset      = md_ptr->offset;
 
-      // initialize the token, it will be overwritten if current domain is originating domain in
-      // spf_add_md_to_inter_proc_md_tracker(), if MD is not found
+      // initialize the token,
+      // when added to inter proc md tracker list, token will be updated if current domain is
+      // originating domain. Token will be updated to a unique handle to handle render events
+      // from the satellite proc domains.
       md_data_header_ptr->token_lsw = (md_ptr->tracking_ptr) ? md_ptr->tracking_ptr->token_lsw : 0;
       md_data_header_ptr->token_msw = (md_ptr->tracking_ptr) ? md_ptr->tracking_ptr->token_msw : 0;
 
@@ -250,6 +252,28 @@ capi_err_t capi_ipc_tx_write_metadata(capi_ipc_tx_t *me_ptr, capi_stream_data_t 
                  payload[1]);
       // #endif
 
+      // if EOS flushing MD is received need to send prebuffers again on the next data flow start, hence
+      // reset the prebuffer sent flag to FALSE
+      if (MODULE_CMN_MD_ID_EOS == md_ptr->metadata_id)
+      {
+         // Exit island here since we need to do a mem free operation which is in nlpi
+         module_cmn_md_eos_t *eos_metadata_ptr = md_ptr->metadata_flag.is_out_of_band
+                                                    ? (module_cmn_md_eos_t *)md_ptr->metadata_ptr
+                                                    : (module_cmn_md_eos_t *)&(md_ptr->metadata_buf);
+
+         IPC_TX_MSG(me_ptr->miid,
+                    DBG_LOW_PRIO,
+                    "MD: Received EOS, it its flushing?%lu reset the prebuffer flag %lu",
+                    eos_metadata_ptr->flags.is_flushing_eos,
+                    me_ptr->sh_buf_info.is_prebuffers_sent);
+
+         // if flushing EOS is received need to resend the prebuffer flags on the next data flow start.
+         if (eos_metadata_ptr->flags.is_flushing_eos)
+         {
+            me_ptr->sh_buf_info.is_prebuffers_sent = FALSE;
+         }
+      }
+
       // -------TRACKING METADATA PART---------------
       // If the tracking mode is disable, we can safely destroy the metadata at the IPC tx input
       if (MODULE_CMN_MD_TRACKING_CONFIG_DISABLE == md_ptr->metadata_flag.tracking_mode)
@@ -295,8 +319,8 @@ capi_err_t capi_ipc_tx_write_metadata(capi_ipc_tx_t *me_ptr, capi_stream_data_t 
                     "MD: is being already tracked, decrement ref count to IPMD tracker in originating domain");
 #endif
          // IPC TX is propagating the MD to downstream proc domain, and we can consider MD is consumed in the scope of
-         // this proc domain. But this is not truly a render/drop event, hence we raise this event to indicate the
-         // orginiator domain to only decrement ref count and not handle any render events
+         // current IPX TX's proc domain. But this is not truly a render/drop event, hence we raise this event to
+         // indicate the orginiator domain to only decrement ref count and not to handle any render events.
          spf_ipcmd_raise_event_to_update_ref_count(me_ptr->miid,
                                                    md_ptr->tracking_ptr,
                                                    md_data_header_ptr->metadata_id,
@@ -408,6 +432,7 @@ capi_err_t capi_ipc_tx_write_metadata(capi_ipc_tx_t *me_ptr, capi_stream_data_t 
       }
       node_ptr = next_ptr;
    }
+
    // always clear flush-eos flag since we propagated to output //todo: review once
    in_stream_ptr->flags.marker_eos  = FALSE;
    in_stream_ptr->metadata_list_ptr = NULL;

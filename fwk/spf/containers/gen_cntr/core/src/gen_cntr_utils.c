@@ -1192,6 +1192,10 @@ ar_result_t gen_cntr_set_propagated_prop_on_ext_output(gen_topo_t               
             // downstream message is sent at the end
             // cu_inform_downstream_about_upstream_property
          }
+         else
+         {
+            cu_ipc_tx_handle_icb_info_from_ds((void *)&me_ptr->cu, gu_out_port_ptr, &ext_out_port_ptr->cu);
+         }
       }
    }
 

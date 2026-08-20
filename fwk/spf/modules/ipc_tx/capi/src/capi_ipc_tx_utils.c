@@ -17,13 +17,23 @@ SPDX-License-Identifier: BSD-3-Clause
  * =========================================================================*/
 
 #include "capi_ipc_tx_utils.h"
+#include "capi_types.h"
+#include "posal_memory.h"
 #include "wr_sh_mem_ep_api.h"
 
 // static bool_t ipc_tx_is_supported_media_type(const capi_media_fmt_v2_t *format_ptr);
 
-static capi_err_t capi_ipc_raise_data_link_info_event(uint32_t miid,
-                                                      capi_event_callback_info_t *cb_info_ptr,
+static capi_err_t capi_ipc_raise_data_link_info_event(uint32_t                             miid,
+                                                      capi_event_callback_info_t          *cb_info_ptr,
                                                       fwk_extn_event_ipc_data_link_info_t *link_info_ptr);
+
+static capi_err_t capi_ipc_tx_send_wr_buffer(capi_ipc_tx_t      *me_ptr,
+                                             uint32_t            buffer_index,
+                                             uint32_t            actual_data_filled,
+                                             uint32_t            meta_data_size,
+                                             uint64_t            timestamp,
+                                             capi_stream_flags_t flags,
+                                             bool_t              is_prebuffer);
 
 static bool_t is_valid_size(size_t actual, size_t max)
 {
@@ -46,36 +56,36 @@ static bool_t ipc_tx_is_supported_media_type(const capi_media_fmt_v2_t *format_p
    if ((CAPI_FIXED_POINT == format_ptr->header.format_header.data_format) ||
        (CAPI_FLOATING_POINT == format_ptr->header.format_header.data_format))
    {
-   if ((16 != format_ptr->format.bits_per_sample) && (32 != format_ptr->format.bits_per_sample))
-   {
-      AR_MSG(DBG_ERROR_PRIO,
-             "CAPI IPC_TX: only supports 16 and 32 bit data. Received %lu.",
-             format_ptr->format.bits_per_sample);
-      return FALSE;
-   }
+      if ((16 != format_ptr->format.bits_per_sample) && (32 != format_ptr->format.bits_per_sample))
+      {
+         AR_MSG(DBG_ERROR_PRIO,
+                "CAPI IPC_TX: only supports 16 and 32 bit data. Received %lu.",
+                format_ptr->format.bits_per_sample);
+         return FALSE;
+      }
 
-   if ((CAPI_DEINTERLEAVED_UNPACKED_V2 != format_ptr->format.data_interleaving) &&
-       (CAPI_INTERLEAVED != format_ptr->format.data_interleaving))
-   {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI IPC_TX : Unsupported data type.");
-      return FALSE;
-   }
+      if ((CAPI_DEINTERLEAVED_UNPACKED_V2 != format_ptr->format.data_interleaving) &&
+          (CAPI_INTERLEAVED != format_ptr->format.data_interleaving))
+      {
+         AR_MSG(DBG_ERROR_PRIO, "CAPI IPC_TX : Unsupported data type.");
+         return FALSE;
+      }
 
-   if (!format_ptr->format.data_is_signed)
-   {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI IPC_TX: Unsigned data not supported.");
-      return FALSE;
-   }
+      if (!format_ptr->format.data_is_signed)
+      {
+         AR_MSG(DBG_ERROR_PRIO, "CAPI IPC_TX: Unsigned data not supported.");
+         return FALSE;
+      }
 
-   if ((format_ptr->format.num_channels == 0) || (format_ptr->format.num_channels > CAPI_MAX_CHANNELS_V2))
-   {
-      AR_MSG(DBG_ERROR_PRIO,
-             "CAPIv2 IPC_TX: Only upto %lu channels supported."
-             "Received %lu.",
-             CAPI_MAX_CHANNELS_V2,
-             format_ptr->format.num_channels);
-      return FALSE;
-   }
+      if ((format_ptr->format.num_channels == 0) || (format_ptr->format.num_channels > CAPI_MAX_CHANNELS_V2))
+      {
+         AR_MSG(DBG_ERROR_PRIO,
+                "CAPIv2 IPC_TX: Only upto %lu channels supported."
+                "Received %lu.",
+                CAPI_MAX_CHANNELS_V2,
+                format_ptr->format.num_channels);
+         return FALSE;
+      }
    }
 
    return TRUE;
@@ -178,13 +188,11 @@ capi_err_t capi_ipc_tx_process(capi_t *_pif, capi_stream_data_t *input[], capi_s
    POSAL_ASSERT(_pif);
    POSAL_ASSERT(input[0]);
 
-   capi_err_t                             capi_result   = CAPI_EOK;
-   capi_ipc_tx_t                         *me_ptr        = (capi_ipc_tx_t *)_pif;
-   capi_stream_data_v2_t                 *in_stream_ptr = (capi_stream_data_v2_t *)input[0];
-   data_cmd_wr_sh_mem_ep_data_buffer_v2_t wr_data_buf;
-
-   uint32_t meta_data_size  = 0;
-   uint32_t curr_buff_index = me_ptr->sh_buf_info.curr_buff_index;
+   capi_err_t             capi_result     = CAPI_EOK;
+   capi_ipc_tx_t         *me_ptr          = (capi_ipc_tx_t *)_pif;
+   capi_stream_data_v2_t *in_stream_ptr   = (capi_stream_data_v2_t *)input[0];
+   uint32_t               meta_data_size  = 0;
+   uint32_t               curr_buff_index = me_ptr->sh_buf_info.curr_buff_index;
 
    bool_t is_data_present = FALSE;
    bool_t is_md_present   = FALSE;
@@ -206,16 +214,16 @@ capi_err_t capi_ipc_tx_process(capi_t *_pif, capi_stream_data_t *input[], capi_s
    {
 #ifdef DEBUG_IPC_TX
       IPC_TX_MSG(me_ptr->miid,
-                  DBG_MED_PRIO,
-                  "write data processing: recreate sh buffer as buffer size got updated."
-                  "metadata_buff_size %lu, data_buff_size %lu, shared_mem_buf_handle[%lu].shm_alloc_size %lu",
-                  me_ptr->sh_buf_info.metadata_buff_size,
-                  me_ptr->sh_buf_info.data_buff_size,
-                  curr_buff_index,
-                  me_ptr->sh_buf_info.shared_mem_buf_handle[curr_buff_index].shm_alloc_size);
+                 DBG_MED_PRIO,
+                 "write data processing: recreate sh buffer as buffer size got updated."
+                 "metadata_buff_size %lu, data_buff_size %lu, shared_mem_buf_handle[%lu].shm_alloc_size %lu",
+                 me_ptr->sh_buf_info.metadata_buff_size,
+                 me_ptr->sh_buf_info.data_buff_size,
+                 curr_buff_index,
+                 me_ptr->sh_buf_info.shared_mem_buf_handle[curr_buff_index].shm_alloc_size);
 #endif
-      me_ptr->sh_buf_info.shmem_alloc_size = ALIGN_128_BYTES(me_ptr->sh_buf_info.data_buff_size) +
-                                             ALIGN_128_BYTES(me_ptr->sh_buf_info.metadata_buff_size);
+      me_ptr->sh_buf_info.shmem_alloc_size =
+         ALIGN_128_BYTES(me_ptr->sh_buf_info.data_buff_size) + ALIGN_128_BYTES(me_ptr->sh_buf_info.metadata_buff_size);
       // Allocate a new shared buffer with the updated metadata size
       if (CAPI_EOK !=
           (capi_result =
@@ -228,8 +236,6 @@ capi_err_t capi_ipc_tx_process(capi_t *_pif, capi_stream_data_t *input[], capi_s
          return capi_result;
       }
    }
-
-   memset(&wr_data_buf, 0, sizeof(data_cmd_wr_sh_mem_ep_data_buffer_v2_t));
 
    if (TRUE == me_ptr->need_to_overrun)
    {
@@ -310,28 +316,121 @@ capi_err_t capi_ipc_tx_process(capi_t *_pif, capi_stream_data_t *input[], capi_s
       }
    }
 
+   // check if prebuffers are not sent, send them before sending regular data buffer.
+   if (me_ptr->sh_buf_info.num_pending_prebuffers)
+   {
+      capi_stream_flags_t flags = input[0]->flags;
+      flags.end_of_frame        = FALSE;
+      flags.marker_eos          = FALSE;
+      flags.erasure             = FALSE;
+
+      // get the first prebuffer timestamp
+      uint64_t timestamp =
+         input[0]->timestamp - (me_ptr->frame_length_info.frame_dur_us * me_ptr->sh_buf_info.num_pending_prebuffers);
+
+      // send prebuffers
+      while (me_ptr->sh_buf_info.num_pending_prebuffers)
+      {
+         uint8_t prebuf_index =
+            me_ptr->sh_buf_info.pending_prebuf_index_arr[me_ptr->sh_buf_info.num_pending_prebuffers - 1];
+
+         if (prebuf_index < me_ptr->sh_buf_info.num_ipc_bufs_created)
+         {
+            capi_result |= capi_ipc_tx_send_wr_buffer(me_ptr,
+                                                      prebuf_index,
+                                                      me_ptr->sh_buf_info.frame_size_in_bytes,
+                                                      0,
+                                                      timestamp,
+                                                      flags,
+                                                      TRUE);
+         }
+         else
+         {
+            IPC_TX_MSG(me_ptr->miid,
+                       DBG_ERROR_PRIO,
+                       "write_data: failed sending prebuffer invalid buf index %lu >= %lu",
+                       prebuf_index,
+                       me_ptr->sh_buf_info.num_ipc_bufs_created);
+         }
+
+         // reset the buffer index to invalid
+         me_ptr->sh_buf_info.pending_prebuf_index_arr[me_ptr->sh_buf_info.num_pending_prebuffers - 1] = 0xFF;
+
+         timestamp += me_ptr->frame_length_info.frame_dur_us;
+
+         me_ptr->sh_buf_info.num_pending_prebuffers--;
+      }
+
+      me_ptr->sh_buf_info.is_prebuffers_sent = TRUE;
+   }
+
+   // send regular buffer
+   capi_result |= capi_ipc_tx_send_wr_buffer(me_ptr,
+                                             me_ptr->sh_buf_info.curr_buff_index,
+                                             me_ptr->sh_buf_info.actual_data_filled,
+                                             meta_data_size,
+                                             input[0]->timestamp,
+                                             input[0]->flags,
+                                             FALSE);
+
+   if (AR_DID_FAIL(capi_result))
+   {
+      IPC_TX_MSG(me_ptr->miid, DBG_HIGH_PRIO, "Sending data buffer from ipc to client failed with 0x%lx", capi_result);
+
+      // if sending gpr data buffer has failed free all the pending trackind MD associated with the desitnation domain
+      // id to avoid any memory leaks just as recovery
+      spf_ipcmd_destroy_pending_tracked_md_info(me_ptr->miid, TRUE, me_ptr->ipc_tx_link_info.peer_proc_domain_id, TRUE);
+      return capi_result;
+   }
+   else
+   {
+      IPC_TX_MSG(me_ptr->miid, DBG_HIGH_PRIO, "Sent a data buffer from IPC to client");
+      me_ptr->output_trigger_info = FWK_EXTN_IPC_PORT_BUFFER_NEEDED; // set the shared ptr so that the contanier starts
+                                                                     // listening to the ext output port queue
+      // todo: we need to set this only when all the buffers are sent
+   }
+
+   // todo_mdf: shouldnt we reset me_ptr->sh_data_buf.actual_data_filled &&
+   // me_ptr->sh_data_buf.ipc_sh_mem_info.mem_attr.offset
+
+   return capi_result;
+}
+
+static capi_err_t capi_ipc_tx_send_wr_buffer(capi_ipc_tx_t      *me_ptr,
+                                             uint32_t            buffer_index,
+                                             uint32_t            actual_data_filled,
+                                             uint32_t            meta_data_size,
+                                             uint64_t            timestamp,
+                                             capi_stream_flags_t flags,
+                                             bool_t              is_prebuffer)
+{
+   capi_err_t result = CAPI_EOK;
    // Fill in the data buffer structure
-   wr_data_buf.data_buf_addr_lsw = me_ptr->sh_buf_info.shared_mem_buf_handle[curr_buff_index].mem_attr.offset;
+   data_cmd_wr_sh_mem_ep_data_buffer_v2_t wr_data_buf;
+   memset(&wr_data_buf, 0, sizeof(data_cmd_wr_sh_mem_ep_data_buffer_v2_t));
+
+   wr_data_buf.data_buf_addr_lsw = me_ptr->sh_buf_info.shared_mem_buf_handle[buffer_index].mem_attr.offset;
    wr_data_buf.data_buf_addr_msw = 0;
    wr_data_buf.data_buf_size =
       me_ptr->sh_buf_info.actual_data_filled; // depends on intr or deintr //total samples * wordsize // buffer size
                                               // calculated for sh buffer
-   wr_data_buf.timestamp_lsw = (uint32_t)input[0]->timestamp;
-   wr_data_buf.timestamp_msw = (uint32_t)(input[0]->timestamp >> 32);
-   wr_data_buf.flags         = input[0]->flags.is_timestamp_valid << WR_SH_MEM_EP_SHIFT_TIMESTAMP_VALID_FLAG;
-   wr_data_buf.flags |= input[0]->flags.ts_continue << WR_SH_MEM_EP_SHIFT_TS_CONTINUE_FLAG;
-   wr_data_buf.flags |= input[0]->flags.end_of_frame << WR_SH_MEM_EP_SHIFT_EOF_FLAG;
-   wr_data_buf.data_mem_map_handle = me_ptr->sh_buf_info.shared_mem_buf_handle[curr_buff_index].mem_attr.sat_handle;
+   wr_data_buf.timestamp_lsw = (uint32_t)timestamp;
+   wr_data_buf.timestamp_msw = (uint32_t)(timestamp >> 32);
+   wr_data_buf.flags         = flags.is_timestamp_valid << WR_SH_MEM_EP_SHIFT_TIMESTAMP_VALID_FLAG;
+   wr_data_buf.flags |= flags.ts_continue << WR_SH_MEM_EP_SHIFT_TS_CONTINUE_FLAG;
+   wr_data_buf.flags |= flags.end_of_frame << WR_SH_MEM_EP_SHIFT_EOF_FLAG;
+
+   wr_data_buf.data_mem_map_handle = me_ptr->sh_buf_info.shared_mem_buf_handle[buffer_index].mem_attr.sat_handle;
 
    // Fill in the metadata buffer structure
    wr_data_buf.md_buf_addr_lsw =
-      me_ptr->sh_buf_info.shared_mem_buf_handle[curr_buff_index].mem_attr.offset + me_ptr->sh_buf_info.data_buff_size;
+      me_ptr->sh_buf_info.shared_mem_buf_handle[buffer_index].mem_attr.offset + me_ptr->sh_buf_info.data_buff_size;
    wr_data_buf.md_buf_addr_msw = 0;
    wr_data_buf.md_buf_size     = meta_data_size;
 
    if (me_ptr->sh_buf_info.metadata_buff_size)
    {
-      wr_data_buf.md_mem_map_handle = me_ptr->sh_buf_info.shared_mem_buf_handle[curr_buff_index].mem_attr.sat_handle;
+      wr_data_buf.md_mem_map_handle = me_ptr->sh_buf_info.shared_mem_buf_handle[buffer_index].mem_attr.sat_handle;
    }
    else
    {
@@ -351,7 +450,7 @@ capi_err_t capi_ipc_tx_process(capi_t *_pif, capi_stream_data_t *input[], capi_s
    args.client_data   = 0;
 
    // Allocate and Send the packet
-   capi_result = __gpr_cmd_alloc_send(&args);
+   result = __gpr_cmd_alloc_send(&args);
 
 #ifdef DEBUG_IPC_TX
    IPC_TX_MSG(me_ptr->miid,
@@ -370,9 +469,10 @@ capi_err_t capi_ipc_tx_process(capi_t *_pif, capi_stream_data_t *input[], capi_s
 
    IPC_TX_MSG(me_ptr->miid,
               DBG_HIGH_PRIO,
-              "wr_data_buf.flags 0x%lx, args.token : 0x%lx",
+              "wr_data_buf.flags 0x%lx, args.token : 0x%lx is_prebuffer? %lu",
               wr_data_buf.flags,
-              args.token);
+              args.token,
+              is_prebuffer);
 
    if (wr_data_buf.md_buf_size)
    {
@@ -387,27 +487,7 @@ capi_err_t capi_ipc_tx_process(capi_t *_pif, capi_stream_data_t *input[], capi_s
    }
 
 #endif
-
-   if (AR_DID_FAIL(capi_result))
-   {
-      IPC_TX_MSG(me_ptr->miid, DBG_HIGH_PRIO, "Sending data buffer from ipc to client failed with 0x%lx", capi_result);
-
-      // if sending gpr data buffer has failed free all the pending trackind MD associated with the desitnation domain
-      // id to avoid any memory leaks just as recovery
-      spf_ipcmd_destroy_pending_tracked_md_info(me_ptr->miid, TRUE, me_ptr->ipc_tx_link_info.peer_proc_domain_id, TRUE);
-      return capi_result;
-   }
-   else
-   {
-      IPC_TX_MSG(me_ptr->miid, DBG_HIGH_PRIO, "Sent a data buffer from IPC to client");
-      me_ptr->output_trigger_info = FWK_EXTN_IPC_PORT_BUFFER_NEEDED; // set the shared ptr so that the contanier starts
-                                                                     // listening to the ext output port queue
-      // todo: we need to set this only when all the buffers are sent
-   }
-
-   // todo_mdf: shouldnt we reset me_ptr->sh_data_buf.actual_data_filled &&  me_ptr->sh_data_buf.ipc_sh_mem_info.mem_attr.offset
-
-   return capi_result;
+   return result;
 }
 
 capi_err_t capi_ipc_tx_process_get_properties(capi_ipc_tx_t *me_ptr, capi_proplist_t *proplist_ptr)
@@ -417,10 +497,10 @@ capi_err_t capi_ipc_tx_process_get_properties(capi_ipc_tx_t *me_ptr, capi_propli
    capi_basic_prop_t mod_prop;
    //  Extensions a) frame duration to calculate buffer size. b)ipc port handler to to handle the data cmd ACK in the
    //  module
-   uint32_t fwk_extn_ids[]  = { FWK_EXTN_IPC_PORT_HANDLER, FWK_EXTN_CONTAINER_FRAME_DURATION };
-   mod_prop.init_memory_req = ALIGN_8_BYTES(sizeof(capi_ipc_tx_t));
-   mod_prop.stack_size      = IPC_TX_STACK_SIZE;
-   mod_prop.num_fwk_extns   = sizeof(fwk_extn_ids) / sizeof(fwk_extn_ids[0]);
+   uint32_t fwk_extn_ids[]     = { FWK_EXTN_IPC_PORT_HANDLER, FWK_EXTN_CONTAINER_FRAME_DURATION };
+   mod_prop.init_memory_req    = ALIGN_8_BYTES(sizeof(capi_ipc_tx_t));
+   mod_prop.stack_size         = IPC_TX_STACK_SIZE;
+   mod_prop.num_fwk_extns      = sizeof(fwk_extn_ids) / sizeof(fwk_extn_ids[0]);
    mod_prop.fwk_extn_ids_arr   = fwk_extn_ids;
    mod_prop.is_inplace         = FALSE;
    mod_prop.req_data_buffering = FALSE;
@@ -670,8 +750,8 @@ capi_err_t capi_ipc_tx_process_set_properties(capi_ipc_tx_t *me_ptr, capi_propli
 
                // bool_t is_media_fmt_changed = FALSE;
 
-               capi_media_fmt_v2_t *data_ptr             = (capi_media_fmt_v2_t *)(payload_ptr->data_ptr);
-               uint32_t             param_size           = payload_ptr->actual_data_len;
+               capi_media_fmt_v2_t *data_ptr   = (capi_media_fmt_v2_t *)(payload_ptr->data_ptr);
+               uint32_t             param_size = payload_ptr->actual_data_len;
                if (!ipc_tx_is_supported_media_type(data_ptr))
                {
                   CAPI_SET_ERROR(capi_result, CAPI_EFAILED);
@@ -810,13 +890,35 @@ capi_err_t capi_ipc_tx_process_set_param(capi_t                 *_pif,
 
          uint32_t old_num_bufs = me_ptr->sh_buf_info.num_ipc_bufs_created;
 
-         me_ptr->sh_buf_info.num_ipc_bufs_needed = payload_ptr->num_ipc_bufs;
-         me_ptr->is_num_bufs_received            = TRUE;
+         me_ptr->sh_buf_info.num_ipc_bufs_needed            = payload_ptr->num_reg_bufs + payload_ptr->num_reg_prebufs;
+         me_ptr->sh_buf_info.num_ipc_prebufs_needed_to_send = payload_ptr->num_reg_prebufs;
+         if (me_ptr->sh_buf_info.pending_prebuf_index_arr)
+         {
+            posal_memory_free(me_ptr->sh_buf_info.pending_prebuf_index_arr);
+            me_ptr->sh_buf_info.pending_prebuf_index_arr = NULL;
+         }
+
+         me_ptr->sh_buf_info.num_pending_prebuffers = 0;
+         if (me_ptr->sh_buf_info.num_ipc_prebufs_needed_to_send)
+         {
+            uint32_t alloc_size = sizeof(uint8_t) * me_ptr->sh_buf_info.num_ipc_prebufs_needed_to_send;
+            me_ptr->sh_buf_info.pending_prebuf_index_arr =
+               (uint8_t *)posal_memory_malloc(alloc_size, (POSAL_HEAP_ID)me_ptr->heap_info.heap_id);
+            if (NULL == me_ptr->sh_buf_info.pending_prebuf_index_arr)
+            {
+               IPC_TX_MSG(me_ptr->miid, DBG_ERROR_PRIO, "Failed malloc mem for prebuffer indices");
+               return capi_result;
+            }
+            memset(me_ptr->sh_buf_info.pending_prebuf_index_arr, 0xFF, alloc_size);
+         }
+
+         me_ptr->is_num_bufs_received = TRUE;
+
 #ifdef DEBUG_IPC_TX
          IPC_TX_MSG(me_ptr->miid,
                     DBG_LOW_PRIO,
-                    "IPC buffer: ipc bufs count recieved: %lu",
-                    me_ptr->sh_buf_info.num_ipc_bufs_needed);
+                    "IPC buffer: ipc bufs count recieved: num_reg_bufs %lu num_reg_prebufs %lu",
+                    payload_ptr->num_reg_bufs, payload_ptr->num_reg_prebufs);
 #endif
          if ((old_num_bufs != me_ptr->sh_buf_info.num_ipc_bufs_needed) &&
              (me_ptr->is_inp_media_fmt_received)) // tbd: num bufs is coming in prepare state also when inpu media fmt
@@ -848,7 +950,7 @@ capi_err_t capi_ipc_tx_process_set_param(capi_t                 *_pif,
 
          param_id_ipc_data_link_info_t *link_info_ptr = (param_id_ipc_data_link_info_t *)(params_ptr->data_ptr);
          // currently ipc modules support one port
-         ipc_data_link_info_per_port_t *ipc_tx_link_info_ptr = (ipc_data_link_info_per_port_t*)(link_info_ptr + 1);
+         ipc_data_link_info_per_port_t *ipc_tx_link_info_ptr = (ipc_data_link_info_per_port_t *)(link_info_ptr + 1);
 
          me_ptr->ipc_tx_link_info.ipc_port_type       = ipc_tx_link_info_ptr->ipc_port_type;
          me_ptr->ipc_tx_link_info.self_port_id        = ipc_tx_link_info_ptr->self_port_id;
@@ -945,8 +1047,8 @@ capi_err_t capi_ipc_tx_process_set_param(capi_t                 *_pif,
             }
             // do nothing for raw compressed as it has a fixed size.
 
-            // Allocate the shared buffer with the default buffer count(2) if the media format is received for the first time and
-            // have a valid size
+            // Allocate the shared buffer with the default buffer count(2) if the media format is received for the first
+            // time and have a valid size
             if (!me_ptr->is_num_bufs_received && me_ptr->sh_buf_info.data_buff_size)
             {
                capi_result |= capi_ipc_tx_manage_buffer(me_ptr,
@@ -959,16 +1061,16 @@ capi_err_t capi_ipc_tx_process_set_param(capi_t                 *_pif,
             }
             else
             {
-         #ifdef DEBUG_IPC_TX
+#ifdef DEBUG_IPC_TX
                IPC_TX_MSG(me_ptr->miid,
-                        DBG_LOW_PRIO,
-                        "Did not allocate buffers with mf (nchs: %lu,bps: %lu, Sr: %lu ) is not set or frame "
-                        "size %lu ms or buffers are already allocated",
-                        me_ptr->inp_media_fmt.format.num_channels,
-                        me_ptr->inp_media_fmt.format.bits_per_sample,
-                        me_ptr->inp_media_fmt.format.sampling_rate,
-                        me_ptr->frame_length_info.frame_dur_ms);
-         #endif
+                          DBG_LOW_PRIO,
+                          "Did not allocate buffers with mf (nchs: %lu,bps: %lu, Sr: %lu ) is not set or frame "
+                          "size %lu ms or buffers are already allocated",
+                          me_ptr->inp_media_fmt.format.num_channels,
+                          me_ptr->inp_media_fmt.format.bits_per_sample,
+                          me_ptr->inp_media_fmt.format.sampling_rate,
+                          me_ptr->frame_length_info.frame_dur_ms);
+#endif
             }
          }
          break;
@@ -986,58 +1088,59 @@ capi_err_t capi_ipc_tx_process_set_param(capi_t                 *_pif,
          break;
       }
 
-// /** Set param used by fwk to set the input/output threshold for the IPC modules. */
-// #define FWK_EXTN_PROPERTY_ID_IPC_FRAME_LENGTH_INFO  0x0A003BAD
+         // /** Set param used by fwk to set the input/output threshold for the IPC modules. */
+         // #define FWK_EXTN_PROPERTY_ID_IPC_FRAME_LENGTH_INFO  0x0A003BAD
 
-// /** unique port handle set by the fwk for each port ID along with link info. */
-// typedef struct fwk_extn_prop_ipc_frame_length_info_t fwk_extn_prop_ipc_frame_length_info_t;
+         // /** unique port handle set by the fwk for each port ID along with link info. */
+         // typedef struct fwk_extn_prop_ipc_frame_length_info_t fwk_extn_prop_ipc_frame_length_info_t;
 
-// /** @weakgroup fwk_extn_prop_ipc_frame_length_info_t
-// @{ */
-// struct fwk_extn_prop_ipc_frame_length_info_t
-// {
-//    bool_t   is_input;
+         // /** @weakgroup fwk_extn_prop_ipc_frame_length_info_t
+         // @{ */
+         // struct fwk_extn_prop_ipc_frame_length_info_t
+         // {
+         //    bool_t   is_input;
 
-//    uint32_t port_id;
+         //    uint32_t port_id;
 
-//    uint32_t frame_duration_in_us;
-//    /** Containers aggregated PCM threshold duration in micro seconds. Applicable only for PCM data */
+         //    uint32_t frame_duration_in_us;
+         //    /** Containers aggregated PCM threshold duration in micro seconds. Applicable only for PCM data */
 
-//    uint32_t frame_length_in_bytes;
-//    /** If PCM format: its frame length in bytes for all the channels.
-//     *  If Raw compressed data: its just max per frame length in bytes.
-//     */
-// };
-// /** @} */ /* end_weakgroup fwk_extn_prop_ipc_frame_length_info_t */
-//       case FWK_EXTN_PROPERTY_ID_IPC_FRAME_LENGTH_INFO:
-//       {
-//          if (params_ptr->actual_data_len < sizeof(fwk_extn_prop_ipc_frame_length_info_t))
-//          {
-//             IPC_TX_MSG(me_ptr->miid,
-//                        DBG_ERROR_PRIO,
-//                        "Param id 0x%lx Bad param size %lu",
-//                        (uint32_t)param_id,
-//                        params_ptr->actual_data_len);
-//             capi_result |= CAPI_ENEEDMORE;
-//             break;
-//          }
-//          fwk_extn_prop_ipc_frame_length_info_t *fm_dur = (fwk_extn_prop_ipc_frame_length_info_t *)params_ptr->data_ptr;
+         //    uint32_t frame_length_in_bytes;
+         //    /** If PCM format: its frame length in bytes for all the channels.
+         //     *  If Raw compressed data: its just max per frame length in bytes.
+         //     */
+         // };
+         // /** @} */ /* end_weakgroup fwk_extn_prop_ipc_frame_length_info_t */
+         //       case FWK_EXTN_PROPERTY_ID_IPC_FRAME_LENGTH_INFO:
+         //       {
+         //          if (params_ptr->actual_data_len < sizeof(fwk_extn_prop_ipc_frame_length_info_t))
+         //          {
+         //             IPC_TX_MSG(me_ptr->miid,
+         //                        DBG_ERROR_PRIO,
+         //                        "Param id 0x%lx Bad param size %lu",
+         //                        (uint32_t)param_id,
+         //                        params_ptr->actual_data_len);
+         //             capi_result |= CAPI_ENEEDMORE;
+         //             break;
+         //          }
+         //          fwk_extn_prop_ipc_frame_length_info_t *fm_dur = (fwk_extn_prop_ipc_frame_length_info_t
+         //          *)params_ptr->data_ptr;
 
-//          me_ptr->frame_length_info.frame_dur_us          = fm_dur->frame_duration_in_us;
-//          me_ptr->frame_length_info.frame_dur_ms          = fm_dur->frame_duration_in_us / NUM_US_PER_MS;
-//          me_ptr->frame_length_info.frame_len_bytes       = fm_dur->frame_length_in_bytes;
-//          me_ptr->frame_length_info.is_frame_len_received = TRUE;
-// #ifdef DEBUG_IPC_TX
-//          IPC_TX_MSG(me_ptr->miid,
-//                     DBG_LOW_PRIO,
-//                     "Frame duration of IPC TX configured to %lu us or %lu ms or bytes %lu",
-//                     fm_dur->frame_duration_in_us,
-//                     me_ptr->frame_length_info.frame_dur_ms,
-//                     fm_dur->frame_length_in_bytes);
-// #endif
+         //          me_ptr->frame_length_info.frame_dur_us          = fm_dur->frame_duration_in_us;
+         //          me_ptr->frame_length_info.frame_dur_ms          = fm_dur->frame_duration_in_us / NUM_US_PER_MS;
+         //          me_ptr->frame_length_info.frame_len_bytes       = fm_dur->frame_length_in_bytes;
+         //          me_ptr->frame_length_info.is_frame_len_received = TRUE;
+         // #ifdef DEBUG_IPC_TX
+         //          IPC_TX_MSG(me_ptr->miid,
+         //                     DBG_LOW_PRIO,
+         //                     "Frame duration of IPC TX configured to %lu us or %lu ms or bytes %lu",
+         //                     fm_dur->frame_duration_in_us,
+         //                     me_ptr->frame_length_info.frame_dur_ms,
+         //                     fm_dur->frame_length_in_bytes);
+         // #endif
 
-//          break;
-//       }
+         //          break;
+         //       }
    }
    return capi_result;
 }
@@ -1068,18 +1171,18 @@ capi_err_t capi_ipc_tx_process_get_param(capi_t                 *_pif,
    return capi_result;
 }
 
-static capi_err_t capi_ipc_raise_data_link_info_event(uint32_t miid,
-                                                      capi_event_callback_info_t *cb_info_ptr,
+static capi_err_t capi_ipc_raise_data_link_info_event(uint32_t                             miid,
+                                                      capi_event_callback_info_t          *cb_info_ptr,
                                                       fwk_extn_event_ipc_data_link_info_t *link_info_ptr)
 {
-    capi_err_t result = CAPI_EOK;
+   capi_err_t result = CAPI_EOK;
    if (NULL == cb_info_ptr->event_cb)
    {
       IPC_TX_MSG(miid, DBG_ERROR_PRIO, " Event callback is not set, Unable to ipc data link info event !");
       return CAPI_EBADPARAM;
    }
 
-   capi_buf_t                                  payload;
+   capi_buf_t payload;
    payload.data_ptr        = (int8_t *)link_info_ptr;
    payload.actual_data_len = payload.max_data_len = sizeof(fwk_extn_event_ipc_data_link_info_t);
 

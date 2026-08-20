@@ -260,7 +260,7 @@ capi_err_t capi_ipc_tx_handle_port_start(capi_ipc_tx_t *me_ptr, uint32_t port_in
 
          // check if any pending media format, apply and set it
       if(me_ptr->is_inp_media_fmt_pending || me_ptr->frame_length_info.is_frame_len_received)
-      {         
+      {
          result = capi_ipc_tx_update_media_fmt(me_ptr, me_ptr->inp_media_fmt, me_ptr->inp_media_fmt_size);
          if (result != CAPI_EOK)
          {
@@ -314,9 +314,11 @@ capi_err_t capi_ipc_tx_handle_port_stop(capi_ipc_tx_t *me_ptr, uint32_t port_ind
 	  {
 	     me_ptr->out_port_info[port_index].port_state = DATA_PORT_STATE_STOPPED;
 		 IPC_TX_MSG(me_ptr->miid, DBG_HIGH_PRIO, "Warning! Received o/p port Stop before Start");
-	  }
-	  // Change trigger status to port buffer needed so that the module stops triggering process
-      me_ptr->output_trigger_info = FWK_EXTN_IPC_PORT_BUFFER_NEEDED;
+     }
+
+     // Change trigger status to port buffer needed so that the module stops triggering process
+     me_ptr->output_trigger_info            = FWK_EXTN_IPC_PORT_BUFFER_NEEDED;
+     me_ptr->sh_buf_info.is_prebuffers_sent = FALSE;
    }
    return result;
 }

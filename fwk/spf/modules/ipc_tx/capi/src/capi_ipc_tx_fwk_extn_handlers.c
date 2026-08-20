@@ -301,6 +301,52 @@ ar_result_t capi_ipc_tx_fwk_extn_ipc_port_data_msg_handler(void         *capi_pt
                // return from here?
             }
          }
+
+         // cache buffer in the prebuffer list if prebuffers haven't been sent yet. this can happen only when data flow
+         // is about to start.
+         if (me_ptr->sh_buf_info.num_ipc_prebufs_needed_to_send && (FALSE == me_ptr->sh_buf_info.is_prebuffers_sent) &&
+             (me_ptr->sh_buf_info.num_pending_prebuffers < me_ptr->sh_buf_info.num_ipc_prebufs_needed_to_send))
+         {
+            /// cache prebuffer index
+            bool_t is_found = FALSE;
+            for (uint32_t i = 0; i < me_ptr->sh_buf_info.num_ipc_prebufs_needed_to_send; i++)
+            {
+               if (0xFF == me_ptr->sh_buf_info.pending_prebuf_index_arr[i])
+               {
+                  me_ptr->sh_buf_info.pending_prebuf_index_arr[i] = buffer_index;
+                  is_found                                        = TRUE;
+                  me_ptr->sh_buf_info.num_pending_prebuffers++;
+               }
+            }
+
+            // if not
+            if (!is_found)
+            {
+               IPC_TX_MSG(me_ptr->miid,
+                          DBG_ERROR_PRIO,
+                          "Failed to pop prebuffers, unexpected scenario num_ipc_prebufs_needed_to_send %lu "
+                          "num_pending_prebuffers %lu ",
+                          me_ptr->sh_buf_info.num_ipc_prebufs_needed_to_send,
+                          me_ptr->sh_buf_info.num_pending_prebuffers);
+               return capi_result;
+            }
+
+            // if prebuffers are just filled wait for the one more buffer for regular data processing
+            // if prebuffer are not filled wait for more prebuffers
+            if (me_ptr->sh_buf_info.num_pending_prebuffers <= me_ptr->sh_buf_info.num_ipc_prebufs_needed_to_send)
+            {
+               me_ptr->output_trigger_info = FWK_EXTN_IPC_PORT_BUFFER_NEEDED;
+            }
+
+            IPC_TX_MSG(me_ptr->miid,
+                       DBG_LOW_PRIO,
+                       "Popped and cached prebuffer, num_ipc_prebufs_needed_to_send %lu "
+                       "num_pending_prebuffers %lu output_trigger_info %lu ",
+                       me_ptr->sh_buf_info.num_ipc_prebufs_needed_to_send,
+                       me_ptr->sh_buf_info.num_pending_prebuffers,
+                       me_ptr->output_trigger_info);
+         }
+
          break; // Exit the loop once the matching buffer index is found
       }
       buffer_index++;

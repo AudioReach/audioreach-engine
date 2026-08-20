@@ -267,7 +267,11 @@ ar_result_t cu_process_peer_port_property(cu_base_t    *base_ptr,
          {
             ext_out_port_ptr->icb_info.ds_flags.is_real_time = is_downstream_rt;
 
-            if(FALSE == gu_is_ipc_ext_output_port(gu_ext_out_port_ptr))
+            if (gu_is_ipc_ext_output_port(gu_ext_out_port_ptr))
+            {
+               cu_ipc_tx_handle_icb_info_from_ds((void *)base_ptr, gu_ext_out_port_ptr, ext_out_port_ptr);
+            }
+            else
             {
                // for ICB purpose (if this port's is_rt changes, then we may need to re-create bufs
                base_ptr->cntr_vtbl_ptr->ext_out_port_recreate_bufs(base_ptr, gu_ext_out_port_ptr);

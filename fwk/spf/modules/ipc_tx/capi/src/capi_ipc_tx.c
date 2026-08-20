@@ -151,6 +151,13 @@ static capi_err_t capi_ipc_tx_end(capi_t *_pif)
    if (me_ptr->sh_buf_info.overrun_buffer_ptr)
    {
       posal_memory_free(me_ptr->sh_buf_info.overrun_buffer_ptr);
+      me_ptr->sh_buf_info.overrun_buffer_ptr = NULL;
+   }
+
+   if(me_ptr->sh_buf_info.pending_prebuf_index_arr)
+   {
+      posal_memory_free(me_ptr->sh_buf_info.pending_prebuf_index_arr);
+      me_ptr->sh_buf_info.pending_prebuf_index_arr = NULL;
    }
 
    me_ptr->vtbl.vtbl_ptr = NULL;
