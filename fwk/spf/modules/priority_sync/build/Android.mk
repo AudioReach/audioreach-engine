@@ -11,7 +11,7 @@ include $(BUILD_HEADER_LIBRARY)
 
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := capi_priority_sync
+LOCAL_MODULE := lib_priority_sync
 LOCAL_MODULE_TAGS := optional
 LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
@@ -42,5 +42,16 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_HEADER_LIBRARIES := libposal_headers libspf_api libspf_interfaces_headers libspf_utils_headers libapm_headers libamdb_headers
 LOCAL_STATIC_LIBRARIES := libposal libspf_interfaces libapm libamdb
 
-include $(BUILD_STATIC_LIBRARY)
+LOCAL_SPF_MODULE_KCONFIG       := CONFIG_PRIORITY_SYNC
+LOCAL_SPF_MODULE_NAME          := $(LOCAL_MODULE)
+LOCAL_SPF_MODULE_MAJOR_VER     := 1
+LOCAL_SPF_MODULE_MINOR_VER     := 0
+LOCAL_SPF_MODULE_AMDB_ITYPE    := "capi"
+LOCAL_SPF_MODULE_AMDB_MTYPE    := "generic"
+LOCAL_SPF_MODULE_AMDB_MID      := "0x07001028"
+LOCAL_SPF_MODULE_AMDB_TAG      := "capi_priority_sync"
+LOCAL_SPF_MODULE_AMDB_MOD_NAME := "MODULE_ID_PRIORITY_SYNC"
+LOCAL_SPF_MODULE_H2XML_HEADERS := "$(LOCAL_PATH)/api/priority_sync_api.h"
+
+include $(BUILD_ARE_MODULES)
 

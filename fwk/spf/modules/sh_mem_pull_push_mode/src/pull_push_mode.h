@@ -20,6 +20,7 @@
 #include "capi_util.h"
 #endif
 #include "posal_timer.h"
+#include "posal_time.h"
 #include "sh_mem_pull_push_mode_api.h"
 #include "ar_error_codes.h"
 #include "capi_types.h"
@@ -37,6 +38,11 @@ extern "C" {
 
 #define MAX_EVENT_CLIENTS 4
 
+#define HEADER_TYPE_UTC_TIMESTAMP        0x00000001
+
+#define HEADER_TYPE_RESERVED_BITS        0xFFFFFFFE
+#define BYTE_FOR_HEADER_ALIGNMENT        4
+
 /* debug message */
 #define MIID_UNKNOWN 0
 #define PULL_PUSH_MSG_PREFIX "CAPI PM:[%lX] "
@@ -47,6 +53,7 @@ extern "C" {
  * Structure definitions
  * ----------------------------------------------------------------------*/
 #define QFORMAT_TO_BIT_WIDTH(q) ((PCM_Q_FACTOR_15 == q) ? 16 : ( (PCM_Q_FACTOR_27 == q ) ? 24 : 32) )
+#define TIME_USEC 1
 
 typedef struct pm_media_fmt_t
 {
@@ -106,6 +113,11 @@ typedef struct capi_pm_media_fmt_t
    capi_standard_data_format_t std;
 } capi_pm_media_fmt_t;
 
+
+typedef struct capi_push_ts_data_t {
+   void *utc_time_module_ptr;    // assign this is UTC TS is needed
+} capi_push_ts_data_t;
+
 typedef struct capi_pm_t
 {
    /* v-table pointer */
@@ -121,6 +133,27 @@ typedef struct capi_pm_t
 
    // container frame duration.
    uint32_t frame_dur_us;
+
+   bool_t is_cntr_duty_cycle_enabled;
+
+   /*header related parameter*/
+   bool_t     is_header_enabled;
+   bool_t     is_update_header;
+   bool_t is_pending_pos_buf_reset;
+   uint32_t   header_type_flags;
+   uint8_t    *header_buffer_ptr;
+   uint32_t   header_buffer_size;
+
+   uint32_t *pcm_param_actual_size_ptr;
+   uint32_t *pcm_param_padding_size_ptr;
+
+   uint32_t  batch_write_index;
+   uint32_t  pcm_bytes_written;
+   uint32_t  batch_bytes_written;
+   // UTC timestamp handling
+   capi_push_ts_data_t ts_data;
+   uint64_t  last_valid_timestamp; // tracks last valid timestamp received in current batch
+   
 } capi_pm_t;
 
 /*------------------------------------------------------------------------
@@ -156,6 +189,7 @@ void pull_push_mode_deinit(pull_push_mode_t *pm_ptr);
 
 capi_err_t pull_mode_read_input(capi_t *_pif, capi_stream_data_t *input[], capi_stream_data_t *output[]);
 capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], capi_stream_data_t *output[]);
+capi_err_t push_mode_end_header_batch(capi_pm_t *_pif, uint64_t timestamp);
 
 capi_err_t pull_push_mode_watermark_levels_init(pull_push_mode_t *pm_ptr,
                                                 uint32_t          num_water_mark_levels,

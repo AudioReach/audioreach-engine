@@ -11,7 +11,7 @@ include $(BUILD_HEADER_LIBRARY)
 
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := capi_splitter
+LOCAL_MODULE := lib_splitter
 LOCAL_MODULE_TAGS := optional
 LOCAL_VENDOR_MODULE := true
 LOCAL_C_INCLUDES := \
@@ -22,6 +22,7 @@ LOCAL_C_INCLUDES := \
 LOCAL_SRC_FILES := \
     capi/src/capi_splitter.c \
     capi/src/capi_splitter_island.c \
+    capi/src/capi_splitter_md_island.c \
     capi/src/capi_splitter_utils.c
 
 LOCAL_CFLAGS += -flto -O3 -Wall -ffixed-x18 -std=c17 -g
@@ -40,5 +41,16 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_HEADER_LIBRARIES := libposal_headers libspf_api libspf_interfaces_headers libspf_utils_headers libapm_headers libamdb_headers
 LOCAL_STATIC_LIBRARIES := libposal libspf_interfaces libapm libamdb
 
-include $(BUILD_STATIC_LIBRARY)
+LOCAL_SPF_MODULE_KCONFIG       := CONFIG_SPLITTER
+LOCAL_SPF_MODULE_NAME          := $(LOCAL_MODULE)
+LOCAL_SPF_MODULE_MAJOR_VER     := 1
+LOCAL_SPF_MODULE_MINOR_VER     := 0
+LOCAL_SPF_MODULE_AMDB_ITYPE    := "capi"
+LOCAL_SPF_MODULE_AMDB_MTYPE    := "generic"
+LOCAL_SPF_MODULE_AMDB_MID      := "0x07001011"
+LOCAL_SPF_MODULE_AMDB_TAG      := "capi_splitter"
+LOCAL_SPF_MODULE_AMDB_MOD_NAME := "MODULE_ID_SPLITTER"
+LOCAL_SPF_MODULE_H2XML_HEADERS := "$(LOCAL_PATH)/api/splitter_api.h"
+
+include $(BUILD_ARE_MODULES)
 

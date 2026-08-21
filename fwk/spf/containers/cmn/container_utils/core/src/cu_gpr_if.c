@@ -72,6 +72,7 @@ uint32_t cu_gpr_callback(gpr_packet_t *packet, void *callback_data)
             case IMCL_INTER_PROC_TRIGGER_MSG_GPR:
             case IMCL_INTER_PROC_POLLING_MSG_GPR:
             case IMCL_INTER_PROC_PEER_STATE_UPDATE:
+            case EVENT_ID_MODULE_CMN_METADATA_CUSTOM_TRACKING_EVENT:
                // for polling message, first push to cmd Q. from there, we'll open the message and push to the ctrl port
                // Q
                // which will be polled at process boundary

@@ -354,6 +354,10 @@ static ar_result_t gen_cntr_handle_rest_of_graph_open(cu_base_t *base_ptr, void 
 
    // note: since newly opened modules/ports are not going to change the order of started_sorted_module_list therefore
    // not updating it
+   if (check_if_pass_thru_container(me_ptr))
+   {
+      TRY(result, pt_cntr_init_data_ports_post_async_create_finish(&me_ptr->topo));
+   }
 
    TRY(result, gen_cntr_allocate_wait_mask_arr(me_ptr));
 
@@ -589,6 +593,11 @@ ar_result_t gen_cntr_gpr_cmd(cu_base_t *base_ptr)
       case APM_CMD_DEREGISTER_SHARED_CFG:
       {
          cu_set_get_cfgs_packed(base_ptr, packet_ptr, SPF_CFG_DATA_SHARED_PERSISTENT);
+         break;
+      }
+      case EVENT_ID_MODULE_CMN_METADATA_CUSTOM_TRACKING_EVENT:
+      {
+         cu_handle_md_tracking_internal_event(base_ptr, packet_ptr, SPF_CFG_DATA_TYPE_DEFAULT);
          break;
       }
       default:
@@ -2371,7 +2380,10 @@ ar_result_t gen_cntr_initiate_duty_cycle_island_entry(cu_base_t *base_ptr)
 
    if (!me_ptr->cu.pm_info.flags.module_disallows_duty_cycling)
    {
-      gen_cntr_listen_to_controls(me_ptr);
+      /* Listen only to the control commands and not Data triggers
+         wakeups. This step should not be skipped for IoT application.
+         TODO: Generalize this implementation*/
+      //gen_cntr_listen_to_controls(me_ptr);
       gen_cntr_handle_events_after_cmds(me_ptr, FALSE, result);
       cu_send_island_entry_ack_to_dcm(&me_ptr->cu);
    }

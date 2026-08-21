@@ -726,6 +726,7 @@ ar_result_t cu_register_module_events(cu_base_t *me_ptr, gpr_packet_t *packet_pt
 ar_result_t cu_register_module_events_v2(cu_base_t *me_ptr, gpr_packet_t *packet_ptr);
 ar_result_t cu_handle_cntr_events_reg_dereg(cu_base_t *me_ptr, topo_reg_event_t *reg_event_payload_ptr, bool_t is_register);
 ar_result_t cu_raise_container_events_to_clients(cu_base_t *me_ptr, uint32_t event_id, int8_t *payload_ptr, uint32_t payload_size);
+ar_result_t cu_handle_md_tracking_internal_event(cu_base_t *  me_ptr, gpr_packet_t *packet_ptr, spf_cfg_data_type_t cfg_type);
 
 ar_result_t cu_graph_connect(cu_base_t *me_ptr);
 ar_result_t cu_graph_control_connect(cu_base_t *me_ptr);

@@ -69,13 +69,10 @@ LOCAL_SHARED_LIBRARIES := \
     liblx-osal \
     libar-gpr \
     libdiag \
-    libtinyalsa
+    liboss_tinyalsa
 
 LOCAL_HEADER_LIBRARIES := libposal_headers libspf_api libspf_interfaces_headers libapm_headers libamdb_headers libirm_headers libdls_headers
 LOCAL_STATIC_LIBRARIES := \
-    capi_priority_sync \
-    capi_splitter \
-    capi_sync \
     libamdb \
     libapm \
     libdls \

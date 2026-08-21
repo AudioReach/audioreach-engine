@@ -58,7 +58,8 @@ static void capi_pm_check_n_enable_module_buffer_access_extension(capi_pm_t *me_
 
    // note that push/pull module only process CAPI_INTERLEAVED format, hence just checking for validaty is sufficient
    bool_t need_to_enable_extension = (TRUE == pull_push_check_media_fmt_validity(&me_ptr->pull_push_mode_info)) &&
-                                     (CAPI_INTERLEAVED == me_ptr->pull_push_mode_info.media_fmt.data_interleaving);
+                                     (CAPI_INTERLEAVED == me_ptr->pull_push_mode_info.media_fmt.data_interleaving) &&
+                                     (FALSE == me_ptr->is_header_enabled);
 
    // check if circular buffer size is set and mulitple of container framelength
    if (me_ptr->pull_push_mode_info.shared_circ_buf_size && me_ptr->frame_dur_us)
@@ -306,7 +307,6 @@ capi_err_t capi_push_mode_init(capi_t *_pif, capi_proplist_t *init_set_propertie
    me_ptr->vtbl.vtbl_ptr = &push_mode_vtbl;
 
    me_ptr->pull_push_mode_info.mode = PUSH_MODE;
-
    memset(&me_ptr->pull_push_mode_info.media_fmt, 0, sizeof(pm_media_fmt_t));
    capi_result = capi_pm_process_init(me_ptr, init_set_properties);
 
@@ -322,6 +322,21 @@ static capi_err_t capi_pm_end(capi_t *_pif)
       return CAPI_EBADPARAM;
    }
    capi_pm_t *me_ptr = (capi_pm_t *)_pif;
+
+   // Free UTC time module if allocated
+   if (NULL != me_ptr->ts_data.utc_time_module_ptr)
+   {
+      posal_memory_free(me_ptr->ts_data.utc_time_module_ptr);
+      me_ptr->ts_data.utc_time_module_ptr = NULL;
+   }
+
+   // Free header buffer if allocated (PUSH mode specific cleanup)
+   if (NULL != me_ptr->header_buffer_ptr)
+   {
+      posal_memory_free(me_ptr->header_buffer_ptr);
+      me_ptr->header_buffer_ptr = NULL;
+      me_ptr->header_buffer_size = 0;
+   }
 
    pull_push_mode_deinit(&(me_ptr->pull_push_mode_info));
 
@@ -389,6 +404,116 @@ static capi_err_t capi_pm_set_param(capi_t                 *_pif,
                              capi_result);
             }
          }
+         break;
+      }
+      case PARAM_ID_SH_MEM_PUSH_MODE_HEADER_CFG:
+      {
+         // Validate this parameter is only for PUSH mode
+         if (PUSH_MODE != me_ptr->pull_push_mode_info.mode)
+         {
+            PULL_PUSH_MSG(miid, DBG_ERROR_PRIO,
+                          "param id 0x%lX only supported for PUSH mode", param_id);
+            CAPI_SET_ERROR(capi_result, CAPI_EUNSUPPORTED);
+            break;
+         }
+
+         // Validate payload size
+         if (params_ptr->actual_data_len < sizeof(sh_mem_push_mode_header_cfg_t))
+         {
+            PULL_PUSH_MSG(miid, DBG_ERROR_PRIO,
+                          "param id 0x%lX: Insufficient payload size %d",
+                          param_id,
+                          params_ptr->actual_data_len);
+            CAPI_SET_ERROR(capi_result, CAPI_ENEEDMORE);
+            break;
+         }
+
+         // Get the configuration payload
+         sh_mem_push_mode_header_cfg_t *cfg_ptr =
+            (sh_mem_push_mode_header_cfg_t *)params_ptr->data_ptr;
+
+         // Validate reserved bits
+         uint32_t unreserved_bits = cfg_ptr->header_type & ~(HEADER_TYPE_RESERVED_BITS);
+         if (unreserved_bits == 0)
+         {
+            PULL_PUSH_MSG(miid, DBG_ERROR_PRIO,
+                          "No Supported header type found, header type received is 0x%x",
+                          cfg_ptr->header_type);
+            break;
+         }
+
+         // Calculate required header buffer size based on enabled header types
+         uint32_t required_size = sizeof(sh_mem_push_mode_batch_header_t) + sizeof(sh_mem_push_mode_param_header_t);  // Sync word + PCM header
+
+         if (cfg_ptr->header_type & HEADER_TYPE_UTC_TIMESTAMP)
+         {
+            required_size += sizeof(sh_mem_push_mode_param_header_t);      // Timestamp param header
+            required_size += sizeof(sh_mem_push_mode_timestamp_payload_t); // Timestamp payload
+
+            if(me_ptr->ts_data.utc_time_module_ptr)
+            {
+               posal_reset_utc_time_module((void *)me_ptr->ts_data.utc_time_module_ptr);
+            }
+            else
+            {
+               uint32_t posal_timer_size = posal_get_time_module_size();
+               if(posal_timer_size)
+               {
+                  uint8_t* ptr = (uint8_t *)posal_memory_malloc(posal_timer_size, (POSAL_HEAP_ID)me_ptr->heap_mem.heap_id);
+                  if(NULL == ptr)
+                  {
+                     PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "Failed to allocated time module of size %lu", posal_timer_size);
+                     return CAPI_EFAILED;
+                  }
+                  me_ptr->ts_data.utc_time_module_ptr = ptr;
+                  posal_reset_utc_time_module((void *)me_ptr->ts_data.utc_time_module_ptr);
+               }
+            }
+         }
+
+         // Free existing buffer if already allocated and size not same
+         if (NULL != me_ptr->header_buffer_ptr && required_size != me_ptr->header_buffer_size)
+         {
+            posal_memory_free(me_ptr->header_buffer_ptr);
+            me_ptr->header_buffer_ptr = NULL;
+            me_ptr->header_buffer_size = 0;
+
+            PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "Freed existing header buffer");
+
+         }
+
+         if(NULL == me_ptr->header_buffer_ptr)
+         {
+            // Allocate new header buffer
+            me_ptr->header_buffer_ptr =
+               (uint8_t *)posal_memory_malloc(required_size, me_ptr->heap_mem.heap_id);
+
+            if (NULL == me_ptr->header_buffer_ptr)
+            {
+               PULL_PUSH_MSG(miid, DBG_ERROR_PRIO,
+                             "Failed to allocate header buffer of size %d", required_size);
+               CAPI_SET_ERROR(capi_result, CAPI_ENOMEMORY);
+               break;
+            }
+
+            me_ptr->header_buffer_size = required_size;
+         }
+
+         // Initialize buffer to zero
+         memset(me_ptr->header_buffer_ptr, 0, required_size);
+
+         // Store the header type flags
+         me_ptr->header_type_flags = cfg_ptr->header_type;
+         // Update the module state
+         me_ptr->is_header_enabled = TRUE;
+         me_ptr->is_update_header = TRUE;
+
+         PULL_PUSH_MSG(miid, DBG_MED_PRIO,
+                       "Header buffer allocated: size=%d bytes, type=0x%x, enabled=%d",
+                       required_size,
+                       me_ptr->header_type_flags,
+                       me_ptr->is_header_enabled);
+
          break;
       }
       case PARAM_ID_MEDIA_FORMAT:
@@ -595,6 +720,55 @@ static capi_err_t capi_pm_set_param(capi_t                 *_pif,
          PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "Received container frame duration %lu ", me_ptr->frame_dur_us);
 
          capi_pm_check_n_enable_module_buffer_access_extension(me_ptr);
+         break;
+      }
+      case INTF_EXTN_PARAM_ID_CNTR_DUTY_CYCLING_ENABLED:
+      {
+         if (params_ptr->actual_data_len < sizeof(intf_extn_param_id_cntr_duty_cycling_enabled_t))
+         {
+            AR_MSG(DBG_ERROR_PRIO,
+                   "Invalid payload size for CNTR_DUTY_CYCLING_ENABLED %d",
+                   params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
+         }
+         intf_extn_param_id_cntr_duty_cycling_enabled_t *payload_ptr =
+             (intf_extn_param_id_cntr_duty_cycling_enabled_t *)params_ptr->data_ptr;
+
+         me_ptr->is_cntr_duty_cycle_enabled = payload_ptr->is_cntr_duty_cycling;
+
+         bool_t allow_duty_cycling = TRUE;
+         intf_extn_event_id_allow_duty_cycling_v2_t event_payload;
+         PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "Raise allow_duty_cycling: %d", allow_duty_cycling);
+
+         event_payload.allow_duty_cycling = allow_duty_cycling;
+
+         /* Create event */
+         capi_event_data_to_dsp_service_t to_send;
+         to_send.param_id = INTF_EXTN_EVENT_ID_ALLOW_DUTY_CYCLING;
+         to_send.payload.actual_data_len = sizeof(intf_extn_event_id_allow_duty_cycling_v2_t);
+         to_send.payload.max_data_len = sizeof(intf_extn_event_id_allow_duty_cycling_v2_t);
+         to_send.payload.data_ptr = (int8_t *)&event_payload;
+
+         /* Create event info */
+         capi_event_info_t event_info;
+         event_info.port_info.is_input_port = FALSE;
+         event_info.port_info.is_valid = FALSE;
+         event_info.payload.actual_data_len = sizeof(to_send);
+         event_info.payload.max_data_len = sizeof(to_send);
+         event_info.payload.data_ptr = (int8_t *)&to_send;
+
+         capi_result = me_ptr->cb_info.event_cb(me_ptr->cb_info.event_context, CAPI_EVENT_DATA_TO_DSP_SERVICE, &event_info);
+
+         if (CAPI_EOK != capi_result)
+         {
+            PULL_PUSH_MSG(miid, DBG_ERROR_PRIO, "Failed to raise INTF_EXTN_EVENT_ID_ALLOW_DUTY_CYCLING event");
+         }
+         else
+         {
+            PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "Raised INTF_EXTN_EVENT_ID_ALLOW_DUTY_CYCLING event allow_duty_cycling:%d", event_payload.allow_duty_cycling);
+         }
+
+         PULL_PUSH_MSG(miid, DBG_LOW_PRIO, "is_cntr_duty_cycle_enabled configured to %lu", me_ptr->is_cntr_duty_cycle_enabled);
          break;
       }
       default:
@@ -826,15 +1000,33 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
          case CAPI_ALGORITHMIC_RESET:
          {
             PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Set property received for algorithmic reset");
-
+            if ((PUSH_MODE == me_ptr->pull_push_mode_info.mode) && me_ptr->is_header_enabled && !me_ptr->is_update_header && (me_ptr->pcm_bytes_written > 0))
+            {
+               PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO,
+                             "Algo reset: finalizing in-progress batch "
+                             "(pcm_bytes_written=%lu) before reset",
+                             me_ptr->pcm_bytes_written);
+               push_mode_end_header_batch(me_ptr, posal_timer_get_time());
+            }
             if (NULL != me_ptr->pull_push_mode_info.shared_pos_buf_ptr)
             {
-               PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Resetting shared position structure");
-               memset(me_ptr->pull_push_mode_info.shared_pos_buf_ptr,
-                      0,
-                      sizeof(sh_mem_pull_push_mode_position_buffer_t));
-
-               me_ptr->pull_push_mode_info.next_read_index = 0;
+               if (PUSH_MODE == me_ptr->pull_push_mode_info.mode && me_ptr->is_header_enabled)
+               {
+                  /* Defer position buffer reset to the next process call so HLOS can
+                   * still read the last finalized batch. Resetting here would move
+                   * pos_buf->index back to 0, making the just-written batch unreadable. */
+                  me_ptr->is_pending_pos_buf_reset = TRUE;
+                  PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO,
+                                "Algo reset: deferring position buffer reset to next process call");
+               }
+               else
+               {
+                  PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Resetting shared position structure");
+                  memset(me_ptr->pull_push_mode_info.shared_pos_buf_ptr,
+                         0,
+                         sizeof(sh_mem_pull_push_mode_position_buffer_t));
+                  me_ptr->pull_push_mode_info.next_read_index = 0;
+               }
             }
             break;
          }
@@ -1111,7 +1303,7 @@ static capi_err_t capi_pm_process_get_properties(capi_pm_t *me_ptr, capi_proplis
          {
             /** Can pass the list of IE list supported by this module to
              *  be updated in the common utlitlity */
-            uint32_t supported_extension_list[] = { INTF_EXTN_IMCL, INTF_EXTN_MODULE_BUFFER_ACCESS };
+            uint32_t supported_extension_list[] = { INTF_EXTN_IMCL, INTF_EXTN_MODULE_BUFFER_ACCESS, INTF_EXTN_DUTY_CYCLING_ISLAND_MODE };
             uint32_t num_supported_extns        = sizeof(supported_extension_list) / sizeof(uint32_t);
             capi_result                         = capi_cmn_check_and_update_intf_extn_status(num_supported_extns,
                                                                      supported_extension_list,

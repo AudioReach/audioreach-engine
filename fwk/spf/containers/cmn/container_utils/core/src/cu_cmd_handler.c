@@ -1779,3 +1779,51 @@ ar_result_t cu_process_cmd_queue(cu_base_t *me_ptr)
    me_ptr->flags.apm_cmd_context = FALSE;
    return result;
 }
+ar_result_t cu_handle_md_tracking_internal_event(cu_base_t *me_ptr, gpr_packet_t *packet_ptr, spf_cfg_data_type_t cfg_type)
+{
+   ar_result_t result            = AR_EOK;
+
+   // Validate packet pointer
+   if (NULL == packet_ptr)
+   {
+      CU_MSG(me_ptr->gu_ptr->log_id, DBG_ERROR_PRIO, "invalid packet_ptr received.");
+      return AR_EBADPARAM;
+   }
+
+   module_cmn_md_tracking_md_event_rsp_handle_t *tracking_event_ptr = GPR_PKT_GET_PAYLOAD(module_cmn_md_tracking_md_event_rsp_handle_t, packet_ptr);
+
+   switch (tracking_event_ptr->tracking_rsp_cfg)
+   {
+      case TRACKING_MD_EVENT_RSP_SET_CFG:
+      {
+
+         uint8_t *param_data_ptr = (uint8_t *)(tracking_event_ptr + 1);
+
+         result = cu_set_get_cfgs_packed_loop(me_ptr,
+                                              param_data_ptr,
+                                              packet_ptr->dst_port,
+                                              tracking_event_ptr->tracking_event_payload_size,
+                                              TRUE, /* is_set_cfg */
+                                              FALSE, /*is_out_of_band*/
+                                              FALSE, /*is_deregister*/
+                                              cfg_type);
+
+         CU_MSG(me_ptr->gu_ptr->log_id, DBG_HIGH_PRIO, "done tracking MD event with result %lu", result);
+
+         __gpr_cmd_free(packet_ptr);
+         break;
+
+      }
+      default:
+      {
+         result = CAPI_EBADPARAM;
+         CU_MSG(me_ptr->gu_ptr->log_id, DBG_ERROR_PRIO, "Unsupported Tracking event RSP CFG: %lu", tracking_event_ptr->tracking_rsp_cfg);
+
+         __gpr_cmd_free(packet_ptr);
+         break;
+      }
+   }
+
+
+   return result;
+}

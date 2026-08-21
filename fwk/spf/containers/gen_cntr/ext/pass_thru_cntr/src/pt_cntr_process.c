@@ -776,12 +776,12 @@ PT_CNTR_STATIC ar_result_t pt_cntr_post_process_peer_ext_output(pt_cntr_t       
                                                         &(ext_out_port_ptr->gc.gu),
                                                         &(sdata_ptr->metadata_list_ptr));
 
-         bool_t out_buf_has_flushing_eos = FALSE;
+         bool_t out_buf_has_flushing_eos_dfg = FALSE;
          gen_topo_populate_metadata_for_peer_cntr(&(me_ptr->gc.topo),
                                                   &(ext_out_port_ptr->gc.gu),
                                                   &(sdata_ptr->metadata_list_ptr),
                                                   &out_buf_ptr->metadata_list_ptr,
-                                                  &out_buf_has_flushing_eos);
+                                                  &out_buf_has_flushing_eos_dfg);
       }
 
 #ifdef PT_CNTR_TIME_PROP_ENABLE
@@ -2268,6 +2268,12 @@ ar_result_t pt_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_index
       // {
       //    return result;
       // }
+   }
+
+   if (me_ptr->gc.cu.cmd_msg.payload_ptr)
+   {
+      // if async command processing is going on then check for any pending event handling
+      gen_cntr_handle_fwk_events_in_data_path(&me_ptr->gc);
    }
 
    /*clear the trigger signal */

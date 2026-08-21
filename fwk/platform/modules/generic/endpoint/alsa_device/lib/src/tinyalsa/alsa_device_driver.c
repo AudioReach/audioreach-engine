@@ -28,7 +28,7 @@ ar_result_t alsa_device_driver_set_cfg(alsa_device_driver_t *alsa_device_driver_
    if (alsa_device_cfg_ptr->bit_width == 32)
       config->format = PCM_FORMAT_S32_LE;
    else if (alsa_device_cfg_ptr->bit_width == 24)
-      config->format = PCM_FORMAT_S24_3LE;
+      config->format = PCM_FORMAT_S24_LE;
    else if (alsa_device_cfg_ptr->bit_width == 16)
       config->format = PCM_FORMAT_S16_LE;
 
@@ -85,6 +85,11 @@ ar_result_t alsa_device_driver_open(alsa_device_driver_t *alsa_device_driver_ptr
       AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: Unable to open PCM device %u (%s)\n",
              alsa_device_driver_ptr->device_id,
              pcm_get_error(alsa_device_driver_ptr->pcm));
+      if (alsa_device_driver_ptr->pcm)
+      {
+         pcm_close(alsa_device_driver_ptr->pcm);
+         alsa_device_driver_ptr->pcm = NULL;
+      }
       return AR_EFAILED;
    }
 
@@ -146,7 +151,7 @@ ar_result_t alsa_device_driver_read(alsa_device_driver_t *alsa_device_driver_ptr
       return AR_EFAILED;
    }
 
-   AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: pcm_read success, bytes: %d", num_bytes);
+   AR_MSG(DBG_LOW_PRIO, "ALSA_DEVICE_DRIVER: pcm_read success, bytes: %d", num_bytes);
    return AR_EOK;
 }
 
@@ -159,7 +164,7 @@ ar_result_t alsa_device_driver_write(alsa_device_driver_t *alsa_device_driver_pt
       return AR_EFAILED;
    }
 
-   //AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: pcm write success \n");
+   AR_MSG(DBG_LOW_PRIO, "ALSA_DEVICE_DRIVER: pcm write success \n");
 
    return AR_EOK;
 }
@@ -184,9 +189,11 @@ ar_result_t alsa_device_driver_close(alsa_device_driver_t *alsa_device_driver_pt
    {
       AR_MSG(DBG_ERROR_PRIO, "ALSA_DEVICE_DRIVER: pcm close failed with error: %s\n",
              pcm_get_error(alsa_device_driver_ptr->pcm));
+      alsa_device_driver_ptr->pcm = NULL;
       return AR_EFAILED;
    }
 
+   alsa_device_driver_ptr->pcm = NULL;
    AR_MSG(DBG_HIGH_PRIO, "ALSA_DEVICE_DRIVER: pcm close success.\n");
 
    return AR_EOK;

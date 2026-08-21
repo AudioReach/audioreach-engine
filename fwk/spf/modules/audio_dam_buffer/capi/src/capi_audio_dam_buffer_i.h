@@ -25,6 +25,7 @@
 #include "capi_intf_extn_data_port_operation.h"
 #include "capi_intf_extn_metadata.h"
 #include "other_metadata.h"
+#include "dam_batch_metadata_api.h"
 #include "platform_internal_dcm_if.h"
 
 #ifdef __cplusplus
@@ -179,6 +180,19 @@ typedef struct
    /* indicate if the EOS is yet to sent */
    bool_t is_dcm_duty_cycling_enabled;
    bool_t ready_for_island_entry;
+
+   /*Indicate if metadata needs to be sent after every batch in batching mode*/
+   bool_t handle_md_batch_tracking;
+   /* ref count of end metadata sent for island entry condition*/
+   uint32_t ref_count_batch_end_md;
+
+   /* Indicate if partial data needs to be drained if eos is received*/
+   bool_t  is_partial_batch_drain_enabled;
+   bool_t  is_handle_partial_drain;
+
+   /*Handle frame size mismatch*/
+   bool_t  send_dfg_md;
+
 } _aud_dam_output_port_info;
 
 typedef struct
@@ -359,6 +373,8 @@ capi_err_t capi_audio_dam_imcl_trigger_island_entry(capi_audio_dam_t *me_ptr,
                                                    uint32_t          op_arr_index,
                                                    vw_imcl_header_t *header_ptr);
 
+bool_t capi_audio_dam_check_island_entry_cond(capi_audio_dam_t* me_ptr);
+
 /////////////////////////////////////  GENERIC UTILS ///////////////////////////////////////
 
 capi_err_t capi_check_and_close_the_gate(capi_audio_dam_t *me_ptr, uint32_t op_arr_index, bool_t is_destroy);
@@ -419,6 +435,12 @@ capi_err_t capi_dam_insert_flushing_eos_at_out_port(capi_audio_dam_t   *me_ptr,
                                                    capi_stream_data_t *output,
                                                    bool_t              skip_voting_on_eos,
                                                    eos_type_t          eos_type);
+
+capi_err_t capi_dam_insert_tracking_md_at_out_port(capi_audio_dam_t   *me_ptr,
+                                                    capi_stream_data_t *output,
+                                                    uint32_t            output_port_index,
+                                                    bool_t              send_dfg_md,
+                                                    bool_t              is_eos_case);
 
 capi_vtbl_t *capi_audio_dam_buffer_get_vtable();
 
