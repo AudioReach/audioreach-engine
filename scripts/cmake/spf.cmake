@@ -191,6 +191,13 @@ function(spf_module_sources)
 		add_library(${SPF_MODULE_NAME} SHARED "" )
 		set(json_file "${PROJECT_BINARY_DIR}/libs_cfg/${SPF_MODULE_NAME}.json")
 		target_compile_options(${SPF_MODULE_NAME} PRIVATE ${SPF_MODULE_CFLAGS})
+
+		if(ARCH STREQUAL "hexagon")
+			target_sources(${SPF_MODULE_NAME} PRIVATE
+				"${CMAKE_SOURCE_DIR}/arch/hexagon/version_shared_lib.c")
+			target_compile_definitions(${SPF_MODULE_NAME} PRIVATE
+				"CAPI_SO_VERSION=\"${SPF_MODULE_NAME}.so.${SPF_MODULE_MAJOR_VER}.${SPF_MODULE_MINOR_VER}\"")
+		endif()
 		file(WRITE ${json_file} 
 		"[\n"
 		"   {\n"
