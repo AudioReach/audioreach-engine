@@ -59,6 +59,7 @@ LOCAL_SRC_FILES := \
     src/linux/posal_power_mgr.c \
     src/linux/posal_rtld.c \
     src/linux/posal_thread_attr_cfg.c \
+    src/linux/posal_time.c \
     src/linux/posal_timer.c \
     src/linux/private/posal_private.c
 
