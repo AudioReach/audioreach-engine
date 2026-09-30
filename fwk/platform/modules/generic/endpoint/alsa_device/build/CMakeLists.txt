@@ -36,3 +36,19 @@ spf_module_sources(
 	H2XML_HEADERS	"${LIB_ROOT}api/alsa_device_api.h"
 	CFLAGS		"-Wno-address-of-packed-member"
 )
+
+spf_module_sources(
+	KCONFIG		CONFIG_ALSA_DEVICE_SOURCE
+	NAME		alsa_device_source
+	MAJOR_VER	1
+	MINOR_VER	0
+	AMDB_ITYPE	"capi"
+	AMDB_MTYPE	"end_point"
+	AMDB_MID	"0x18000003"
+	AMDB_TAG	"capi_alsa_device_source"
+	AMDB_MOD_NAME	"MODULE_ID_ALSA_DEVICE_SOURCE"
+	SRCS		${alsa_device_sources}
+	INCLUDES	${alsa_device_includes}
+	H2XML_HEADERS	"${LIB_ROOT}api/alsa_device_api.h"
+	CFLAGS		"-Wno-address-of-packed-member"
+)
