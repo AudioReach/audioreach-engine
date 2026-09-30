@@ -428,7 +428,7 @@ ar_result_t amdb_load_unload_modules(amdb_module_load_unload_t *payload_ptr,
    memset(context_ptr, 0, alloc_size);
    *context_ptr = temp_context;
 
-   h_info_list = (spf_list_node_t *)context_ptr + 1;
+   h_info_list = (spf_list_node_t *)(context_ptr + 1);
    h_info_ptr  = (amdb_module_handle_info_t *)(h_info_list + payload_ptr->num_modules);
 
    for (uint32_t i = 0; i < payload_ptr->num_modules; i++)
