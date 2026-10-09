@@ -2594,6 +2594,12 @@ ar_result_t gen_topo_topo_process(gen_topo_t        *topo_ptr,
                          module_ptr->gu.module_instance_id);
 #endif
       }
+      else if (module_ptr->flags.need_ipc_port_extn)
+      {
+         // todo_mdf: make this function inline
+         trigger_cond_satisfied =
+            gen_topo_is_ipc_module_trigger_satisfied(topo_ptr, module_ptr, inp_has_no_trigger, out_has_no_trigger);
+      }
       else
       {
          trigger_cond_satisfied =
@@ -2855,9 +2861,87 @@ ar_result_t gen_topo_validate_port_sdata(uint32_t                log_id,
                                          gen_topo_common_port_t *cmn_port_ptr,
                                          bool_t                  is_input,
                                          uint32_t                port_index,
-                                         gen_topo_module_t*      module_ptr,
+                                         gen_topo_module_t      *module_ptr,
                                          bool_t                  PROCESS_DONE)
 {
+   // check if module has generated output buffer post process or not
+   if (!is_input && (GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS == cmn_port_ptr->flags.supports_buffer_reuse_extn))
+   {
+      if (PROCESS_DONE)
+      {
+         if (NULL == cmn_port_ptr->sdata.buf_ptr[0].data_ptr)
+         {
+            TOPO_MSG(log_id,
+                     DBG_ERROR_PRIO,
+                     "Error! CAPI internal buffer not set post process for Module 0x%lx out port idx %lx",
+                     module_ptr->gu.module_instance_id,
+                     port_index);
+            spf_svc_crash();
+            return AR_EFAILED;
+         }
+
+         if (cmn_port_ptr->sdata.buf_ptr[0].max_data_len < cmn_port_ptr->max_buf_len_per_buf)
+         {
+            TOPO_MSG(log_id,
+                     DBG_ERROR_PRIO,
+                     "Error! CAPI internal buffer set invalid buffer len %lu < %lu(max_buf_len_per_buf) process for "
+                     "Module 0x%lx output port idx %lx",
+                     module_ptr->gu.module_instance_id,
+                     port_index,
+                     cmn_port_ptr->sdata.buf_ptr[0].max_data_len,
+                     cmn_port_ptr->max_buf_len_per_buf);
+            spf_svc_crash();
+            return AR_EFAILED;
+         }
+      }
+      else // pre process
+      {
+         if (cmn_port_ptr->sdata.buf_ptr[0].data_ptr)
+         {
+            TOPO_MSG(log_id,
+                     DBG_LOW_PRIO,
+                     "Warning! Buffer already assigned CAPI internal buffer access Module 0x%lx output port idx %lx buf "
+                     "0x%p origin 0x%lu",
+                     module_ptr->gu.module_instance_id,
+                     port_index,
+                      cmn_port_ptr->sdata.buf_ptr[0].data_ptr,
+                     cmn_port_ptr->flags.buf_origin);
+            // note that buffer could have been assgined to output if its facing external output port
+         }
+      }
+   }
+   else if (is_input && (GEN_TOPO_MODULE_INPUT_BUF_ACCESS == cmn_port_ptr->flags.supports_buffer_reuse_extn))
+   {
+      if (PROCESS_DONE)
+      {
+         // check if buffer was not cleared by the module post process
+         if (NULL != cmn_port_ptr->sdata.buf_ptr[0].data_ptr &&
+             (GEN_TOPO_BUF_ORIGIN_CAPI_MODULE == cmn_port_ptr->flags.buf_origin))
+         {
+            TOPO_MSG(log_id,
+                     DBG_ERROR_PRIO,
+                     "Error! CAPI internal buffer not cleared post process for Module 0x%lx input port idx %lx",
+                     module_ptr->gu.module_instance_id,
+                     port_index);
+            spf_svc_crash();
+            return AR_EFAILED;
+         }
+      }
+      else // pre process
+      {
+         if (NULL == cmn_port_ptr->sdata.buf_ptr[0].data_ptr)
+         {
+            TOPO_MSG(log_id,
+                     DBG_ERROR_PRIO,
+                     "Error! CAPI internal buffer not assigned pre process for Module 0x%lx input port idx %lx",
+                     module_ptr->gu.module_instance_id,
+                     port_index);
+            spf_svc_crash();
+            return AR_EFAILED;
+         }
+      }
+   }
+
    // validation not needed for non PCM/ non unpacked formats.
    if (!gen_topo_is_pcm_any_unpacked(cmn_port_ptr))
    {

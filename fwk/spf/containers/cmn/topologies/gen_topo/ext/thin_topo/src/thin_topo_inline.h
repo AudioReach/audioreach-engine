@@ -117,7 +117,8 @@ static inline void thin_topo_decr_active_md_nodes(gen_topo_t *topo_ptr, module_c
 #ifdef VERBOSE_DEBUGGING
    TOPO_MSG(topo_ptr->gu.log_id,
             DBG_LOW_PRIO,
-            "Destroying metadata list node 0x%lx is_found:%lu decremented thin topo's active MD counter to %lu",
+            " Metadata list node 0x%lx is removed from cntr, is_found:%lu decremented thin topo's active MD counter to "
+            "%lu",
             md_list_ptr,
             is_found,
             topo_ptr->exit_flags.num_active_md_nodes_in_cntr);

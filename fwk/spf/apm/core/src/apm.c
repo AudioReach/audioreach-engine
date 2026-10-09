@@ -22,6 +22,7 @@
 #include "apm_gpr_if.h"
 #include "apm_offload_memmap_utils.h"
 #include "apm_ext_cmn.h"
+#include "spf_inter_proc_md_utils.h"
 
 #include "irm.h"
 
@@ -254,6 +255,9 @@ void apm_destroy()
    /** Destroy the channel */
    posal_channel_destroy(&apm_info_ptr->channel_ptr);
 
+   // initialize SPF IPCMD utility for tracking inter proc metadata
+   spf_ipcmd_deinit();
+
    AR_MSG(DBG_HIGH_PRIO, "Completed apm_destroy() ...");
 
    return;
@@ -423,6 +427,9 @@ ar_result_t apm_create()
    // Set the start value of container count based on processor domain.
    // This would help different SPF instances to start with unique log_id
    apm_info_ptr->graph_info.container_count = (uint16_t)(256 * host_domain_id);
+
+   // initialize SPF IPCMD utility for tracking inter proc metadata
+   spf_ipcmd_init();
 
    AR_MSG(DBG_HIGH_PRIO, "APM thread launched successfully");
 

@@ -1231,6 +1231,12 @@ ar_result_t st_topo_process(gen_topo_t *topo_ptr, gu_module_list_t **start_modul
          }
       }
 
+      /* Iterate through IPC input ports and check if the trigger is satisfied */
+      if (module_ptr->gu.ipc_input_port_list_ptr)
+      {
+         gen_topo_pure_st_check_ipc_input_port_triggers(topo_ptr, module_ptr, &atleast_one_input_has_data);
+      }
+
       /* For module trigger to be satisifed from the outputs perspective following conditions should be met,
           1. Atleast one output is started [if a module is at SG/ext boundary and the peer module SG is stopped,
              then it cannot process]
@@ -1289,6 +1295,15 @@ ar_result_t st_topo_process(gen_topo_t *topo_ptr, gu_module_list_t **start_modul
          }
       }
 
+      /* Iterate through IPC output ports and check if the trigger is satisfied */
+      if (module_ptr->gu.ipc_output_port_list_ptr)
+      {
+         gen_topo_pure_st_check_ipc_output_port_triggers(topo_ptr,
+                                                         module_ptr,
+                                                         &atleast_one_op_started,
+                                                         &all_started_out_ports_have_trigger);
+      }
+
       // For signal triggered, if atleast one input has buffer then call process.
       // note that module active flag is checked so atleast one input/output must be in started state.
       //    1. Source module - DTMF gen - input is always assumed to present, so call the module.
@@ -1299,9 +1314,12 @@ ar_result_t st_topo_process(gen_topo_t *topo_ptr, gu_module_list_t **start_modul
       //       Ex: if SAL has only one input from DTMF gen, and input is at flow gap skip SAL module
       ///   4. No need to check output triggers, module.flag.active = TRUE is sufficient
       //    5. STM process must be called on signal triggers
+      //    6. For IPC modules, if IPC trigger is satisfied and regular out/input port trigger is satisfied
+      //       then calls the process.
       bool_t trigger_cond_satisfied =
          (atleast_one_input_has_data && (atleast_one_op_started && all_started_out_ports_have_trigger)) ||
          module_ptr->flags.need_stm_extn;
+
 #ifdef TRIGGER_DEBUG
       TOPO_MSG_ISLAND(topo_ptr->gu.log_id,
                       DBG_LOW_PRIO,
@@ -1310,7 +1328,6 @@ ar_result_t st_topo_process(gen_topo_t *topo_ptr, gu_module_list_t **start_modul
                       trigger_cond_satisfied);
 #endif
 
-      // Call the module if tigger conditions are met.
       if (trigger_cond_satisfied)
       {
          // if the module supports DM extension set samples required to be produced depending upon the mode.

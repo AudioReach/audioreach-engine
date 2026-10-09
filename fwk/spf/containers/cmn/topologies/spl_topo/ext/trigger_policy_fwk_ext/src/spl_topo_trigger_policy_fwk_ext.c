@@ -184,19 +184,19 @@ bool_t spl_topo_int_in_port_is_trigger_present(void *  ctx_topo_ptr,
  * framework check to make sure the buffer is filled to 10ms, but the topo check needs to make sure the
  * buffer is filled to 1ms.
  */
-bool_t spl_topo_in_port_is_trigger_present(void *  ctx_topo_ptr,
-                                                void *  ctx_in_port_ptr,
-                                                bool_t *is_ext_trigger_not_satisfied_ptr,
-                                                bool_t  is_internal_check)
+bool_t spl_topo_in_port_is_trigger_present(void   *ctx_topo_ptr,
+                                           void   *ctx_in_port_ptr,
+                                           bool_t *is_ext_trigger_not_satisfied_ptr,
+                                           bool_t  is_internal_check)
 {
    INIT_EXCEPTION_HANDLING
    ar_result_t             result          = AR_EOK;
-   spl_topo_t *            topo_ptr        = (spl_topo_t *)ctx_topo_ptr;
-   spl_topo_input_port_t * in_port_ptr     = (spl_topo_input_port_t *)ctx_in_port_ptr;
+   spl_topo_t             *topo_ptr        = (spl_topo_t *)ctx_topo_ptr;
+   spl_topo_input_port_t  *in_port_ptr     = (spl_topo_input_port_t *)ctx_in_port_ptr;
    bool_t                  has_trigger     = TRUE;
    bool_t                  port_has_data   = FALSE;
    spl_topo_output_port_t *out_port_ptr    = NULL;
-   spl_topo_input_port_t * ext_in_port_ptr = NULL;
+   spl_topo_input_port_t  *ext_in_port_ptr = NULL;
 
 #if SPL_TOPO_DEBUG_LEVEL >= SPL_TOPO_DEBUG_LEVEL_3
    spl_topo_module_t *module_ptr = (spl_topo_module_t *)in_port_ptr->t_base.gu.cmn.module_ptr;
@@ -356,17 +356,17 @@ bool_t spl_topo_in_port_trigger_blocked(spl_topo_t *             topo_ptr,
 }
 
 // This is used to determine if a port's trigger policy is satisfied on the output side.
-bool_t spl_topo_out_port_is_trigger_present(void *  ctx_topo_ptr,
-                                                 void *  ctx_out_port_ptr,
-                                                 bool_t *is_ext_trigger_not_satisfied_ptr)
+bool_t spl_topo_out_port_is_trigger_present(void   *ctx_topo_ptr,
+                                            void   *ctx_out_port_ptr,
+                                            bool_t *is_ext_trigger_not_satisfied_ptr)
 
 {
-   spl_topo_t *            topo_ptr                = (spl_topo_t *)ctx_topo_ptr;
-   spl_topo_output_port_t *out_port_ptr            = (spl_topo_output_port_t *)ctx_out_port_ptr;
-   spl_topo_module_t *     module_ptr              = (spl_topo_module_t *)out_port_ptr->t_base.gu.cmn.module_ptr;
-   bool_t                  has_enough_space        = FALSE;
-   uint32_t                out_port_empty_space    = 0;
-   bool_t                  has_trigger             = FALSE;
+   spl_topo_t             *topo_ptr             = (spl_topo_t *)ctx_topo_ptr;
+   spl_topo_output_port_t *out_port_ptr         = (spl_topo_output_port_t *)ctx_out_port_ptr;
+   spl_topo_module_t      *module_ptr           = (spl_topo_module_t *)out_port_ptr->t_base.gu.cmn.module_ptr;
+   bool_t                  has_enough_space     = FALSE;
+   uint32_t                out_port_empty_space = 0;
+   bool_t                  has_trigger          = FALSE;
 
    // 1. (int/ext) Needs a valid media format.
    if (spl_topo_media_format_not_received_on_port(topo_ptr, &(out_port_ptr->t_base.common)))
@@ -907,4 +907,97 @@ uint32_t spl_topo_out_port_needs_trigger(spl_topo_t *topo_ptr, spl_topo_output_p
    }
 #endif
    return rc;
+}
+
+bool_t spl_topo_is_ipc_module_trigger_satisfied(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr)
+{
+   bool_t ext_trigger_not_satisfied = FALSE;
+
+   // Check IPC TX modules trigger
+   if ((1 == module_ptr->gu.num_input_ports) && (1 == module_ptr->gu.num_ipc_output_ports))
+   {
+      gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)module_ptr->gu.input_port_list_ptr->ip_port_ptr;
+
+      gen_topo_output_port_t *ipc_out_port_ptr =
+         (gen_topo_output_port_t *)module_ptr->gu.ipc_output_port_list_ptr->op_port_ptr;
+
+      if ((TOPO_PORT_STATE_STARTED != in_port_ptr->common.state) ||
+          (TOPO_PORT_STATE_STARTED != ipc_out_port_ptr->common.state))
+      {
+         return FALSE;
+      }
+
+      bool_t inp_trigger_present =
+         spl_topo_in_port_is_trigger_present(topo_ptr, in_port_ptr, NULL, TRUE /* internal port*/);
+
+      fwk_extn_ipc_port_trigger_t ipc_out_trigger =
+         gen_topo_get_ipc_port_trigger_from_module(topo_ptr,
+                                                   module_ptr,
+                                                   FALSE,
+                                                   ipc_out_port_ptr->gu.cmn.id,
+                                                   &ipc_out_port_ptr->common);
+
+      bool_t is_trigger_satisfied = (inp_trigger_present && (FWK_EXTN_IPC_PORT_BUFFER_NOT_NEEDED == ipc_out_trigger));
+
+      TOPO_MSG(topo_ptr->gu.log_id,
+               DBG_LOW_PRIO,
+               "IPC TX Module 0x%lX: inp_trigger_present: %lu ipc_out_trigger: %lu is_module_trigger_satisfied %lu",
+               module_ptr->gu.module_instance_id,
+               inp_trigger_present,
+               ipc_out_trigger,
+               is_trigger_satisfied);
+
+      return is_trigger_satisfied;
+   }
+   // Check IPC RX modules trigger
+   else if ((1 == module_ptr->gu.num_ipc_input_ports) && (1 == module_ptr->gu.num_output_ports))
+   {
+      gen_topo_input_port_t *ipc_in_port_ptr =
+         (gen_topo_input_port_t *)module_ptr->gu.ipc_input_port_list_ptr->ip_port_ptr;
+
+      gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)module_ptr->gu.output_port_list_ptr->op_port_ptr;
+
+      if ((TOPO_PORT_STATE_STARTED != ipc_in_port_ptr->common.state) ||
+          (TOPO_PORT_STATE_STARTED != out_port_ptr->common.state))
+      {
+         return FALSE;
+      }
+
+      fwk_extn_ipc_port_trigger_t ipc_in_trigger = gen_topo_get_ipc_port_trigger_from_module(topo_ptr,
+                                                                                             module_ptr,
+                                                                                             TRUE,
+                                                                                             ipc_in_port_ptr->gu.cmn.id,
+                                                                                             &ipc_in_port_ptr->common);
+
+      bool_t out_trigger_present =
+         spl_topo_out_port_is_trigger_present(topo_ptr, out_port_ptr, &ext_trigger_not_satisfied);
+
+      bool_t is_trigger_satisfied =
+         (out_trigger_present &&
+          ((FWK_EXTN_IPC_PORT_BUFFER_NOT_NEEDED | FWK_EXTN_IPC_PORT_BUFFER_NOT_NEEDED_OPTIONALLY) & ipc_in_trigger));
+
+      TOPO_MSG(topo_ptr->gu.log_id,
+               DBG_LOW_PRIO,
+               "IPC RX Module 0x%lX: ipc_in_trigger: %lu out_trigger_present: %lu is_module_trigger_satisfied %lu",
+               module_ptr->gu.module_instance_id,
+               ipc_in_trigger,
+               out_trigger_present,
+               is_trigger_satisfied);
+
+      return is_trigger_satisfied;
+   }
+   else
+   {
+      TOPO_MSG(topo_ptr->gu.log_id,
+               DBG_LOW_PRIO,
+               " IPC Module 0x%lX: Trigger not satisfied, Unsupported Num inputs (%lu, %lu) Num outputs (%lu, %lu ) "
+               "not supported",
+               module_ptr->gu.module_instance_id,
+               module_ptr->gu.num_input_ports,
+               module_ptr->gu.num_ipc_input_ports,
+               module_ptr->gu.num_output_ports,
+               module_ptr->gu.num_ipc_output_ports);
+      return FALSE;
+   }
+   return FALSE;
 }

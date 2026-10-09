@@ -1,0 +1,68 @@
+'''
+/*==============================================================================
+@file multi_port_example.scons
+@brief 
+
+==============================================================================*/
+'''
+
+Import('env')
+import os
+#---------------------------- h2xml generation --------------------------
+env.Append(H2XML_INC_PATH = "${AVS_ROOT}/api/ar_utils ")
+env.Append(H2XML_INC_PATH = "${AVS_ROOT}/api/modules ")
+env.Append(H2XML_INC_PATH = "${AVS_ROOT}/api/apm ")
+if os.path.exists("${INC_ROOT}/gpr/platform"):
+	env.Append(H2XML_INC_PATH = "${INC_ROOT}/gpr/platform/qurt/osal/api ")
+else:
+	env.Append(H2XML_INC_PATH = "${INC_ROOT}/gpr/core/ar_osal/qurt/api ")
+
+env.H2xmlFileGenerate(env.subst('../api'))
+#---------------------------- h2xml generation --------------------------
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+LIBNAME = 'multi_port_example'
+
+items = env.GetSoftwareUnits()
+ 
+x = items.get('LIBS')
+
+avs_reg_sources = []
+avs_stub_sources = []
+avs_fwk_sources = list(x)
+
+for i in x: 
+    
+    if i.name == 'capi_multi_port_example.lib':
+        avs_reg_sources.append(i)
+        avs_fwk_sources.remove(i)
+    if "_stub" in i.name:
+        avs_stub_sources.append(i)
+        avs_fwk_sources.remove(i)
+
+core_public_apis = [
+ 'DEBUGTOOLS',
+ 'SERVICES',
+ 'KERNEL',
+]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['SHARED_LIBRARY_INC_PATHS'])
+    
+platform_public_apis = [
+  'STDDEF', # AEEDef
+  'HAPSDK', # HAP_debug, farf etc
+    ]
+    
+env.RequirePublicApi(platform_public_apis, area='platform')
+
+if 'USES_AVS_SHARED_LIBS' in env:
+    SRCPATH='..'
+    env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+    env.AddAvsSharedLibrary(['AVS_SHARED'],'${BUILDPATH}/'+LIBNAME, [avs_reg_sources, avs_stub_sources, avs_fwk_sources],build_type='MOD', PACK_SRC=True)
+else:    
+   if 'USES_AVS_LIBRARY_BUILDER' in env:
+      x = env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+      [avs_reg_sources, avs_stub_sources, avs_fwk_sources],'MOD', PACK_SRC=True)

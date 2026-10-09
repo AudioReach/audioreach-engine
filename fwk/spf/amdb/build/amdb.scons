@@ -1,0 +1,120 @@
+'''
+/*==============================================================================
+@file amdb.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+#-------------------------------------------------------------------------------
+# Make all warnings into errors
+#-------------------------------------------------------------------------------
+env.Append(CFLAGS='-Wunused-variable')
+
+platform_public_apis = [
+  'STDDEF',  # idl dependency
+  'HAPSDK_AUDIO',  # CAPI_new, etc...
+  'QAIC',  # idl -> .h
+  'PLATFORM_FS',
+  'A1STD'
+  ]
+
+# This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+env.RequirePublicApi(platform_public_apis, area='platform')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS='-ffunction-sections')
+
+core_public_apis = [
+   'DEBUGTOOLS',
+   'KERNEL',
+   'POWER',
+   'SERVICES',
+   'DAL',
+   'SYSTEMDRIVERS'
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['SHARED_LIBRARY_INC_PATHS'])
+env.RequireRestrictedApi('AVS')
+env.RequireProtectedApi('AVS')
+env.RequirePublicApi(core_public_apis, area='core')
+
+env.PublishPrivateApi('AMDB_INTERNAL', ['${INC_ROOT}/${AVS_AU_NAME}/fwk/spf/amdb/ext/inc',
+                                      '${INC_ROOT}/${AVS_AU_NAME}/fwk/spf/amdb/ext/src',
+                                      '${INC_ROOT}/${AVS_AU_NAME}/fwk/spf/amdb/core/inc',
+                                      '${INC_ROOT}/${AVS_AU_NAME}/fwk/spf/amdb/core/src'])
+
+env.RequirePublicApi('AMDB')
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+
+if "MDSPMODE" in env and "USES_AVS_TEST" in env:
+    pass
+
+env.Append(CFLAGS=" -DDL_INFO_DEFINED ")
+env.Append(CPPFLAGS=" -DDL_INFO_DEFINED ")	
+	
+LIBNAME = 'amdb'
+LIBNAME_PRIVATE = 'amdb_private'
+SRCPATH = ".."
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+# avs_sources = env.GlobSourceFiles(['src/*.c'], SRCPATH,posix=True)
+# import pdb; pdb.set_trace()
+core_source_list = ['core/src/amdb.c', 'core/src/amdb_capi.c', 'core/src/amdb_capi_island.c', \
+                    'core/src/amdb_utils.c', 'core/src/amdb_static_loading.c']
+ext_source_list = []
+if 'GEN_SHARED_LIBS' in env or 'MDSPMODE' in env or 'SDSPMODE' in env:
+    core_source_list.remove('core/src/amdb_static_loading.c')
+    ext_source_list.append('/ext/src/*.c')
+else :
+    core_source_list.append('/ext/stub/*.c')
+    
+avs_sources = env.GlobSourceFiles(core_source_list, SRCPATH, posix=True) + \
+                env.GlobSourceFiles(ext_source_list, SRCPATH, posix=True)
+
+avs_private_sources = env.GlobSourceFiles(['core/src/private/*.c'], SRCPATH, posix=True)
+
+# Link autogen files.
+auto_gen_dir = env.subst('${BUILDPATH}')
+autogen = 'autogen/%s/*.c' % auto_gen_dir   
+autogen_priv = 'autogen/%s/*_private.c' % auto_gen_dir   
+#import pdb;pdb.set_trace()
+
+autogen_reg_sources_t = env.GlobSourceFiles([ autogen], SRCPATH, posix=True)
+autogen_priv_sources = env.GlobSourceFiles([ autogen_priv], SRCPATH, posix=True)
+
+#Seperate private and public files.
+
+autogen_reg_sources = set(autogen_reg_sources_t) - set(autogen_priv_sources)
+avs_reg_sources = avs_sources + list(autogen_reg_sources)
+avs_private_reg_sources = avs_private_sources + autogen_priv_sources
+
+# import pdb; pdb.set_trace() 
+avs_stub_sources = []
+avs_fwk_sources = []
+#-------------------------------------------------------------------------------
+# Add Libraries to image
+#-------------------------------------------------------------------------------
+non_island_reg_sources = []
+island_reg_sources = []
+if 'USES_AUDIO_IN_ISLAND' in env:
+    non_island_reg_sources, island_reg_sources = env.IslandFilter(avs_reg_sources)
+    non_island_stub_sources, island_stub_sources = env.IslandFilter(avs_stub_sources)
+    if 'USES_AVS_LIBRARY_BUILDER' in env:
+        env.AddAvsLibrary(['AVS_ADSP', 'AVS_ADSP_USER'], '${BUILDPATH}/' + LIBNAME,
+        [non_island_reg_sources, non_island_stub_sources, avs_fwk_sources], PACK_SRC=True)
+    get_island_lib = env.AddAvsLibrary(['AVS_ADSP', 'AVS_ADSP_USER'], '${BUILDPATH}/' + LIBNAME + '_island', [island_reg_sources, island_stub_sources, avs_fwk_sources], PACK_SRC=True)
+    env.AddBinaryLibrary(['AVS_ADSP_USER', 'AVS_ADSP'], '${BUILDPATH}/'+LIBNAME_PRIVATE, [avs_private_reg_sources, [], []] )
+    
+else:
+    env.AddAvsLibrary(['AVS_ADSP', 'AVS_ADSP_USER','AUDIOLITE_LIBS'], '${BUILDPATH}/' + LIBNAME,
+      [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+    env.AddBinaryLibrary(['AVS_ADSP_USER', 'AVS_ADSP','AUDIOLITE_LIBS'], '${BUILDPATH}/'+LIBNAME_PRIVATE, [avs_private_reg_sources, [], []] )

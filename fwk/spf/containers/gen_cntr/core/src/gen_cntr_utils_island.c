@@ -203,7 +203,7 @@ ar_result_t gen_cntr_vote_against_island(void *cu_ptr)
    return result;
 }
 
-void gen_cntr_clear_ext_out_bufs(gen_cntr_ext_out_port_t *ext_port_ptr, bool_t clear_max)
+void gen_cntr_clear_ext_out_bufs_util_(gen_cntr_ext_out_port_t *ext_port_ptr, bool_t clear_max)
 {
    ext_port_ptr->buf.data_ptr        = NULL;
    ext_port_ptr->buf.actual_data_len = 0;

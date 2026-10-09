@@ -267,8 +267,15 @@ ar_result_t cu_process_peer_port_property(cu_base_t    *base_ptr,
          {
             ext_out_port_ptr->icb_info.ds_flags.is_real_time = is_downstream_rt;
 
-            // for ICB purpose (if this port's is_rt changes, then we may need to re-create bufs
-            base_ptr->cntr_vtbl_ptr->ext_out_port_recreate_bufs(base_ptr, gu_ext_out_port_ptr);
+            if (gu_is_ipc_ext_output_port(gu_ext_out_port_ptr))
+            {
+               cu_ipc_tx_handle_icb_info_from_ds((void *)base_ptr, gu_ext_out_port_ptr, ext_out_port_ptr);
+            }
+            else
+            {
+               // for ICB purpose (if this port's is_rt changes, then we may need to re-create bufs
+               base_ptr->cntr_vtbl_ptr->ext_out_port_recreate_bufs(base_ptr, gu_ext_out_port_ptr);
+            }
          }
 
          // need to inform upstream about the propagated downstream RT property
@@ -439,6 +446,8 @@ static ar_result_t cu_propagate_to_peer_container_ext_port(cu_base_t            
    // Get spf_msg_header_t* from the intent buf pointer.
    spf_msg_header_t *header_ptr;
 
+   CU_MSG(me_ptr->gu_ptr->log_id, DBG_HIGH_PRIO, "num_properties: %lu", prop_ptr->num_properties);
+
    // Update the required for the data ptr and msg header.
    uint32_t msg_pkt_size =
       GET_SPF_MSG_REQ_SIZE((prop_ptr->num_properties - 1) * sizeof(spf_msg_peer_port_property_info_t) +
@@ -522,79 +531,85 @@ ar_result_t cu_inform_downstream_about_upstream_property(cu_base_t *base_ptr)
 {
    ar_result_t result = AR_EOK;
 
-   for (gu_ext_out_port_list_t *ext_out_port_list_ptr = base_ptr->gu_ptr->ext_out_port_list_ptr;
-        (NULL != ext_out_port_list_ptr);
-        LIST_ADVANCE(ext_out_port_list_ptr))
+   gu_ext_out_port_list_t *ext_out_port_lists[] = { base_ptr->gu_ptr->ext_out_port_list_ptr,
+                                                    base_ptr->gu_ptr->ipc_ext_out_port_list_ptr };
+
+   for (uint32_t i = 0; i < SIZE_OF_ARRAY(ext_out_port_lists); i++)
    {
-      gu_ext_out_port_t *gu_ext_out_port_ptr = ext_out_port_list_ptr->ext_out_port_ptr;
-      cu_ext_out_port_t *ext_out_port_ptr =
-         (cu_ext_out_port_t *)((uint8_t *)gu_ext_out_port_ptr + base_ptr->ext_out_port_cu_offset);
-
-      if (!ext_out_port_ptr->prop_info.prop_enabled)
+      for (gu_ext_out_port_list_t *ext_out_port_list_ptr = ext_out_port_lists[i]; (NULL != ext_out_port_list_ptr);
+           LIST_ADVANCE(ext_out_port_list_ptr))
       {
-         continue;
-      }
+         gu_ext_out_port_t *gu_ext_out_port_ptr = ext_out_port_list_ptr->ext_out_port_ptr;
+         cu_ext_out_port_t *ext_out_port_ptr =
+            (cu_ext_out_port_t *)((uint8_t *)gu_ext_out_port_ptr + base_ptr->ext_out_port_cu_offset);
 
-      // if downstream is not prepared or started then no need to inform the upstream-RT property.
-      if (ext_out_port_ptr->connected_port_state != TOPO_PORT_STATE_PREPARED &&
-          ext_out_port_ptr->connected_port_state != TOPO_PORT_STATE_STARTED)
-      {
-         continue;
-      }
-
-      spf_msg_peer_two_port_property_update_t two_prop;
-      memset(&two_prop, 0, sizeof(spf_msg_peer_two_port_property_update_t));
-      spf_msg_peer_port_property_info_t *cur_prop_ptr = two_prop.prop1.payload;
-
-      /************* is upstream real time */
-      uint32_t is_rt        = FALSE;
-      uint32_t old_is_us_rt = FALSE;
-      // out port propagates upstream RT
-      base_ptr->topo_vtbl_ptr->get_port_property(base_ptr->topo_ptr,
-                                                 TOPO_DATA_OUTPUT_PORT_TYPE,
-                                                 PORT_PROPERTY_IS_UPSTREAM_RT,
-                                                 (void *)gu_ext_out_port_ptr->int_out_port_ptr,
-                                                 (uint32_t *)&is_rt);
-
-      if ((is_rt != ext_out_port_ptr->prop_info.is_us_rt) || (!ext_out_port_ptr->prop_info.is_rt_informed))
-      {
-         two_prop.prop1.num_properties++;
-         cur_prop_ptr->property_type  = PORT_PROPERTY_IS_UPSTREAM_RT;
-         cur_prop_ptr->property_value = is_rt;
-         cur_prop_ptr                 = &two_prop.prop2;
-         // assume prop will be successful
-         ext_out_port_ptr->prop_info.is_rt_informed = TRUE;
-         old_is_us_rt                               = ext_out_port_ptr->prop_info.is_us_rt;
-         ext_out_port_ptr->prop_info.is_us_rt       = is_rt;
-
-         //mark this flag so that container real time flag can be updated.
-         CU_SET_ONE_FWK_EVENT_FLAG(base_ptr, rt_ftrt_change);
-
-         CU_MSG(base_ptr->gu_ptr->log_id,
-                DBG_MED_PRIO,
-                SPF_LOG_PREFIX
-                "Propagating to peer port of (mod-inst-id, port-id) (0x%lX, 0x%lx) upstream real time is_rt=%u",
-                gu_ext_out_port_ptr->int_out_port_ptr->cmn.module_ptr->module_instance_id,
-                gu_ext_out_port_ptr->int_out_port_ptr->cmn.id,
-                is_rt);
-      }
-      /************* state should not be propagated downstream */
-
-      if (two_prop.prop1.num_properties > 0)
-      {
-         result = ext_out_port_ptr->prop_info.prop_us_prop_to_ds_fn(base_ptr, gu_ext_out_port_ptr, &two_prop.prop1);
-         if (AR_FAILED(result))
+         if (!ext_out_port_ptr->prop_info.prop_enabled)
          {
-            // resetting this flag so that we retry again later.
-            ext_out_port_ptr->prop_info.is_rt_informed = FALSE;
-            ext_out_port_ptr->prop_info.is_us_rt       = old_is_us_rt;
+            continue;
+         }
+
+         // if downstream is not prepared or started then no need to inform the upstream-RT property.
+         if (ext_out_port_ptr->connected_port_state != TOPO_PORT_STATE_PREPARED &&
+             ext_out_port_ptr->connected_port_state != TOPO_PORT_STATE_STARTED)
+         {
+            continue;
+         }
+
+         spf_msg_peer_two_port_property_update_t two_prop;
+         memset(&two_prop, 0, sizeof(spf_msg_peer_two_port_property_update_t));
+         spf_msg_peer_port_property_info_t *cur_prop_ptr = two_prop.prop1.payload;
+
+         /************* is upstream real time */
+         uint32_t is_rt        = FALSE;
+         uint32_t old_is_us_rt = FALSE;
+         // out port propagates upstream RT
+         base_ptr->topo_vtbl_ptr->get_port_property(base_ptr->topo_ptr,
+                                                    TOPO_DATA_OUTPUT_PORT_TYPE,
+                                                    PORT_PROPERTY_IS_UPSTREAM_RT,
+                                                    (void *)gu_ext_out_port_ptr->int_out_port_ptr,
+                                                    (uint32_t *)&is_rt);
+
+         if ((is_rt != ext_out_port_ptr->prop_info.is_us_rt) || (!ext_out_port_ptr->prop_info.is_rt_informed))
+         {
+            two_prop.prop1.num_properties++;
+            cur_prop_ptr->property_type  = PORT_PROPERTY_IS_UPSTREAM_RT;
+            cur_prop_ptr->property_value = is_rt;
+            cur_prop_ptr                 = &two_prop.prop2;
+            // assume prop will be successful
+            ext_out_port_ptr->prop_info.is_rt_informed = TRUE;
+            old_is_us_rt                               = ext_out_port_ptr->prop_info.is_us_rt;
+            ext_out_port_ptr->prop_info.is_us_rt       = is_rt;
+
+            // mark this flag so that container real time flag can be updated.
+            CU_SET_ONE_FWK_EVENT_FLAG(base_ptr, rt_ftrt_change);
 
             CU_MSG(base_ptr->gu_ptr->log_id,
                    DBG_MED_PRIO,
-                   "Cannot propagate to peer port of (mod-inst-id, port-id) (0x%lX, 0x%lx) upstream real time is_rt=%u, resetting",
+                   SPF_LOG_PREFIX
+                   "Propagating to peer port of (mod-inst-id, port-id) (0x%lX, 0x%lx) upstream real time is_rt=%u",
                    gu_ext_out_port_ptr->int_out_port_ptr->cmn.module_ptr->module_instance_id,
                    gu_ext_out_port_ptr->int_out_port_ptr->cmn.id,
-                   old_is_us_rt);
+                   is_rt);
+         }
+         /************* state should not be propagated downstream */
+
+         if (two_prop.prop1.num_properties > 0)
+         {
+            result = ext_out_port_ptr->prop_info.prop_us_prop_to_ds_fn(base_ptr, gu_ext_out_port_ptr, &two_prop.prop1);
+            if (AR_FAILED(result))
+            {
+               // resetting this flag so that we retry again later.
+               ext_out_port_ptr->prop_info.is_rt_informed = FALSE;
+               ext_out_port_ptr->prop_info.is_us_rt       = old_is_us_rt;
+
+               CU_MSG(base_ptr->gu_ptr->log_id,
+                      DBG_MED_PRIO,
+                      "Cannot propagate to peer port of (mod-inst-id, port-id) (0x%lX, 0x%lx) upstream real time "
+                      "is_rt=%u, resetting",
+                      gu_ext_out_port_ptr->int_out_port_ptr->cmn.module_ptr->module_instance_id,
+                      gu_ext_out_port_ptr->int_out_port_ptr->cmn.id,
+                      old_is_us_rt);
+            }
          }
       }
    }
@@ -607,127 +622,134 @@ ar_result_t cu_inform_upstream_about_downstream_property(cu_base_t *base_ptr)
 {
    ar_result_t result = AR_EOK;
 
-   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = base_ptr->gu_ptr->ext_in_port_list_ptr;
-        (NULL != ext_in_port_list_ptr);
-        LIST_ADVANCE(ext_in_port_list_ptr))
+   gu_ext_in_port_list_t *ext_in_port_lists[] = { base_ptr->gu_ptr->ext_in_port_list_ptr,
+                                                  base_ptr->gu_ptr->ipc_ext_in_port_list_ptr };
+
+   for (uint32_t i = 0; i < SIZE_OF_ARRAY(ext_in_port_lists); i++)
    {
-      gu_ext_in_port_t *gu_ext_in_port_ptr = ext_in_port_list_ptr->ext_in_port_ptr;
-      cu_ext_in_port_t *ext_in_port_ptr =
-         (cu_ext_in_port_t *)((uint8_t *)gu_ext_in_port_ptr + base_ptr->ext_in_port_cu_offset);
-
-      if (!ext_in_port_ptr->prop_info.prop_enabled)
+      for (gu_ext_in_port_list_t *ext_in_port_list_ptr = ext_in_port_lists[i]; (NULL != ext_in_port_list_ptr);
+           LIST_ADVANCE(ext_in_port_list_ptr))
       {
-         continue;
-      }
+         gu_ext_in_port_t *gu_ext_in_port_ptr = ext_in_port_list_ptr->ext_in_port_ptr;
+         cu_ext_in_port_t *ext_in_port_ptr =
+            (cu_ext_in_port_t *)((uint8_t *)gu_ext_in_port_ptr + base_ptr->ext_in_port_cu_offset);
 
-      // if upstream is not prepared or started then no need to inform the downstrea-RT property and downstrea-state.
-      if (ext_in_port_ptr->connected_port_state != TOPO_PORT_STATE_PREPARED &&
-          ext_in_port_ptr->connected_port_state != TOPO_PORT_STATE_STARTED)
-      {
-         continue;
-      }
-
-      spf_msg_peer_two_port_property_update_t two_prop;
-      memset(&two_prop, 0, sizeof(spf_msg_peer_two_port_property_update_t));
-      spf_msg_peer_port_property_info_t *cur_prop_ptr = two_prop.prop1.payload;
-
-      {
-         /**************** is downstream RT */
-         uint32_t is_rt        = FALSE;
-         uint32_t old_is_ds_rt = FALSE;
-         // in port propagates downstream RT
-         base_ptr->topo_vtbl_ptr->get_port_property(base_ptr->topo_ptr,
-                                                    TOPO_DATA_INPUT_PORT_TYPE,
-                                                    PORT_PROPERTY_IS_DOWNSTREAM_RT,
-                                                    (void *)gu_ext_in_port_ptr->int_in_port_ptr,
-                                                    (uint32_t *)&is_rt);
-
-         if ((is_rt != ext_in_port_ptr->prop_info.is_ds_rt) || (!ext_in_port_ptr->prop_info.is_rt_informed))
+         if (!ext_in_port_ptr->prop_info.prop_enabled)
          {
-            two_prop.prop1.num_properties++;
-            cur_prop_ptr->property_type  = PORT_PROPERTY_IS_DOWNSTREAM_RT;
-            cur_prop_ptr->property_value = is_rt;
-            cur_prop_ptr                 = &two_prop.prop2;
-
-            // assume prop will be successful
-            ext_in_port_ptr->prop_info.is_rt_informed = TRUE;
-            old_is_ds_rt                              = ext_in_port_ptr->prop_info.is_ds_rt;
-            ext_in_port_ptr->prop_info.is_ds_rt       = is_rt;
-
-            //mark this flag so that container real time flag can be updated.
-            CU_SET_ONE_FWK_EVENT_FLAG(base_ptr, rt_ftrt_change);
-
-            CU_MSG(base_ptr->gu_ptr->log_id,
-                   DBG_MED_PRIO,
-                   SPF_LOG_PREFIX "Propagating to peer port of (mod-inst-id, port-id) (0x%lX, 0x%lx) downstream real time is_rt=%u",
-                   gu_ext_in_port_ptr->int_in_port_ptr->cmn.module_ptr->module_instance_id,
-                   gu_ext_in_port_ptr->int_in_port_ptr->cmn.id,
-                   is_rt);
+            continue;
          }
 
-         /**************** downstream's state */
-         topo_port_state_t state       = TOPO_PORT_STATE_INVALID;
-         topo_port_state_t old_state   = TOPO_PORT_STATE_INVALID;
-         topo_port_state_t my_sg_state = TOPO_PORT_STATE_INVALID;
-         base_ptr->topo_vtbl_ptr->get_port_property(base_ptr->topo_ptr,
-                                                    TOPO_DATA_INPUT_PORT_TYPE,
-                                                    PORT_PROPERTY_TOPO_STATE,
-                                                    (void *)gu_ext_in_port_ptr->int_in_port_ptr,
-                                                    (uint32_t *)&state);
-         my_sg_state = topo_sg_state_to_port_state(base_ptr->topo_vtbl_ptr->get_sg_state(gu_ext_in_port_ptr->sg_ptr));
-
-         // 1.  if my sg state is STOP/SUSPEND then propagated state will also be same. send it to upstream
-         // 2.  if my sg state is START then propagated state will be based on the downstream state propagation. send
-         // the propagated state to the upstream.
-         // 3.  if my sg state is PREPARE then propagated state will be STOP (since we are not handling PREPARE for
-         // propagation), now we don't need to send the STOP state to the upstream. Because if we do then upstream will
-         // send upstream-stop-ack. All this is unnecessary.
-         if (cu_need_to_inform_peer_about_state(state) && cu_need_to_inform_peer_about_state(my_sg_state))
+         // if upstream is not prepared or started then no need to inform the downstrea-RT property and downstrea-state.
+         if (ext_in_port_ptr->connected_port_state != TOPO_PORT_STATE_PREPARED &&
+             ext_in_port_ptr->connected_port_state != TOPO_PORT_STATE_STARTED)
          {
-            CU_MSG(base_ptr->gu_ptr->log_id,
-                   DBG_MED_PRIO,
-                   "Informing my state (0x%lX, 0x%lx) my port state=%u to peer",
-                   gu_ext_in_port_ptr->int_in_port_ptr->cmn.module_ptr->module_instance_id,
-                   gu_ext_in_port_ptr->int_in_port_ptr->cmn.id,
-                   state);
+            continue;
+         }
 
-            if ((state != ext_in_port_ptr->prop_info.port_state) || (!ext_in_port_ptr->prop_info.is_state_informed))
+         spf_msg_peer_two_port_property_update_t two_prop;
+         memset(&two_prop, 0, sizeof(spf_msg_peer_two_port_property_update_t));
+         spf_msg_peer_port_property_info_t *cur_prop_ptr = two_prop.prop1.payload;
+
+         {
+            /**************** is downstream RT */
+            uint32_t is_rt        = FALSE;
+            uint32_t old_is_ds_rt = FALSE;
+            // in port propagates downstream RT
+            base_ptr->topo_vtbl_ptr->get_port_property(base_ptr->topo_ptr,
+                                                       TOPO_DATA_INPUT_PORT_TYPE,
+                                                       PORT_PROPERTY_IS_DOWNSTREAM_RT,
+                                                       (void *)gu_ext_in_port_ptr->int_in_port_ptr,
+                                                       (uint32_t *)&is_rt);
+
+            if ((is_rt != ext_in_port_ptr->prop_info.is_ds_rt) || (!ext_in_port_ptr->prop_info.is_rt_informed))
             {
                two_prop.prop1.num_properties++;
-               cur_prop_ptr->property_type  = PORT_PROPERTY_TOPO_STATE;
-               cur_prop_ptr->property_value = state;
+               cur_prop_ptr->property_type  = PORT_PROPERTY_IS_DOWNSTREAM_RT;
+               cur_prop_ptr->property_value = is_rt;
+               cur_prop_ptr                 = &two_prop.prop2;
+
                // assume prop will be successful
-               ext_in_port_ptr->prop_info.is_state_informed = TRUE;
-               old_state                                    = ext_in_port_ptr->prop_info.port_state;
-               ext_in_port_ptr->prop_info.port_state        = state;
+               ext_in_port_ptr->prop_info.is_rt_informed = TRUE;
+               old_is_ds_rt                              = ext_in_port_ptr->prop_info.is_ds_rt;
+               ext_in_port_ptr->prop_info.is_ds_rt       = is_rt;
+
+               // mark this flag so that container real time flag can be updated.
+               CU_SET_ONE_FWK_EVENT_FLAG(base_ptr, rt_ftrt_change);
 
                CU_MSG(base_ptr->gu_ptr->log_id,
                       DBG_MED_PRIO,
-                      "Propagating to peer port of (mod-inst-id, port-id) (0x%lX, 0x%lx) topo_state =%u",
+                      SPF_LOG_PREFIX
+                      "Propagating to peer port of (mod-inst-id, port-id) (0x%lX, 0x%lx) downstream real time is_rt=%u",
+                      gu_ext_in_port_ptr->int_in_port_ptr->cmn.module_ptr->module_instance_id,
+                      gu_ext_in_port_ptr->int_in_port_ptr->cmn.id,
+                      is_rt);
+            }
+
+            /**************** downstream's state */
+            topo_port_state_t state       = TOPO_PORT_STATE_INVALID;
+            topo_port_state_t old_state   = TOPO_PORT_STATE_INVALID;
+            topo_port_state_t my_sg_state = TOPO_PORT_STATE_INVALID;
+            base_ptr->topo_vtbl_ptr->get_port_property(base_ptr->topo_ptr,
+                                                       TOPO_DATA_INPUT_PORT_TYPE,
+                                                       PORT_PROPERTY_TOPO_STATE,
+                                                       (void *)gu_ext_in_port_ptr->int_in_port_ptr,
+                                                       (uint32_t *)&state);
+            my_sg_state =
+               topo_sg_state_to_port_state(base_ptr->topo_vtbl_ptr->get_sg_state(gu_ext_in_port_ptr->sg_ptr));
+
+            // 1.  if my sg state is STOP/SUSPEND then propagated state will also be same. send it to upstream
+            // 2.  if my sg state is START then propagated state will be based on the downstream state propagation. send
+            // the propagated state to the upstream.
+            // 3.  if my sg state is PREPARE then propagated state will be STOP (since we are not handling PREPARE for
+            // propagation), now we don't need to send the STOP state to the upstream. Because if we do then upstream
+            // will send upstream-stop-ack. All this is unnecessary.
+            if (cu_need_to_inform_peer_about_state(state) && cu_need_to_inform_peer_about_state(my_sg_state))
+            {
+               CU_MSG(base_ptr->gu_ptr->log_id,
+                      DBG_MED_PRIO,
+                      "Informing my state (0x%lX, 0x%lx) my port state=%u to peer",
                       gu_ext_in_port_ptr->int_in_port_ptr->cmn.module_ptr->module_instance_id,
                       gu_ext_in_port_ptr->int_in_port_ptr->cmn.id,
                       state);
+
+               if ((state != ext_in_port_ptr->prop_info.port_state) || (!ext_in_port_ptr->prop_info.is_state_informed))
+               {
+                  two_prop.prop1.num_properties++;
+                  cur_prop_ptr->property_type  = PORT_PROPERTY_TOPO_STATE;
+                  cur_prop_ptr->property_value = state;
+                  // assume prop will be successful
+                  ext_in_port_ptr->prop_info.is_state_informed = TRUE;
+                  old_state                                    = ext_in_port_ptr->prop_info.port_state;
+                  ext_in_port_ptr->prop_info.port_state        = state;
+
+                  CU_MSG(base_ptr->gu_ptr->log_id,
+                         DBG_MED_PRIO,
+                         "Propagating to peer port of (mod-inst-id, port-id) (0x%lX, 0x%lx) topo_state =%u",
+                         gu_ext_in_port_ptr->int_in_port_ptr->cmn.module_ptr->module_instance_id,
+                         gu_ext_in_port_ptr->int_in_port_ptr->cmn.id,
+                         state);
+               }
             }
-         }
 
-         if (two_prop.prop1.num_properties > 0)
-         {
-            result = ext_in_port_ptr->prop_info.prop_ds_prop_to_us_fn(base_ptr, gu_ext_in_port_ptr, &two_prop.prop1);
-            if (AR_FAILED(result))
+            if (two_prop.prop1.num_properties > 0)
             {
-               // resetting these flags so that we retry again later.
-               ext_in_port_ptr->prop_info.is_rt_informed    = FALSE;
-               ext_in_port_ptr->prop_info.is_ds_rt          = old_is_ds_rt;
-               ext_in_port_ptr->prop_info.is_state_informed = FALSE;
-               ext_in_port_ptr->prop_info.port_state        = old_state;
+               result = ext_in_port_ptr->prop_info.prop_ds_prop_to_us_fn(base_ptr, gu_ext_in_port_ptr, &two_prop.prop1);
+               if (AR_FAILED(result))
+               {
+                  // resetting these flags so that we retry again later.
+                  ext_in_port_ptr->prop_info.is_rt_informed    = FALSE;
+                  ext_in_port_ptr->prop_info.is_ds_rt          = old_is_ds_rt;
+                  ext_in_port_ptr->prop_info.is_state_informed = FALSE;
+                  ext_in_port_ptr->prop_info.port_state        = old_state;
 
-               CU_MSG(base_ptr->gu_ptr->log_id,
-                      DBG_MED_PRIO,
-                      "Cannot Propagate to peer port of (mod-inst-id, port-id) (0x%lX, 0x%lx) port_state =%u, "
-                      "resetting the flags to try later",
-                      gu_ext_in_port_ptr->int_in_port_ptr->cmn.module_ptr->module_instance_id,
-                      gu_ext_in_port_ptr->int_in_port_ptr->cmn.id,
-                      old_state);
+                  CU_MSG(base_ptr->gu_ptr->log_id,
+                         DBG_MED_PRIO,
+                         "Cannot Propagate to peer port of (mod-inst-id, port-id) (0x%lX, 0x%lx) port_state =%u, "
+                         "resetting the flags to try later",
+                         gu_ext_in_port_ptr->int_in_port_ptr->cmn.module_ptr->module_instance_id,
+                         gu_ext_in_port_ptr->int_in_port_ptr->cmn.id,
+                         old_state);
+               }
             }
          }
       }

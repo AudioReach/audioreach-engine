@@ -101,7 +101,7 @@ ar_result_t capi_data_marker_intercept_delay_marker_and_check_raise_events(capi_
          offset_us      = capi_data_marker_convert_offset_to_us(md_ptr->offset, &me_ptr->operating_mf);
          uint32_t delay = intercepted_time - delay_md_ptr->insertion_time + offset_us;
 
-         AR_MSG(DBG_LOW_PRIO,
+         AR_MSG(DBG_HIGH_PRIO,
                 "capi_data_marker: 0x%lX: PATH_DELAY_MEASUREMENT: Delay Marker MD found 0x%p with token 0x%lx, "
                 "MD frame counter %lu, intercepted time %lu (0x%lx%lx) us, offset_us = 0x%lx, delay = %lu",
                 me_ptr->miid,
@@ -151,7 +151,7 @@ ar_result_t capi_data_marker_insert_marker(capi_data_marker_t *me_ptr, module_cm
       cfg_md_info_t *node_obj_ptr = (cfg_md_info_t *)curr_list_node_ptr->obj_ptr;
 
       if ((0 != node_obj_ptr->frame_dur_ms) &&
-          (0 != ((me_ptr->frame_counter * me_ptr->cntr_frame_dur_ms) % node_obj_ptr->frame_dur_ms)))
+          (0 != ((me_ptr->frame_counter * me_ptr->cntr_frame_dur_us) % (node_obj_ptr->frame_dur_ms * 1000))))
       {
     	 curr_list_node_ptr = curr_list_node_ptr->next_ptr;
          continue;

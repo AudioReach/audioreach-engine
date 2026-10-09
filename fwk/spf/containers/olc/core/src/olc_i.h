@@ -90,6 +90,10 @@ External ports for olc have 2 queues
 #define OLC_GET_EXT_CTRL_PORT_Q_ADDR(x) (CU_PTR_PUT_OFFSET(x, ALIGN_8_BYTES(sizeof(olc_ext_out_port_t))))
 #define OLC_GET_EXT_OUT_SGM_Q_ADDR(x) (CU_PTR_PUT_OFFSET(x, ALIGNED_SIZE_W_QUEUES(olc_ext_out_port_t, 1)))
 
+#define OLC_EXT_IN_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(olc_ext_in_port_t)))
+#define OLC_EXT_OUT_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(olc_ext_out_port_t)))
+#define OLC_EXT_CTRL_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(olc_ext_ctrl_port_t)))
+
 /* =======================================================================
 OLC Structure Definitions
 ========================================================================== */
@@ -238,6 +242,8 @@ typedef struct olc_t
    uint32_t total_flush_eos_stuck;
    /**< total flushing EOSes stuck in the container. needed for voting */
 
+   uint32_t ctrl_mode_of_operation;
+   /**< OLC mode of operation, whether its control/default mode of operation> */
 } olc_t;
 
 /* =======================================================================
@@ -454,6 +460,11 @@ ar_result_t olc_serv_reg_notify_deinit(olc_t *me_ptr);
 ar_result_t olc_serv_reg_notify_register(olc_t *me_ptr, uint32_t satellite_proc_domain_id);
 
 void olc_set_input_discontinuity_flag(olc_t *me_ptr, olc_ext_in_port_t *ext_in_port_ptr);
+
+static inline bool_t is_olc_in_control_only_mode(olc_t *me_ptr)
+{
+   return (OLC_MODE_CONTROL_ONLY == me_ptr->spgm_info.mode_of_operation) ? TRUE : FALSE;
+}
 
 #ifdef __cplusplus
 }

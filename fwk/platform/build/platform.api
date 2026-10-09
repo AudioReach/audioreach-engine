@@ -1,0 +1,18 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+
+Import('env')
+
+env.PublishRestrictedApi('AVS',[
+   '${AVS_FOLDER_ROOT}/driver/platform/core_drv/prbdm/inc',
+   '${AVS_ROOT}/platform/core_drv/platform_cfg/inc',
+   '${AVS_ROOT}/platform/core_drv/voice_timer/inc',
+   '${AVS_ROOT}/platform/private/api'
+   ])
+
+env.LoadAPIUnits()

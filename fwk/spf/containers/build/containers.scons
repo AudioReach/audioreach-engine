@@ -1,0 +1,25 @@
+'''
+/*==============================================================================
+@file containers.scons
+@brief
+
+==============================================================================*/
+
+'''
+
+Import('env')
+import os
+
+env.RequireRestrictedApi(['MODULE_INTERFACES_API', 'MODULE_INTERFACES_UTILS',  'CAPI_CMN_LIB'])
+
+# This macro is used to enable thin topo extension for Generic container and gen topo.
+if 'USES_THIN_TOPO' in env:
+   env.Append(CPPDEFINES="USES_THIN_TOPO")
+   env.Append(CDEFINES="USES_THIN_TOPO")
+   env.PublishProtectedApi('AVS',['${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/thin_topo/src/'])
+else:
+   # stub inline functions
+   env.PublishProtectedApi('AVS',['${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/thin_topo/stub_src/'])
+
+
+env.LoadSoftwareUnits()

@@ -264,7 +264,7 @@ static ar_result_t gen_cntr_pure_st_data_process_one_frame(gen_cntr_t *me_ptr)
          }
 
          /** try to fill buf for Signal trigger */
-         ext_in_port_ptr->vtbl_ptr->on_trigger(me_ptr, ext_in_port_ptr);
+         ext_in_port_ptr->vtbl_ptr->on_trigger(&me_ptr->cu, (gu_ext_in_port_t *)ext_in_port_ptr);
 
          if (AR_DID_FAIL(result))
          {
@@ -312,6 +312,48 @@ static ar_result_t gen_cntr_pure_st_data_process_one_frame(gen_cntr_t *me_ptr)
       pc_ptr->ext_out_port_scratch_ptr[out_port_index].prev_actual_data_len = actual_data_len;
    }
 
+   /* Iterate through all IPC input and output ports, poll and setup the buffers. */
+   for (gu_ext_in_port_list_t *ipc_in_port_list_ptr = me_ptr->topo.gu.ipc_ext_in_port_list_ptr;
+        (NULL != ipc_in_port_list_ptr);
+        LIST_ADVANCE(ipc_in_port_list_ptr))
+   {
+      gen_topo_input_port_t *ipc_in_port_ptr =
+         (gen_topo_input_port_t *)ipc_in_port_list_ptr->ext_in_port_ptr->int_in_port_ptr;
+
+      if (TOPO_PORT_STATE_STARTED != ipc_in_port_ptr->common.state)
+      {
+         continue;
+      }
+
+      TRY(result,
+          cu_poll_and_setup_ipc_input_port_buffer(&me_ptr->cu,
+                                                  ipc_in_port_list_ptr->ext_in_port_ptr,
+                                                  NULL,
+                                                  ALLOW_UNDERRUN));
+   }
+
+   for (gu_ext_out_port_list_t *ipc_out_port_list_ptr = me_ptr->topo.gu.ipc_ext_out_port_list_ptr;
+        (NULL != ipc_out_port_list_ptr);
+        LIST_ADVANCE(ipc_out_port_list_ptr))
+   {
+      gen_topo_output_port_t *ipc_out_port_ptr =
+         (gen_topo_output_port_t *)ipc_out_port_list_ptr->ext_out_port_ptr->int_out_port_ptr;
+
+      if (TOPO_PORT_STATE_STARTED != ipc_out_port_ptr->common.state)
+      {
+         continue;
+      }
+
+      TRY(result,
+          cu_poll_and_setup_ipc_output_port_buffer(&me_ptr->cu,
+                                                   ipc_out_port_list_ptr->ext_out_port_ptr,
+                                                   NULL,
+                                                   ALLOW_OVERRUN));
+   }
+
+   // get buffer from modules that support input buffer access extension and propagate backwards.
+   gen_topo_handle_assign_buffers_capi_input_buffer_extn_module(&me_ptr->topo);
+
    while (TRUE)
    {
       if (gen_cntr_is_pure_signal_triggered(me_ptr))
@@ -322,9 +364,9 @@ static ar_result_t gen_cntr_pure_st_data_process_one_frame(gen_cntr_t *me_ptr)
       {
          /** Switches from Pure ST to Gen Topo dynamically in the following scenarios:
 
-         Case 1: After setting up ext input and output container may not support pure ST, due to ext input threshold/media
-           format propagation exit and continue processing gen topo. For example, change in threshold leading to
-           (num_proc_loops != 1) needs a switch to gen topo.
+         Case 1: After setting up ext input and output container may not support pure ST, due to ext input
+         threshold/media format propagation exit and continue processing gen topo. For example, change in threshold
+         leading to (num_proc_loops != 1) needs a switch to gen topo.
 
          Case 2: Module event like MF/threshold changes can lead Pure ST disablement dynamically, hence need to switch
          to gen topo and continue. For example, change in threshold leading to (num_proc_loops != 1) needs a switch to
@@ -378,6 +420,11 @@ static ar_result_t gen_cntr_pure_st_data_process_one_frame(gen_cntr_t *me_ptr)
          }
       }
    }
+
+   // clear capi input/output buffers that are held in the topo bufs ptr. if any data is present
+   // replace it with a topo buffer (allocates a buffer and does a copy).
+   gen_topo_clear_and_replace_capi_input_buffers(&me_ptr->topo, TRUE /* force drop flag*/);
+   gen_topo_clear_and_replace_capi_output_buffers(&me_ptr->topo, TRUE /* force drop flag*/);
 
    // free ext input if it was borrowed by the external input
    for (gu_ext_in_port_list_t *ext_in_port_list_ptr = me_ptr->topo.gu.ext_in_port_list_ptr;

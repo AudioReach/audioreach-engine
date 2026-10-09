@@ -1,0 +1,80 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+
+Import('env')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS = '-ffunction-sections')
+
+core_public_apis = [
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS'])
+env.RequireRestrictedApi('SVA_COMMON_SHARED_INCS')
+env.RequireProtectedApi('AVS')
+env.PublishPrivateApi('AVS',[
+   '../inc',
+   '../src',
+   '../../api',
+   '../../../../platform/core_drv/qcom/prm_drv/cdc_ctrl_util/inc',
+   ])
+
+if 'USES_DETECTION_ENGINE_TOUSE_CDC_CTRL_MIC_SWITCH' in env:
+   env.Append(CPPDEFINES="USES_DETECTION_ENGINE_TOUSE_CDC_CTRL_MIC_SWITCH")
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'capi_detection_engine'
+LIBNAME_STUB = LIBNAME+'_stub'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+avs_reg_sources = env.GlobSourceFiles(['src/*.cpp', 'src/*.c'], SRCPATH,posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.cpp', 'stub_src/*.c'], SRCPATH,posix=True)
+
+#if 'USES_RT_PROXY_UNIT_TEST' in env:
+#   avs_reg_sources = env.GlobSourceFiles(['src/*.cpp', 'src/*.c', 'tst/*.cpp', 'tst/*.c'], SRCPATH,posix=True)
+
+platform_public_apis = [
+  'STDDEF', # AEEDef
+  'HAPSDK', # HAP_debug, farf etc
+    ]
+
+# This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+env.RequirePublicApi(platform_public_apis, area='platform')
+
+bucket= ['AVS_ADSP','AVS_ADSP_USER']
+
+if 'USES_AUDIO_IN_ISLAND' in env and 'USES_DETECTION_ENGINE_TOUSE_CDC_CTRL_MIC_SWITCH' in env:
+    non_island_sources,island_sources = env.IslandFilter(avs_reg_sources)
+    non_island_stub_sources,island_stub_sources = env.IslandFilter(avs_stub_sources)
+    # print('island sources:',island_sources)
+    # print('island stubs sources:',island_stub_sources)
+    # print('non island sources:',non_island_sources)
+    # print('non island stubs sources:',non_island_stub_sources)
+    env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME, non_island_sources)
+    get_island_lib = env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME+'_island', [island_sources])
+    # print('capi detection engine scons dbg - in island cond')
+    if 'USES_MEMSEG' in env:
+        env.TagLibraryForMemorySegment(bucket, 'va', get_island_lib)
+    elif 'USES_ISLAND' in env:
+        env.AddIslandLibrary(bucket, get_island_lib)
+        # print('capi detection engine scons dbg - in uses island cond')
+    else:
+        print('capi detection engine scons dbg - skipped')
+else:
+    env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME, avs_reg_sources) 
+    env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)
+
+# print('exiting capi detection engine scons dbg')

@@ -1,0 +1,43 @@
+'''
+/*==============================================================================
+@file capi_data_marker.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+core_public_apis = [
+   'SERVICES',
+   'DEBUGTOOLS',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 
+   'MODULE_INTERFACES_API', 
+   'SHARED_LIBRARY_INC_PATHS',
+   'CAPI_CMN_LIB',
+   ])
+env.RequireProtectedApi('AVS')
+env.PublishPrivateApi('AVS',['../inc','../../api'])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'capi_data_marker'
+
+#import pdb; pdb.set_trace()
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+avs_reg_sources = env.GlobSourceFiles(['src/*.c'], SRCPATH,posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.c'], SRCPATH,posix=True)
+avs_fwk_sources = []
+
+if 'USES_AVS_LIBRARY_BUILDER' in env:
+   env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+      [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+

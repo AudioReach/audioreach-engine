@@ -1,0 +1,47 @@
+'''
+/*==============================================================================
+@file cntr_cmn.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+import os
+
+CBSP_API = [
+   'BOOT',
+   'DAL',
+   'DEBUGTOOLS',
+   'HAL',
+   'MPROC',
+   'POWER',
+   'SERVICES',
+   'SYSTEMDRIVERS',
+
+   # needs to be last also contains wrong comdef.h
+   'KERNEL',   
+]
+
+env.RequirePublicApi(CBSP_API,area='core')
+
+env.RequireRestrictedApi(['MODULE_INTERFACES_API', 'MODULE_INTERFACES_UTILS',  'CAPI_CMN_LIB'])
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS'])
+env.RequireProtectedApi('AVS')
+
+env.RequirePublicApi([
+  'AMDB',
+])
+platform_public_apis = [
+    'QAIC',
+    'STDDEF',
+    'HAPSDK'
+    ]
+env.RequirePublicApi(platform_public_apis, area='platform') # This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+      
+env.LoadSoftwareUnits()

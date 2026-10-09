@@ -202,6 +202,12 @@ static bool_t gen_cntr_need_to_process_frames(gen_cntr_t *me_ptr,
       }
    }
 
+   // IPC output ports need to have an output buffer to continue processing further.
+   if (me_ptr->topo.gu.ipc_ext_out_port_list_ptr && (TRUE == gen_cntr_check_if_ipc_ext_out_needs_buffer(me_ptr)))
+   {
+      return EXIT_PROCESSING;
+   }
+
    // cannot process, need to release the output buffer first and wait for trigger to process.
    if (*is_output_ready_ptr)
    {
@@ -752,6 +758,33 @@ static ar_result_t gen_cntr_data_process_one_frame(gen_cntr_t *me_ptr)
             temp_ext_in_port_ptr->flags.ready_to_go = FALSE;
          }
       }
+
+      // this check is needed to exit inner loop (process_one_frame()) if ipc/ext input is not present.
+      if (me_ptr->topo.gu.ipc_ext_in_port_list_ptr && (GEN_TOPO_DATA_TRIGGER == me_ptr->topo.proc_context.curr_trigger))
+      {
+         // by this time, input and output buffers must be popped & assigned.
+         for (gu_ext_in_port_list_t *ipc_ext_in_port_list_ptr = me_ptr->topo.gu.ipc_ext_in_port_list_ptr;
+              (NULL != ipc_ext_in_port_list_ptr);
+              LIST_ADVANCE(ipc_ext_in_port_list_ptr))
+         {
+            gen_cntr_ext_in_port_t *ipc_ext_in_port_ptr =
+               (gen_cntr_ext_in_port_t *)ipc_ext_in_port_list_ptr->ext_in_port_ptr;
+            // don't check port state & data flow state here as it's checked already inside gen_topo_in_port_needs_data
+
+            gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t*)ipc_ext_in_port_ptr->gu.int_in_port_ptr;
+
+            gen_topo_module_t *module_ptr = (gen_topo_module_t *)in_port_ptr->gu.cmn.module_ptr;
+
+            // query if module has the trigger.
+            fwk_extn_ipc_port_trigger_t ipc_in_trigger =
+               gen_topo_get_ipc_port_trigger_from_module(&me_ptr->topo, module_ptr, TRUE, in_port_ptr->gu.cmn.id, &in_port_ptr->common);
+
+            if ((0 == me_ptr->topo.num_data_tpm) && (FWK_EXTN_IPC_PORT_BUFFER_NEEDED == ipc_in_trigger))
+            {
+               me_ptr->wait_mask_arr[module_ptr->gu.path_index] |= ipc_ext_in_port_ptr->cu.bit_mask;
+            }
+         }
+      }
    }
 
    out_port_index = 0;
@@ -775,6 +808,9 @@ static ar_result_t gen_cntr_data_process_one_frame(gen_cntr_t *me_ptr)
          TRY(result, ext_out_port_ptr->vtbl_ptr->setup_topo_buf(me_ptr, ext_out_port_ptr));
       }
    }
+
+   // get buffer from modules that support input buffer access extension and propagate backwards.
+   gen_topo_handle_assign_buffers_capi_input_buffer_extn_module(&me_ptr->topo);
 
    for (uint8_t i = 0; i < me_ptr->cu.gu_ptr->num_parallel_paths; i++)
    {
@@ -814,6 +850,15 @@ static ar_result_t gen_cntr_data_process_one_frame(gen_cntr_t *me_ptr)
          }
       }
    }
+
+   // clear capi input/output buffers that are held in the topo bufs ptr. if any data is present
+   // replace it with a topo buffer (allocates a buffer and does a copy).
+   gen_topo_clear_and_replace_capi_input_buffers(&me_ptr->topo,
+                                                 (GEN_TOPO_SIGNAL_TRIGGER ==
+                                                  me_ptr->topo.proc_context.curr_trigger) /* force drop flag*/);
+   gen_topo_clear_and_replace_capi_output_buffers(&me_ptr->topo,
+                                                  (GEN_TOPO_SIGNAL_TRIGGER ==
+                                                   me_ptr->topo.proc_context.curr_trigger) /* force drop flag*/);
 
    /**  For each external out port, postprocess data, send media fmt and data down. */
    out_port_index = 0;
@@ -1124,10 +1169,12 @@ ar_result_t gen_cntr_data_process_frames(gen_cntr_t *me_ptr)
 
    if (gen_cntr_wait_for_any_ext_trigger(me_ptr, TRUE /* process context */, TRUE /*is_entry */))
    {
+      gen_cntr_handle_fwk_events_in_data_path(me_ptr);
       return AR_EOK;
    }
 
    /**
+
     * purpose of for loop:
     * when release_out_buf is TRUE, input may not have been released. in cases like push mode,
     * input cannot be queued back or dropped. Also there's no output trigger to wake back up.
@@ -1185,12 +1232,12 @@ ar_result_t gen_cntr_data_process_frames(gen_cntr_t *me_ptr)
 
       gen_cntr_handle_fwk_events_in_data_path(me_ptr);
 
-      if (need_to_exit_outer_loop)
+      if (gen_cntr_wait_for_any_ext_trigger(me_ptr, TRUE /* process context*/, FALSE /* is_entry */))
       {
          break;
       }
 
-      if (gen_cntr_wait_for_any_ext_trigger(me_ptr, TRUE /* process context*/, FALSE /* is_entry */))
+      if (need_to_exit_outer_loop)
       {
          break;
       }
@@ -1534,7 +1581,21 @@ ar_result_t gen_cntr_output_bufQ_trigger(cu_base_t *base_ptr, uint32_t channel_b
       // If Signal is set in output data q then pop from output data q
       if (temp_ext_out_port_ptr->cu.bit_mask & channel_status)
       {
-         TRY(result, temp_ext_out_port_ptr->vtbl_ptr->setup_bufs(me_ptr, temp_ext_out_port_ptr));
+         TRY(result,
+             temp_ext_out_port_ptr->vtbl_ptr->setup_bufs(&me_ptr->cu, (gu_ext_out_port_t *)temp_ext_out_port_ptr));
+      }
+   }
+
+   for (gu_ext_out_port_list_t *ipc_ext_out_port_list_ptr = me_ptr->topo.gu.ipc_ext_out_port_list_ptr;
+        (NULL != ipc_ext_out_port_list_ptr);
+        LIST_ADVANCE(ipc_ext_out_port_list_ptr))
+   {
+      gen_cntr_ext_out_port_t *ipc_ext_out_port_ptr =
+         (gen_cntr_ext_out_port_t *)ipc_ext_out_port_list_ptr->ext_out_port_ptr;
+
+      if (ipc_ext_out_port_ptr->cu.bit_mask & channel_status)
+      {
+         TRY(result, cu_ipc_port_ext_out_on_data_trigger(base_ptr, (gu_ext_out_port_t *)ipc_ext_out_port_ptr, NULL));
       }
    }
 
@@ -1663,7 +1724,20 @@ ar_result_t gen_cntr_input_dataQ_trigger(cu_base_t *base_ptr, uint32_t channel_b
           * then timestamp of the
           * buffer will get replaced.Also it could cause higher continuous latency
           * */
-         temp_ext_in_port_ptr->vtbl_ptr->on_trigger(me_ptr, temp_ext_in_port_ptr);
+         temp_ext_in_port_ptr->vtbl_ptr->on_trigger(base_ptr, (gu_ext_in_port_t *)temp_ext_in_port_ptr);
+      }
+   }
+
+   for (gu_ext_in_port_list_t *ipc_ext_in_port_list_ptr = me_ptr->topo.gu.ipc_ext_in_port_list_ptr;
+        (NULL != ipc_ext_in_port_list_ptr);
+        LIST_ADVANCE(ipc_ext_in_port_list_ptr))
+   {
+      gen_cntr_ext_in_port_t *ipc_ext_in_port_ptr =
+         (gen_cntr_ext_in_port_t *)ipc_ext_in_port_list_ptr->ext_in_port_ptr;
+
+      if (ipc_ext_in_port_ptr->cu.bit_mask & channel_status)
+      {
+         cu_ipc_port_ext_in_on_data_trigger(base_ptr, (gu_ext_in_port_t *)ipc_ext_in_port_ptr, NULL);
       }
    }
 

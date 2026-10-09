@@ -1,0 +1,64 @@
+#===============================================================================
+#
+# AVS AU
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+Import('env')
+
+
+core_public_apis = [
+   'DEBUGTOOLS',
+   'KERNEL',
+   'POWER',
+   'SERVICES',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'MODULE_INTERFACES_API'])
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS', 'CAPI_CMN_LIB'])
+env.RequireProtectedApi('AVS')
+
+env.PublishPrivateApi('AVS',[
+   '../inc',
+   '../src',
+   '../../lib/inc',   
+   ])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'capi_rat'
+LIBNAME_STUB = LIBNAME+'_stub'
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+# Generate regular source file list
+avs_reg_sources = env.GlobSourceFiles(['/src/*.c', '/src/*.S'], SRCPATH,posix=True)
+
+
+# Generate stub source file list
+avs_stub_sources = env.GlobSourceFiles(['/stub_src/*.c', '/stub_src/*.S'], SRCPATH,posix=True)
+
+# Genate  source file list
+avs_fwk_sources = []
+
+bucket = ['AVS_ADSP','AVS_ADSP_USER','AVS_SHARED']
+
+if 'USES_AUDIO_IN_ISLAND' in env:
+    non_island_sources,island_sources = env.IslandFilter(avs_reg_sources)
+    env.AddLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME, non_island_sources)
+    get_island_lib = env.AddLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME+'_island', [island_sources])
+    if 'USES_MEMSEG' in env:
+       env.TagLibraryForMemorySegment(['AVS_ADSP','AVS_ADSP_USER'], 'va', get_island_lib)
+    elif 'USES_ISLAND' in env:
+       env.AddIslandLibrary(['AVS_ADSP','AVS_ADSP_USER'], get_island_lib)
+else:
+     env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME, avs_reg_sources)
+     env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)
+
+
+

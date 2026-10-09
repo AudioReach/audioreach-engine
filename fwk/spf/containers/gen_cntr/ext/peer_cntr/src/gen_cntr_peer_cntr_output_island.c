@@ -11,7 +11,7 @@
 #include "gen_cntr_i.h"
 #include "apm.h"
 
-static ar_result_t gen_cntr_output_buf_set_up_peer_cntr(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
+static ar_result_t gen_cntr_output_buf_set_up_peer_cntr(cu_base_t *me_ptr, gu_ext_out_port_t *ext_out_port_ptr);
 static ar_result_t gen_cntr_check_realloc_ext_buffer(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_port_ptr);
 
 const gen_cntr_ext_out_vtable_t peer_cntr_ext_out_vtable = {
@@ -216,9 +216,11 @@ ar_result_t gen_cntr_init_after_popping_peer_cntr_out_buf(gen_cntr_t *me_ptr, ge
  *
  * any of the output port can trigger this.
  */
-static ar_result_t gen_cntr_output_buf_set_up_peer_cntr(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr)
+static ar_result_t gen_cntr_output_buf_set_up_peer_cntr(cu_base_t *base_ptr, gu_ext_out_port_t *gu_ext_out_port_ptr)
 {
-   ar_result_t result = AR_EOK;
+   ar_result_t              result           = AR_EOK;
+   gen_cntr_t              *me_ptr           = (gen_cntr_t *)base_ptr;
+   gen_cntr_ext_out_port_t *ext_out_port_ptr = (gen_cntr_ext_out_port_t *)gu_ext_out_port_ptr;
    INIT_EXCEPTION_HANDLING
 
    // Buffer should have been returned to either Q  in previous iteration.

@@ -144,6 +144,7 @@ static const topo_to_cntr_vtable_t topo_to_olc_vtable = {
    .notify_ts_disc_evt                          = NULL,
    .module_buffer_access_event                  = NULL,
    .check_if_any_ext_in_has_to_preserve_prebuffer = NULL,
+   .handle_ipc_data_link_info_event             = NULL,
 };
 
 // function table for response handling.

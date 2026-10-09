@@ -1,8 +1,8 @@
-#ifndef _CAPI_FWK_EXTNS_ASYNC_SIGNAL_TRIGGER_H_
-#define _CAPI_FWK_EXTNS_ASYNC_SIGNAL_TRIGGER_H_
+#ifndef _CAPI_FWK_EXTNS_EXTERNAL_IO_CTRL_H_
+#define _CAPI_FWK_EXTNS_EXTERNAL_IO_CTRL_H_
 
 /**
- *   \file capi_fwk_extns_async_signal_trigger.h
+ *   \file capi_fwk_extns_external_io_ctrl.h
  *   \brief
  *        This file contains Async Signal Trigger Module's Extension.
  *
@@ -12,7 +12,7 @@
 
 #include "capi_types.h"
 
-/** @addtogroup capi_fwk_ext_async_signal_trigger
+/** @addtogroup capi_fwk_extns_external_io_ctrl
 @{ */
 
 /*==============================================================================
@@ -113,4 +113,4 @@ struct capi_prop_async_signal_callback_info_t
 
 /** @} */ /* end_addtogroup capi_fwk_ext_async_signal_trigger */
 
-#endif /* _CAPI_FWK_EXTNS_ASYNC_SIGNAL_TRIGGER_H_ */
+#endif /* _CAPI_FWK_EXTNS_EXTERNAL_IO_CTRL_H_ */

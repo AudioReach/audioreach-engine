@@ -135,8 +135,20 @@ static ar_result_t audio_dam_stream_read_util_(audio_dam_stream_reader_t *reader
 
    *output_buf_ts_is_valid = reader_handle->rd_client_ptr_arr[0]->circ_buf_ptr->is_valid_timestamp;
 
-   int64_t cur_writer_ts = reader_handle->rd_client_ptr_arr[0]->circ_buf_ptr->timestamp;
-   *output_buf_ts        = cur_writer_ts - (remaining_unread_len_in_us + output_frame_len_us);
+   /* Guard: only compute the output timestamp when the cached writer timestamp is
+    * valid. When it is not valid, zero out *output_buf_ts so that no consumer can
+    * accidentally use a garbage or underflowed value even if it skips the validity
+    * flag check. */
+   int64_t cur_writer_ts = 0;
+   if (*output_buf_ts_is_valid)
+   {
+      cur_writer_ts  = reader_handle->rd_client_ptr_arr[0]->circ_buf_ptr->timestamp;
+      *output_buf_ts = cur_writer_ts - (remaining_unread_len_in_us + output_frame_len_us);
+   }
+   else
+   {
+      *output_buf_ts = 0;
+   }
 
    *output_buf_len_in_us = output_frame_len_us;
 

@@ -140,7 +140,7 @@ extern "C"
  *    metadata_header_extn_t base_extn[0]; // optional extension header payload aligned to 4 bytes, used in MDF only for now
  *                                         // BIT 6 should be set to indicate the presence of this payload.
  *                                         // The present definition of extension is published for internal usage within and
- *                                         // is locally defined for MDF offload interfaces. (\offload_metatdata_api.h)
+ *                                         // is locally defined for MDF offload interfaces. (\offload_metadata_api.h)
  * }
  */
 #include "spf_begin_pack.h"
@@ -162,7 +162,7 @@ struct metadata_header_t
     *
     *    This bit is specifically used for MDF to classify if the metadata is relevant
     *    to external client versus internally generated and propagated within SPF.
-    *    Should be set to ‘0’ always  for HLOS
+    *    Should be set to 0 always  for HLOS
     *
     *
     *   BIT_2_to_1 : Specifies if the Metadata is trackable.
@@ -394,7 +394,7 @@ typedef struct metadata_tracking_event_t metadata_tracking_event_t;
     Additional note on payload details
     EOS does not have any Payload definition for HLOS client.
     EOS payload for internal propagation within SPF is defined by module_cmn_md_eos_t in \module_cmn_metadata.h
-    EOS payload for internal propagation between SPF instances (MDF) is defined by module_cmn_md_eos_ext_t in \offload_metatdata_api.h
+    EOS payload for internal propagation between SPF instances (MDF) is defined by module_cmn_md_eos_ext_t in \offload_metadata_api.h
 */
 #define MODULE_CMN_MD_ID_EOS 				0x0A00100C
 

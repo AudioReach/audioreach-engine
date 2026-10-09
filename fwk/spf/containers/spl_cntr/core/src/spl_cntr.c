@@ -20,6 +20,7 @@
 #include "graph_utils.h"
 #include "posal_power_mgr.h"
 #include "posal_queue.h"
+#include "spl_cntr_ipc_fwk_ext.h"
 
 /* =======================================================================
 Declarations
@@ -89,7 +90,11 @@ static const cu_cntr_vtable_t spl_cntr_cntr_funcs = {
 
    .handle_cntr_period_change                = spl_cntr_handle_cntr_period_change,
    .handle_cntr_set_calibration_ops_done     = spl_cntr_handle_cntr_set_calibration_ops_done,
-   .handle_cntr_set_offload_voice_session_info = spl_cntr_handle_offload_voice_session_info
+   .handle_cntr_set_offload_voice_session_info = spl_cntr_handle_offload_voice_session_info,
+
+   .ipc_port_ext_in_data_trigger_handler          = spl_cntr_ipc_input_data_q_trigger,
+   .ipc_port_ext_out_data_trigger_handler         = spl_cntr_ipc_output_data_q_trigger,
+   .get_and_update_fwk_extn_ipc_port_msg_cb_info = spl_cntr_get_and_update_fwk_extn_ipc_port_msg_cb_info,
 
 };
 // clang-format on
@@ -127,6 +132,7 @@ const cu_msg_handler_t spl_cntr_cmd_handler_table[] = {
    { SPF_MSG_CMD_MEDIA_FORMAT, spl_cntr_ctrl_path_media_fmt },
    { SPF_MSG_CMD_REGISTER_CFG, spl_cntr_set_get_cfg },
    { SPF_MSG_CMD_DEREGISTER_CFG, spl_cntr_set_get_cfg },
+   { SPF_MSG_CMD_IPC_PORT_FWK_EXTN_GPR, spl_cntr_handle_ipc_port_gpr_cmd },
 };
 
 // clang-format off
@@ -162,6 +168,7 @@ static const topo_to_cntr_vtable_t topo_to_spl_cntr_vtable = {
    .notify_ts_disc_evt                             = NULL,
    .module_buffer_access_event                     = NULL,
    .check_if_any_ext_in_has_to_preserve_prebuffer  = NULL,
+   .handle_ipc_data_link_info_event             = spl_cntr_handle_ipc_data_link_info_event,
 };
 // clang-format on
 

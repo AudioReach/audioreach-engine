@@ -681,6 +681,7 @@ ar_result_t apm_cfg_container_prop(apm_container_t *container_node_ptr, uint8_t 
          case APM_CONTAINER_PROP_ID_THREAD_SCHED_POLICY:
          case APM_CONTAINER_PROP_ID_THREAD_CORE_AFFINITY:
          case APM_CONTAINER_PROP_ID_FRAME_SIZE:
+         case APM_CONTAINER_PROP_ID_OPERATION_MODE:
          {
             break;
          }
@@ -2549,7 +2550,8 @@ ar_result_t apm_parse_module_ctrl_link_cfg_list(apm_t *  apm_info_ptr,
             /** If the control link being closed is within the single
              *  container, then link info need to be sent as is to the
              *  container as there are no port handles. */
-            if ((module_node_ptr_list[PEER_1_MODULE]->host_cont_ptr->container_id) ==
+            if (module_node_ptr_list[PEER_1_MODULE] && module_node_ptr_list[PEER_2_MODULE] &&
+                 (module_node_ptr_list[PEER_1_MODULE]->host_cont_ptr->container_id) ==
                 (module_node_ptr_list[PEER_2_MODULE]->host_cont_ptr->container_id))
             {
                /** Pointer to this container's running list of module control

@@ -42,6 +42,7 @@ extern "C" {
 
 #include "gen_topo.h"
 #include "gen_topo_buf_mgr.h"
+#include "spl_cntr_ipc_fwk_ext.h"
 
 /* =======================================================================
 SPL_CNTR Macros
@@ -110,7 +111,7 @@ SPL_CNTR Macros
    // #define SPL_CNTR_LOG_AT_OUTPUT TRUE
 #else
    // Don't change this line.
-   #define SPL_CNTR_DEBUG_LEVEL SPL_CNTR_DEBUG_LEVEL_NONE
+   // #define SPL_CNTR_DEBUG_LEVEL SPL_CNTR_DEBUG_LEVEL_NONE
 #endif
 
 // #define SPL_CNTR_RESYNC_MASK            0x80000000
@@ -152,6 +153,8 @@ resource allocation and initialization.
 #define SPL_CNTR_EXT_OUT_PORT_SIZE_W_QS (ALIGNED_SIZE_W_QUEUES(spl_cntr_ext_out_port_t, 1))
 #define SPL_CNTR_INT_CTRL_PORT_SIZE_W_QS (ALIGNED_SIZE_W_QUEUES(spl_cntr_int_ctrl_port_t, 0))
 
+#define SPL_CNTR_EXT_IN_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(spl_cntr_ext_in_port_t)))
+#define SPL_CNTR_EXT_OUT_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(spl_cntr_ext_out_port_t)))
 #define SPL_CNTR_EXT_CTRL_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(spl_cntr_ext_ctrl_port_t)))
 #define SPL_CNTR_INT_CTRL_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(spl_cntr_int_ctrl_port_t)))
 
@@ -633,7 +636,7 @@ static inline void spl_cntr_remove_ext_in_port_from_gpd_mask(spl_cntr_t *me_ptr,
                      ext_in_port_ptr->cu.bit_mask);
 }
 
-static inline void spl_cntr_add_ext_in_port_from_gpd_mask(spl_cntr_t *me_ptr, spl_cntr_ext_in_port_t *ext_in_port_ptr)
+static inline void spl_cntr_add_ext_in_port_to_gpd_mask(spl_cntr_t *me_ptr, spl_cntr_ext_in_port_t *ext_in_port_ptr)
 {
   cu_set_bits_in_x(&me_ptr->gpd_mask, ext_in_port_ptr->cu.bit_mask);
   cu_set_bits_in_x(&me_ptr->gpd_mask_arr[ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->path_index],
@@ -647,7 +650,7 @@ static inline void spl_cntr_remove_ext_out_port_from_gpd_mask(spl_cntr_t *me_ptr
                      ext_out_port_ptr->cu.bit_mask);
 }
 
-static inline void spl_cntr_add_ext_out_port_from_gpd_mask(spl_cntr_t *me_ptr, spl_cntr_ext_out_port_t *ext_out_port_ptr)
+static inline void spl_cntr_add_ext_out_port_to_gpd_mask(spl_cntr_t *me_ptr, spl_cntr_ext_out_port_t *ext_out_port_ptr)
 {
   cu_set_bits_in_x(&me_ptr->gpd_mask, ext_out_port_ptr->cu.bit_mask);
   cu_set_bits_in_x(&me_ptr->gpd_mask_arr[ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->path_index],
@@ -686,6 +689,49 @@ uint32_t spl_cntr_aggregate_ext_in_port_delay_topo_cb(gen_topo_t *topo_ptr, gu_e
 uint32_t spl_cntr_aggregate_ext_out_port_delay_topo_cb(gen_topo_t *topo_ptr, gu_ext_out_port_t *gu_ext_out_port_ptr);
 uint32_t spl_cntr_get_additional_ext_in_port_delay_cu_cb(cu_base_t *base_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr);
 uint32_t spl_cntr_get_additional_ext_out_port_delay_cu_cb(cu_base_t *base_ptr, gu_ext_out_port_t *gu_ext_out_port_ptr);
+
+ar_result_t spl_cntr_handle_events_after_cmds(spl_cntr_t *me_ptr, bool_t is_ack_cmd, ar_result_t rsp_result);
+
+/**
+ * Used to remove a bit from the gpd mask. Handles modifying send_to_topo as well.
+ */
+static inline void spl_cntr_ext_in_port_clear_gpd_mask(spl_cntr_t *me_ptr, spl_cntr_ext_in_port_t *ext_in_port_ptr)
+{
+   gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
+   spl_cntr_remove_ext_in_port_from_gpd_mask(me_ptr, ext_in_port_ptr);
+   cu_clear_bits_in_x(&me_ptr->gpd_optional_mask, ext_in_port_ptr->cu.bit_mask);
+
+   // Only send started ports to topo.
+   if ((TOPO_PORT_STATE_STARTED == in_port_ptr->common.state) &&
+       (spl_cntr_ext_in_port_local_buf_exists(ext_in_port_ptr)))
+   {
+      ext_in_port_ptr->topo_buf.send_to_topo = TRUE;
+   }
+   else
+   {
+      ext_in_port_ptr->topo_buf.send_to_topo = FALSE;
+   }
+}
+
+/**
+ * Used to remove a bit from the gpd mask. Handles modifying send_to_topo as well.
+ */
+static inline void spl_cntr_ext_out_port_clear_gpd_mask(spl_cntr_t *me_ptr, spl_cntr_ext_out_port_t *ext_out_port_ptr)
+{
+   spl_topo_output_port_t *out_port_ptr = (spl_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
+   spl_cntr_remove_ext_out_port_from_gpd_mask(me_ptr, ext_out_port_ptr);
+   cu_clear_bits_in_x(&me_ptr->gpd_optional_mask, ext_out_port_ptr->cu.bit_mask);
+
+   // Only send only started ports to topo.
+   if (TOPO_PORT_STATE_STARTED == out_port_ptr->t_base.common.state)
+   {
+      ext_out_port_ptr->topo_buf.send_to_topo = TRUE;
+   }
+   else
+   {
+      ext_out_port_ptr->topo_buf.send_to_topo = FALSE;
+   }
+}
 
 #ifdef __cplusplus
 }

@@ -625,6 +625,54 @@ typedef struct apm_cont_prop_id_frame_size_t apm_cont_prop_id_frame_size_t;
 
 /*--------------------------------------------------------------------------------------------------------------------*/
 
+
+/*--------------------------------------------------------------------------------------------------------------------*/
+/** @ingroup spf_apm_container_props
+    Container property identifier for container's mode of operation.
+
+    @msgpayload
+    apm_cont_prop_id_operation_mode_t
+*/
+#define APM_CONTAINER_PROP_ID_OPERATION_MODE 0x08001B92
+
+/** @ingroup spf_apm_container_props
+    In default mode of operation, containers support legacy behavior or the default properties
+    of each contianer.*/
+#define APM_CONT_DEFAULT_MODE_OF_OPERATION 0x0
+
+/** @ingroup spf_apm_container_props
+    Control only mode implies that container can only handle control command and doesn't handle
+    any data path. Currently GC, SC, PTC and wear containers support  only default mode of operation.
+    Only OLC supports control only mode of operation in the new MDF architecture where OLC is not
+    expected to host any data processing modules like Wr/Rd Shm clients. */
+#define APM_CONT_CONTROL_ONLY_MODE_OF_OPERATION 0x1
+
+/*# @h2xmlp_property    {"Container mode of operation", APM_CONTAINER_PROP_ID_OPERATION_MODE}
+    @h2xmlp_description {Configures container's mode of operation.} */
+
+/** @ingroup spf_apm_container_props
+    Payload for #APM_CONTAINER_PROP_ID_OPERATION_MODE.
+ */
+#include "spf_begin_pack.h"
+struct apm_cont_prop_id_operation_mode_t
+{
+   uint32_t mode_of_operation;
+   /*#<
+        @h2xmle_description { Configures the container's mode of operation.
+
+                                @valuesbul
+                                - #APM_CONT_DEFAULT_MODE_OF_OPERATION
+                                - #APM_CONT_CONTROL_ONLY_MODE_OF_OPERATION @tablebulletend  }
+        @h2xmle_rangeList   {"Default mode of operation"=APM_CONT_DEFAULT_MODE_OF_OPERATION,
+                             "Control mode of operation"=APM_CONT_CONTROL_ONLY_MODE_OF_OPERATION}
+        @h2xmle_default     {APM_CONT_DEFAULT_MODE_OF_OPERATION}*/
+}
+#include "spf_end_pack.h"
+;
+typedef struct apm_cont_prop_id_operation_mode_t apm_cont_prop_id_operation_mode_t;
+/*--------------------------------------------------------------------------------------------------------------------*/
+
+
 /*--------------------------------------------------------------------------------------------------------------------*/
 /*# @}                   <-- End of container_cfg -->*/
 

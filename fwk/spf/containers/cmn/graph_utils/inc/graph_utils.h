@@ -185,8 +185,11 @@ typedef struct gu_ext_out_port_t
 
 typedef struct gu_cmn_port_flags_t
 {
-   uint8_t mark : 1;          /**< for graph sort usage */
-   uint8_t elementary_pending_attachment : 1;     /**< used only for output ports - TRUE means downstream module is an elementary module and pending attachment. */
+   uint8_t mark : 1;                          /**< for graph sort usage */
+   uint8_t elementary_pending_attachment : 1; /**< used only for output ports - TRUE means downstream module is an
+                                                 elementary module and pending attachment. */
+   uint8_t
+      is_ipc_port : 1; /**< applicable for data ports - TRUE means this is an IPC port, FALSE - regular data port. */
 } gu_cmn_port_flags_t;
 
 /**
@@ -197,7 +200,10 @@ typedef struct gu_cmn_port_t
    uint32_t            id;         /**< This is the ID of the port. Index of the port (CAPIv2 requirement) is different. Framework sets ID <->
                                           Index mapping to the module.*/
    gu_module_t *       module_ptr; /**< Ptr of the module to which this input port belongs */
-   uint8_t             index;      /**< index (0 to num_ports) is determined by number of active ports */
+   uint8_t
+      index; /**< index (0 to num_ports) is determined by number of active ports. Index is set sequentially as long
+                a module has only IPC or regular ports. If there is a mix of port index assignment will have duplicates
+                between IPC and regular ports. Check gu_move_port_to_smallest_available_index() */
    gu_cmn_port_flags_t flags;
    gu_status_t         gu_status;
 } gu_cmn_port_t;
@@ -330,30 +336,43 @@ typedef struct gu_module_t
                               AMDB_MODULE_TYPE_DETECTOR, AMDB_MODULE_TYPE_GENERATOR, AMDB_MODULE_TYPE_PP, AMDB_MODULE_TYPE_END_POINT */
    uint8_t  itype;       /**< interface type of the module: CAPI or STUB */
 
-   uint8_t  max_input_ports;
-   uint8_t  max_output_ports;
+   // max ports is sum of both regular and IPC ports
+   uint8_t max_input_ports;
+   uint8_t max_output_ports;
 
-   uint8_t  min_input_ports;
-   uint8_t  min_output_ports;
+   // Number of input ports sum of both regular and IPC ports.
+   uint8_t min_input_ports;
+   uint8_t min_output_ports;
 
-   uint8_t  num_input_ports;
-   uint8_t  num_output_ports;
-   uint8_t  num_ctrl_ports;
+   uint8_t num_input_ports;  // Num of elements in input_port_list_ptr
+   uint8_t num_output_ports; // Num of elements in output_port_list_ptr
+
+   uint8_t  num_ipc_input_ports; // Num of elements in ipc_input_port_list_ptr
+   uint8_t  num_ipc_output_ports; // Num of elements in ipc_output_port_list_ptr
+
+
+   uint8_t num_ctrl_ports;
 
    gu_status_t gu_status;
 
-   uint8_t path_index;   /**< identifier in case there are multiple parallel paths in the topo. */
-   gu_module_flags_t flags;
-   gu_input_port_list_t * input_port_list_ptr;  /**< gu_input_port_t */
+   uint8_t                path_index; /**< identifier in case there are multiple parallel paths in the topo. */
+   gu_module_flags_t      flags;
+   gu_input_port_list_t  *input_port_list_ptr;  /**< gu_input_port_t */
    gu_output_port_list_t *output_port_list_ptr; /**< gu_output_port_t */
+
+   // even though these ports are defined as lists, currently there is virutal limit of only 1 supported
+   // IPC port to optimize for the exisiting requirements. IPC ports have different handlers in ctrl and data path,
+   // thats why maintained in separate list to optimize port type checks.
+   gu_input_port_list_t  *ipc_input_port_list_ptr;  /**< gu_input_port_t */
+   gu_output_port_list_t *ipc_output_port_list_ptr; /**< gu_output_port_t */
 
    gu_ctrl_port_list_t *ctrl_port_list_ptr; /**< list of control ports connected to the module. */
 
-   gu_sg_t *   sg_ptr; /**< every module belongs to a subgraph. not port */
+   gu_sg_t *sg_ptr; /**< every module belongs to a subgraph. not port */
 
-   gu_output_port_t *host_output_port_ptr; /** NULL if no attached(elementary) module - points to host module's output port. */
+   gu_output_port_t
+      *host_output_port_ptr; /** NULL if no attached(elementary) module - points to host module's output port. */
 } gu_module_t;
-
 
 typedef enum gu_sg_mem_resource_type_t
 {
@@ -410,18 +429,30 @@ typedef struct gu_t
    uint32_t          log_id;        /**< logging id: see topo_utils.h LOG_ID_CNTR_TYPE_SHIFT etc */
    gu_sort_status_t  sort_status;   /**< indicates if sort was completed or not */
    uint8_t           num_subgraphs; /**< number of subgraphs */
-   uint8_t           num_ext_in_ports;
-   uint8_t           num_ext_out_ports;
+
+   uint8_t           num_ext_in_ports; // Num of ele in ext_in_port_list_ptr
+   uint8_t           num_ext_out_ports;  // Num of ele in ext_out_port_list_ptr
+
    uint8_t           num_ext_ctrl_ports;
+
+   uint8_t           num_ipc_ext_in_ports;  // Num of ele in ipc_ext_in_port_list_ptr
+   uint8_t           num_ipc_ext_out_ports; // Num of ele in ipc_ext_out_port_list_ptr
+
    uint8_t           num_parallel_paths; /**< number of parallel paths */
    gu_sg_list_t      *sg_list_ptr;   /**< list of subgraphs. Each node is a gu_sg_t.*/
    gu_module_list_t  *sorted_module_list_ptr; /**< sorted module list. Sorted in DAG order. Each node is gu_module_t. Modules could
                                                     belong to different subgraphs. sg_ptr->module_list_ptr is the primary list. */
+
    gu_ext_in_port_list_t *  ext_in_port_list_ptr;   /**< gu_ext_in_port_t */
    gu_ext_out_port_list_t * ext_out_port_list_ptr;  /**< gu_ext_out_port_t */
+
+   gu_ext_in_port_list_t *  ipc_ext_in_port_list_ptr;   /**< gu_ext_in_port_t */
+   gu_ext_out_port_list_t * ipc_ext_out_port_list_ptr;  /**< gu_ext_out_port_t */
+
    gu_ext_ctrl_port_list_t *ext_ctrl_port_list_ptr; /**< List of control ports to the graph.*/
+
    posal_mutex_t            prof_mutex;             /**< Mutex used to access profiling shared resources */
-   uint32_t container_instance_id;                   /**< instance id of container */
+   uint32_t           container_instance_id;        /**< instance id of container */
 
    gu_async_graph_t *async_gu_ptr; /**< graph info which is kept hidden from the main gu while data path is running in parallel. This is used in open and close context. Don't use this directly from container and topo layer. */
 
@@ -431,7 +462,6 @@ typedef struct gu_t
    uint32_t       is_sync_cmd_context_; /**< if greater than zero then it means that the command handling is currently running synchronously with data-path processing. */
 #endif
 } gu_t;
-
 
 /* structure which temporarily holds the graph information which is either not yet added into the primary gu (open) or just unlinked from the primary gu (close).
  * */
@@ -538,8 +568,7 @@ static inline ar_result_t gu_deinit_ext_ctrl_port(gu_ext_ctrl_port_t *ext_ctrl_p
    return AR_EFAILED;
 }
 
-void gu_prepare_cleanup_for_graph_open_failure(gu_t *                     gu_ptr,
-                                               spf_msg_cmd_graph_open_t * open_cmd_ptr);
+void gu_prepare_cleanup_for_graph_open_failure(gu_t *gu_ptr, spf_msg_cmd_graph_open_t *open_cmd_ptr);
 
 ar_result_t gu_respond_to_graph_open(gu_t *gu_ptr, spf_msg_t *cmd_msg_ptr, POSAL_HEAP_ID heap_id);
 
@@ -583,7 +612,6 @@ gu_input_port_t *gu_find_input_port(gu_module_t *module_ptr, uint32_t id);
 gu_output_port_t *gu_find_output_port(gu_module_t *module_ptr, uint32_t id);
 gu_output_port_t *gu_find_output_port_by_index(gu_module_t *module_ptr, uint32_t index);
 gu_input_port_t *gu_find_input_port_by_index(gu_module_t *module_ptr, uint32_t index);
-gu_cmn_port_t *gu_find_port_by_index(spf_list_node_t *list_ptr, uint32_t index);
 
 gu_ctrl_port_t *gu_find_ctrl_port_by_id(gu_module_t *module_ptr, uint32_t id);
 
@@ -701,6 +729,69 @@ static inline gu_t* get_gu_ptr_for_current_command_context(gu_t* gu_ptr)
 {
 	return (gu_ptr->async_gu_ptr)? &gu_ptr->async_gu_ptr->gu: gu_ptr;
 }
+
+/*
+ * Helper function to update state of graph components.
+ * All states are not always valid, e.g. if state is NEW, it should not be changed to updated
+ */
+static inline void gu_set_status(gu_status_t *status_to_update, gu_status_t status_value)
+{
+   // Reject the status update if moving from NEW to UPDATED.
+   if ((GU_STATUS_NEW == *status_to_update) && (GU_STATUS_UPDATED == status_value))
+   {
+      return;
+   }
+   *status_to_update = status_value;
+}
+
+ar_result_t gu_insert_data_port(gu_t *            gu_ptr,
+                                 gu_module_t *     module_ptr,
+                                 spf_list_node_t **list_pptr,
+                                 gu_cmn_port_t *   port_ptr,
+                                 POSAL_HEAP_ID     heap_id);
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////// IPC ports related API ////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+#define IS_IPC_INPUT TRUE
+#define IS_IPC_OUTPUT FALSE
+
+// this function returns is a given input port is an IPC port
+static inline bool_t gu_is_ipc_input_port(gu_input_port_t *in_port_ptr)
+{
+   return (in_port_ptr && in_port_ptr->cmn.flags.is_ipc_port);
+}
+
+static inline bool_t gu_is_ipc_output_port(gu_output_port_t *out_port_ptr)
+{
+   return (out_port_ptr && out_port_ptr->cmn.flags.is_ipc_port);
+}
+
+// this function returns is a given input port is an IPC port
+static inline bool_t gu_is_ipc_ext_input_port(gu_ext_in_port_t *ext_in_port_ptr)
+{
+   return (ext_in_port_ptr && ext_in_port_ptr->int_in_port_ptr &&
+           ext_in_port_ptr->int_in_port_ptr->cmn.flags.is_ipc_port);
+}
+
+static inline bool_t gu_is_ipc_ext_output_port(gu_ext_out_port_t *ext_out_port_ptr)
+{
+   return (ext_out_port_ptr && ext_out_port_ptr->int_out_port_ptr &&
+           ext_out_port_ptr->int_out_port_ptr->cmn.flags.is_ipc_port);
+}
+
+ar_result_t gu_insert_ipc_input_port(gu_t            *gu_ptr,
+                                     gu_module_t     *module_ptr,
+                                     gu_input_port_t *input_port_ptr,
+                                     POSAL_HEAP_ID    heap_id);
+
+ar_result_t gu_insert_ipc_output_port(gu_t             *gu_ptr,
+                                      gu_module_t      *module_ptr,
+                                      gu_output_port_t *output_port_ptr,
+                                      POSAL_HEAP_ID     heap_id);
+
+bool_t gu_does_module_needs_ipc_port(gu_module_t *module_ptr, bool_t is_input_port);
 
 #ifdef __cplusplus
 }

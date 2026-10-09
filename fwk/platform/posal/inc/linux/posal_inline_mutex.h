@@ -46,6 +46,10 @@ static inline ar_result_t posal_inline_mutex_init(posal_inline_mutex_t *pposal_m
     pthread_mutex_t* mutex = NULL;
     pthread_mutexattr_t attr;
     mutex = ((pthread_mutex_t *) malloc(sizeof(pthread_mutex_t)));
+    if (NULL == mutex)
+    {
+        return AR_ENOMEMORY;
+    }
     pthread_mutexattr_init(&attr);
 #if defined(ARSPF_PLATFORM_QNX)
     pthread_mutexattr_setrecursive(&attr, PTHREAD_RECURSIVE_ENABLE);

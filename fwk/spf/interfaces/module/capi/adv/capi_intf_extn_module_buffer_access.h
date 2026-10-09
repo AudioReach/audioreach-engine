@@ -25,7 +25,7 @@ extern "C" {
 @{ */
 
 /** Unique identifier to check if a given module support this extension. */
-#define INTF_EXTN_MODULE_BUFFER_ACCESS 0x0A000BAD
+#define INTF_EXTN_MODULE_BUFFER_ACCESS 0x0A001061
 
 /**
    Event ID used by module to inform the framework that it can access module's buffer for processing data
@@ -100,7 +100,7 @@ extern "C" {
     @msgpayload{intf_extn_event_id_module_buffer_access_enable_t}
     @tablens{weak__intf__extn__event__id__module__buffer__access__enable__t}
 */
-#define INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE 0x0A001BAD
+#define INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE 0x0A001062
 
 typedef struct intf_extn_event_id_module_buffer_access_enable_t intf_extn_event_id_module_buffer_access_enable_t;
 
@@ -171,6 +171,53 @@ struct intf_extn_output_buffer_manager_cb_info_t
     */
 };
 /** @} */ /* end_weakgroup intf_extn_output_buffer_manager_cb_info_t */
+
+#define INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE_V2 0x0A001060
+
+typedef struct intf_extn_event_id_module_buffer_access_enable_v2_t intf_extn_event_id_module_buffer_access_enable_v2_t;
+
+typedef capi_err_t (*intf_extn_get_module_port_buf_func_v2_t)(uint32_t    buffer_mgr_cb_handle,
+                                                            uint32_t    port_index,
+                                                            uint32_t   *num_bufs,
+                                                            capi_buf_t *buffer_ptr);
+
+typedef capi_err_t (*intf_extn_return_module_port_buf_func_v2_t)(uint32_t    buffer_mgr_cb_handle,
+                                                                uint32_t    port_index,
+                                                                uint32_t   *num_bufs,
+                                                                capi_buf_t *buffer_ptr);
+
+/** @weakgroup intf_extn_event_id_module_buffer_access_enable_v2_t
+@{ */
+struct intf_extn_event_id_module_buffer_access_enable_v2_t
+{
+   uint32_t enable;
+   /** 1. Indicates if the extension is supported or not.
+       2. At any given point, if the module disablse the extn, fwk is expected to immediately return the buffers shared
+      by the modules. If process gets called without returning buffers module's can return error. */
+
+   uint32_t buffer_mgr_cb_handle;
+   /** indicates if the extension is supported or not. At any given point, if the module disable the extn, fwk is
+    * expected to immediately return the buffers shared by the modules.*/
+
+   intf_extn_get_module_port_buf_func_v2_t get_port_buf_fn;
+   /* Framework uses this to request the module to share port buffer to process. This function can be used to query buffer
+    * for input/output ports. If the module provides the buffer for a given port, fwk assigns the same data buffer to the corresponding
+    * ports capi_stream_data_v2_t when it calls capi process().
+
+    * If module doesnt provide the buffer or returns an CAPI error framework assigns a topo buffer
+    * for that port before calling the process.
+    *
+    * Framework calls the module process with the same as the capi stream buffer, this marks return of the buffer to module.
+    *
+    * If the fwk wants to return the buffer before it calls the process for any reason, it can use return_port_buf_fn() for
+    * example if graph stops or there is an algorithmic reset.*/
+
+   intf_extn_return_module_port_buf_func_v2_t return_port_buf_fn;
+   /** For module framework uses this function only to return buffer back once processing or buffer is not needed
+    * anymore due to graph commands. If module returns error for free and need to handle recovery if possible.
+    */
+};
+/** @} */ /* end_weakgroup intf_extn_event_id_module_buffer_access_enable_v2_t */
 
 /** @} */ /* end_addtogroup capi_if_ext_module_buffer_access */
 #ifdef __cplusplus

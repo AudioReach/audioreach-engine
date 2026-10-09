@@ -33,7 +33,7 @@ extern "C" {
 #define GATE_MAX_INTENTS_PER_CTRL_PORT 1
 #define GATE_MAX_CONTROL_PORTS 1
 #define CAPI_GATE_KPPS 50
-#define GATE_NUM_FRAMEWORK_EXTENSIONS 1
+#define GATE_NUM_FRAMEWORK_EXTENSIONS 2
 #define GATE_NUM_US_PER_MS 1000
 #define GATE_SCHEDULING_JITTER_US 100
 //#define GATE_DBG 1
@@ -94,6 +94,13 @@ typedef struct capi_gate_t
 
    int32_t deadline_offset_us;
    /* Deadline offset in micro seconds */
+
+   uint32_t frame_size_scale_factor_override;
+   /* Scale frame size by this factor to derive frame proc duration, by overriding default calculated proc duration */
+
+   uint32_t frame_size_us;
+   /* Set container frame size(purely based on threshold and not scaled frame size) */
+
 } capi_gate_t;
 
 /* clang-format on */
