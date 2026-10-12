@@ -1,0 +1,90 @@
+'''
+/*==============================================================================
+@file ext.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.Append(CFLAGS = '-Wno-tautological-compare')
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS = '-ffunction-sections')
+
+core_public_apis = [
+   'DAL',
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'CDF', 'SHARED_LIBRARY_INC_PATHS', 'CAPI_LIBRARY_FACTORY', 'MODULE_INTERFACES_UTILS'])
+env.RequireProtectedApi('AVS')
+env.RequirePublicApi([
+  'AMDB',
+])
+env.RequireRestrictedApi('AVS_CONVERTER_PROFILE')
+
+
+platform_public_apis = [
+    'QAIC',
+    'STDDEF',
+    'HAPSDK'
+    ]
+
+env.RequirePublicApi(platform_public_apis, area='platform') # This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+
+env.PublishPrivateApi('AVS',[
+   '../core/inc',
+   '../core/src',
+   '../core/build',
+   '../cmn/inc',
+   '../cmn_sh_mem/inc',
+   ])
+'''
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'CompDecomContainer'
+#import pdb; pdb.set_trace()
+
+items = env.GetSoftwareUnits()
+ 
+x = items.get('LIBS')
+
+avs_reg_sources = list(x)
+avs_stub_sources = []
+avs_fwk_sources = []
+island_reg_sources = []
+island_stub_sources = []
+
+for i in x: 
+    print i.name
+    if "_stub" in i.name:
+        avs_stub_sources.append(i)
+        avs_fwk_sources.remove(i)
+    if "_island" in i.name:
+        if 'USES_AUDIO_IN_ISLAND' in env:
+            #island_reg_sources.append(i)
+            avs_reg_sources.remove(i)
+# Generate  source file list
+
+
+if 'USES_AUDIO_IN_ISLAND' in env:
+    if 'USES_AVS_LIBRARY_BUILDER' in env:
+        env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME, [avs_reg_sources, avs_stub_sources, avs_fwk_sources], 'MOD',PACK_SRC=True)
+    get_island_lib = env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME+'_island', [island_reg_sources, island_stub_sources], 'MOD',PACK_SRC=True)
+    
+else:
+            
+if 'USES_AVS_LIBRARY_BUILDER' in env:
+    env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME, [avs_reg_sources, avs_stub_sources, avs_fwk_sources], 'MOD',PACK_SRC=True)
+   
+'''
+env.LoadSoftwareUnits()         
+
+

@@ -301,24 +301,9 @@ ar_result_t posal_thread_launch3(posal_thread_t     *posal_obj_ptr,
           nPriority);
 #endif /* DEBUG_POSAL_THREAD */
 
-/* Med prio debug message to help associate thread name with thread ID
- * Due to Qshrink requirement of not supporting varaible string,
- * thread name has to be printed out in Hex. */
-#if defined(ARSPF_PLATFORM_QNX) || defined(ARSPF_PLATFORM_LRH)
-   AR_MSG(DBG_MED_PRIO, "THRD CREATE: Thread=0x%x Name = %s", thrd_obj_ptr->tid, threadname);
-#else
-   AR_MSG(DBG_HIGH_PRIO,
-          "THRD CREATE: Thread=0x%x Name(Hex)= %x, %x, %x, %x, %x, %x, %x, %x",
-          thrd_obj_ptr->tid,
-          threadname[0],
-          threadname[1],
-          threadname[2],
-          threadname[3],
-          threadname[4],
-          threadname[5],
-          threadname[6],
-          threadname[7]);
-#endif
+/* High prio debug message to help associate thread name with thread ID*/
+
+   AR_MSG(DBG_HIGH_PRIO, "THRD CREATE: Thread=0x%x Name = %s", thrd_obj_ptr->tid, threadname);
 
    goto done;
 

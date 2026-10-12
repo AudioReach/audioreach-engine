@@ -620,7 +620,7 @@ ar_result_t irm_get_cfg(irm_t                   *irm_ptr,
                     cmn_capabilities_ptr,
                     sizeof(irm_system_capabilities_t));
 
-            *error_code_ptr |= irm_send_get_cfg_cmd_to_satellite(irm_ptr,
+            ar_result_t send_result = irm_send_get_cfg_cmd_to_satellite(irm_ptr,
                                                                  APM_CMD_GET_CFG,
                                                                  PARAM_ID_IRM_SYSTEM_CAPABILITIES,
                                                                  host_domain_id,
@@ -630,7 +630,15 @@ ar_result_t irm_get_cfg(irm_t                   *irm_ptr,
                                                                  (uint8_t *)cmn_capabilities_ptr,
                                                                  param_ptr,
                                                                  *curr_cmd_ctrl_pptr);
+            *error_code_ptr |= send_result;
 
+            // If the first call fails and frees curr_cmd_ctrl_ptr, break to avoid double free
+            if (AR_DID_FAIL(send_result))
+            {
+               *curr_cmd_ctrl_pptr = NULL; // Mark as freed to prevent further use
+               break;
+            }
+            // TODO: Need to handle when we have multiple satellite domains and more than one sat pd get cfg is failed.
             cmn_capabilities_ptr++;
          }
 

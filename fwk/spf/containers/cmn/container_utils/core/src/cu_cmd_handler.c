@@ -1480,30 +1480,32 @@ ar_result_t cu_unsupported_cmd(cu_base_t *me_ptr)
    return AR_EUNSUPPORTED;
 }
 
-ar_result_t cu_cmd_icb_info_from_downstream(cu_base_t *base_ptr)
+ar_result_t cu_ext_out_handle_icb_info_from_downstream(cu_base_t                     *base_ptr,
+                                                       spf_msg_cmd_inform_icb_info_t *ds_icb_info_ptr,
+                                                       gu_ext_out_port_t             *gu_ext_out_port_ptr)
 {
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
 
-   spf_msg_header_t              *header_ptr          = (spf_msg_header_t *)base_ptr->cmd_msg.payload_ptr;
-   spf_msg_cmd_inform_icb_info_t *ds_icb_info_ptr     = (spf_msg_cmd_inform_icb_info_t *)&header_ptr->payload_start;
-   gu_ext_out_port_t             *gu_ext_out_port_ptr = (gu_ext_out_port_t *)header_ptr->dst_handle_ptr;
-   cu_ext_out_port_t             *ext_out_port_ptr =
+   cu_ext_out_port_t *ext_out_port_ptr =
       (cu_ext_out_port_t *)(((uint8_t *)gu_ext_out_port_ptr + base_ptr->ext_out_port_cu_offset));
+   //gu_module_t *gu_module_ptr = gu_ext_out_port_ptr->int_out_port_ptr->cmn.module_ptr;
 
    topo_port_state_t out_port_sg_state =
       topo_sg_state_to_port_state(base_ptr->topo_vtbl_ptr->get_sg_state(gu_ext_out_port_ptr->sg_ptr));
 
-   ext_out_port_ptr->icb_info.ds_frame_len.frame_len_samples = ds_icb_info_ptr->downstream_frame_len_samples;
-   ext_out_port_ptr->icb_info.ds_frame_len.frame_len_us      = ds_icb_info_ptr->downstream_frame_len_us;
-   ext_out_port_ptr->icb_info.ds_frame_len.sample_rate       = ds_icb_info_ptr->downstream_sample_rate;
-   ext_out_port_ptr->icb_info.ds_period_us                   = ds_icb_info_ptr->downstream_period_us;
-   ext_out_port_ptr->icb_info.ds_flags.variable_input        = ds_icb_info_ptr->downstream_consumes_variable_input;
-   ext_out_port_ptr->icb_info.ds_flags.is_real_time          = ds_icb_info_ptr->downstream_is_self_real_time;
-   ext_out_port_ptr->icb_info.ds_sid                         = ds_icb_info_ptr->downstream_sid;
-   ext_out_port_ptr->icb_info.ds_flags.is_default_single_buffering_mode =
-      (ds_icb_info_ptr->downstream_set_single_buffer_mode) ? TRUE : FALSE;
-
+   if(NULL != ds_icb_info_ptr)
+   {
+      ext_out_port_ptr->icb_info.ds_frame_len.frame_len_samples = ds_icb_info_ptr->downstream_frame_len_samples;
+      ext_out_port_ptr->icb_info.ds_frame_len.frame_len_us      = ds_icb_info_ptr->downstream_frame_len_us;
+      ext_out_port_ptr->icb_info.ds_frame_len.sample_rate       = ds_icb_info_ptr->downstream_sample_rate;
+      ext_out_port_ptr->icb_info.ds_period_us                   = ds_icb_info_ptr->downstream_period_us;
+      ext_out_port_ptr->icb_info.ds_flags.variable_input        = ds_icb_info_ptr->downstream_consumes_variable_input;
+      ext_out_port_ptr->icb_info.ds_flags.is_real_time          = ds_icb_info_ptr->downstream_is_self_real_time;
+      ext_out_port_ptr->icb_info.ds_sid                         = ds_icb_info_ptr->downstream_sid;
+      ext_out_port_ptr->icb_info.ds_flags.is_default_single_buffering_mode =
+         (ds_icb_info_ptr->downstream_set_single_buffer_mode) ? TRUE : FALSE;
+   }
    CU_MSG(base_ptr->gu_ptr->log_id,
           DBG_HIGH_PRIO,
           "ICB: Received ICB info from downstream of Module (0x%lX, %lX) - "
@@ -1520,7 +1522,14 @@ ar_result_t cu_cmd_icb_info_from_downstream(cu_base_t *base_ptr)
    /** handle only in start state. in other states, prepare will take care of this.*/
    if ((TOPO_PORT_STATE_PREPARED == out_port_sg_state) || (TOPO_PORT_STATE_STARTED == out_port_sg_state))
    {
-      TRY(result, base_ptr->cntr_vtbl_ptr->ext_out_port_recreate_bufs((void *)base_ptr, gu_ext_out_port_ptr));
+      if (gu_is_ipc_ext_output_port(gu_ext_out_port_ptr))
+      {
+         TRY(result, cu_ipc_tx_handle_icb_info_from_ds((void *)base_ptr, gu_ext_out_port_ptr, ext_out_port_ptr));
+      }
+      else
+      {
+         TRY(result, base_ptr->cntr_vtbl_ptr->ext_out_port_recreate_bufs((void *)base_ptr, gu_ext_out_port_ptr));
+      }
    }
    else
    {

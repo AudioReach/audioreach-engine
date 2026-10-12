@@ -1,0 +1,14 @@
+'''
+/*==============================================================================
+@file ipc_tx.scons
+@brief 
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.H2xmlFileGenerate(env.subst('${AVS_ROOT}/spf/modules/ipc_tx/api'))
+
+env.LoadSoftwareUnits()
+

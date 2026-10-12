@@ -560,12 +560,13 @@ static ar_result_t gen_cntr_output_buf_set_up_gpr_client_v2(gen_cntr_t *        
    return result;
 }
 
-ar_result_t gen_cntr_output_buf_set_up_gpr_client(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr)
+ar_result_t gen_cntr_output_buf_set_up_gpr_client(cu_base_t *base_ptr, gu_ext_out_port_t *gu_ext_out_port_ptr)
 {
-   ar_result_t result = AR_EOK;
-
-   gpr_packet_t *packet_ptr;
-   uint32_t      gpr_opcode;
+   ar_result_t              result           = AR_EOK;
+   gen_cntr_t              *me_ptr           = (gen_cntr_t *)base_ptr;
+   gen_cntr_ext_out_port_t *ext_out_port_ptr = (gen_cntr_ext_out_port_t *)gu_ext_out_port_ptr;
+   gpr_packet_t            *packet_ptr;
+   uint32_t                 gpr_opcode;
 
    if (ext_out_port_ptr->out_buf_gpr_client.payload_ptr != NULL)
    {
@@ -1263,6 +1264,7 @@ void gen_cntr_propagate_metadata_gpr_client(gen_cntr_t *me_ptr, gen_cntr_ext_out
       }
 
       bool_t is_dropped = FALSE;
+
       // Client metadata should have already been written to read buffer and removed from list.
       // if it is still in the list, it implies it is getting dropped
       if (MODULE_CMN_MD_NEEDS_PROPAGATION_TO_CLIENT_BUFFER_ENABLE ==
@@ -1275,8 +1277,8 @@ void gen_cntr_propagate_metadata_gpr_client(gen_cntr_t *me_ptr, gen_cntr_ext_out
                                      node_ptr,
                                      is_dropped /*is_dropped*/,
                                      &ext_out_port_ptr->md_list_ptr,
-									 0,
-									 FALSE); // rendered
+                                     0,
+                                     FALSE); // rendered
 
       node_ptr = next_ptr;
    }

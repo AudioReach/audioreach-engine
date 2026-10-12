@@ -57,6 +57,9 @@ struct capi_prop_stm_trigger_t
    /**< The counter pointed to by this pointer is incremented by the module
     *   whenever the signal is set/raised by an interrupt.
     */
+#ifdef ENABLE_CNTR_PROC_TIME_PROFILING
+   uint64_t *isr_callback_ts_ptr;
+#endif
 };
 /** @} */ /* end_weakgroup weak_capi_prop_stm_trigger_t */
 

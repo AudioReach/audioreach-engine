@@ -35,6 +35,7 @@ const cu_msg_handler_t gen_cntr_cmd_handler_table[] = {
    { SPF_MSG_CMD_MEDIA_FORMAT, gen_cntr_ctrl_path_media_fmt_cmd },
    { SPF_MSG_CMD_REGISTER_CFG, gen_cntr_set_get_cfg },
    { SPF_MSG_CMD_DEREGISTER_CFG, gen_cntr_set_get_cfg },
+   { SPF_MSG_CMD_IPC_PORT_FWK_EXTN_GPR, gen_cntr_handle_ipc_port_gpr_cmd }
 };
 
 /* CU call back functions for container specific handling */
@@ -93,6 +94,11 @@ const cu_cntr_vtable_t gen_cntr_cntr_funcs = {
 
    .initiate_duty_cycle_island_entry         = gen_cntr_initiate_duty_cycle_island_entry,
    .initiate_duty_cycle_island_exit          = gen_cntr_initiate_duty_cycle_island_exit,
+
+   .ipc_port_ext_in_data_trigger_handler          = gen_cntr_input_dataQ_trigger,
+   .ipc_port_ext_out_data_trigger_handler         = gen_cntr_output_bufQ_trigger,
+
+   .get_and_update_fwk_extn_ipc_port_msg_cb_info = gen_cntr_get_and_update_fwk_extn_ipc_port_msg_cb_info,
 };
 
 const topo_to_cntr_vtable_t topo_to_gen_cntr_vtable = {
@@ -127,9 +133,11 @@ const topo_to_cntr_vtable_t topo_to_gen_cntr_vtable = {
    .check_for_error_print                       = gen_cntr_check_for_err_print,
 
    .notify_ts_disc_evt                          = gen_cntr_notify_timestamp_discontinuity_event_cb,
-   .module_buffer_access_event                  = NULL,
+   .module_buffer_access_event                  = gen_cntr_handle_module_buffer_access_event,
 
    .check_if_any_ext_in_has_to_preserve_prebuffer = gen_cntr_check_if_any_ext_in_has_to_preserve_prebuffer,
+
+   .handle_ipc_data_link_info_event = gen_cntr_handle_ipc_data_link_info_event,
 };
 
 // clang-format on

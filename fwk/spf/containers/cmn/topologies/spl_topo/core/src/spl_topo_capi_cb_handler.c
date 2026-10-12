@@ -481,6 +481,20 @@ capi_err_t spl_topo_capi_callback(void *context_ptr, capi_event_id_t id, capi_ev
                result = spl_topo_handle_data_port_activity_sync_event_cb(spl_topo_ptr, spl_topo_module_ptr, &dsp_event_ptr->payload);
                break;
             }
+            case FWK_EXTN_EVENT_ID_IPC_DATA_LINK_INFO:
+            {
+               if (topo_ptr->topo_to_cntr_vtable_ptr->handle_ipc_data_link_info_event)
+               {
+                  result = topo_ptr->topo_to_cntr_vtable_ptr->handle_ipc_data_link_info_event(topo_ptr,
+                                                                                              module_ptr,
+                                                                                              event_info_ptr);
+               }
+               else
+               {
+                  return CAPI_EUNSUPPORTED;
+               }
+               break;
+            }
             default:
             {
                result = spl_topo_ptr->t_base.topo_to_cntr_vtable_ptr->raise_data_to_dsp_service_event(module_ptr,

@@ -563,11 +563,12 @@ static ar_result_t gen_cntr_input_data_set_up_peer_cntr(gen_cntr_t             *
 /**
  * Encode (AEnc, VEnc), split A2DP (encode, decode), decode with ASM loopback, push mode.
  */
-ar_result_t gen_cntr_input_dataQ_trigger_peer_cntr(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr)
+ar_result_t gen_cntr_input_dataQ_trigger_peer_cntr(cu_base_t *base_ptr, gu_ext_in_port_t *gu_ext_in_port_ptr)
 {
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
-
+   gen_cntr_t             *me_ptr          = (gen_cntr_t *)base_ptr;
+   gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)gu_ext_in_port_ptr;
    // Take next msg off the q
    TRY(result, gen_cntr_get_input_data_cmd(me_ptr, ext_in_port_ptr));
 

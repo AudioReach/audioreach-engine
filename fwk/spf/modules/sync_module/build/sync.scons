@@ -1,0 +1,15 @@
+'''
+/*==============================================================================
+@file sync.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.H2xmlFileGenerate(env.subst('${AVS_ROOT}/spf/modules/sync_module/api'))
+
+env.LoadSoftwareUnits()
+

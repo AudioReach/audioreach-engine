@@ -17,6 +17,9 @@
 /* =======================================================================
 Static Function Definitions
 ========================================================================== */
+
+static ar_result_t olc_handle_sg_mgmt_cmd(cu_base_t *base_ptr, uint32_t sg_ops, topo_sg_state_t sg_state);
+
 /**
  * called for all use cases. both for internal and external clients.
  */
@@ -1204,10 +1207,11 @@ ar_result_t olc_graph_open(cu_base_t *base_ptr)
       gen_topo_set_default_media_fmt_at_open(&me_ptr->topo);
    }
 
-   graph_init_data.spf_handle_ptr = &me_ptr->cu.spf_handle;
-   graph_init_data.gpr_cb_fn      = cu_gpr_callback;
-   graph_init_data.capi_cb        = gen_topo_capi_callback;
-   graph_init_data.propagate_rdf  = TRUE;
+   graph_init_data.spf_handle_ptr    = &me_ptr->cu.spf_handle;
+   graph_init_data.gpr_cb_fn         = cu_gpr_callback;
+   graph_init_data.ipc_ext_gpr_cb_fn = cu_ipc_module_gpr_callback;
+   graph_init_data.capi_cb           = gen_topo_capi_callback;
+   graph_init_data.propagate_rdf     = TRUE;
    // Update gu structures based on changes to graph.
    TRY(result, gen_topo_create_modules(&me_ptr->topo, &graph_init_data));
    // stack_size = graph_init_data.max_stack_size;
@@ -1289,7 +1293,7 @@ ar_result_t olc_graph_prepare(cu_base_t *base_ptr)
    cmd_gmgmt_ptr = (spf_msg_cmd_graph_mgmt_t *)&header_ptr->payload_start;
    VERIFY(result, (NULL != cmd_gmgmt_ptr));
 
-   TRY(result, cu_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_PREPARE, TOPO_SG_STATE_PREPARED));
+   TRY(result, olc_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_PREPARE, TOPO_SG_STATE_PREPARED));
 
    // if the num of sub > 0, send the prepare command to satellite sub graph
    if (cmd_gmgmt_ptr->sg_id_list.num_sub_graph > 0)
@@ -1357,7 +1361,7 @@ ar_result_t olc_graph_start(cu_base_t *base_ptr)
 
    VERIFY(result, (1 == me_ptr->satellite_up_down_status));
 
-   TRY(result, cu_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_START, TOPO_SG_STATE_STARTED));
+   TRY(result, olc_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_START, TOPO_SG_STATE_STARTED));
 
    if (cmd_gmgmt_ptr->sg_id_list.num_sub_graph > 0)
    {
@@ -1423,7 +1427,7 @@ ar_result_t olc_graph_suspend(cu_base_t *base_ptr)
 
    VERIFY(result, (1 == me_ptr->satellite_up_down_status));
 
-   TRY(result, cu_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_SUSPEND, TOPO_SG_STATE_SUSPENDED));
+   TRY(result, olc_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_SUSPEND, TOPO_SG_STATE_SUSPENDED));
 
    if (cmd_gmgmt_ptr->sg_id_list.num_sub_graph > 0)
    {
@@ -1488,7 +1492,7 @@ ar_result_t olc_graph_stop(cu_base_t *base_ptr)
 
    VERIFY(result, (1 == me_ptr->satellite_up_down_status));
 
-   TRY(result, cu_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_STOP, TOPO_SG_STATE_STOPPED));
+   TRY(result, olc_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_STOP, TOPO_SG_STATE_STOPPED));
 
    if (cmd_gmgmt_ptr->sg_id_list.num_sub_graph > 0)
    {
@@ -1554,7 +1558,7 @@ ar_result_t olc_graph_flush(cu_base_t *base_ptr)
 
    VERIFY(result, (1 == me_ptr->satellite_up_down_status));
 
-   TRY(result, cu_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_FLUSH, TOPO_SG_STATE_INVALID));
+   TRY(result, olc_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_FLUSH, TOPO_SG_STATE_INVALID));
 
    if (cmd_gmgmt_ptr->sg_id_list.num_sub_graph > 0)
    {
@@ -1629,7 +1633,7 @@ ar_result_t olc_graph_close(cu_base_t *base_ptr)
    rsp_node_ptr->token      = 0;
    rsp_node_ptr->cmd_msg    = &me_ptr->cu.cmd_msg;
 
-   TRY(result, cu_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_CLOSE, TOPO_SG_STATE_STOPPED));
+   TRY(result, olc_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_CLOSE, TOPO_SG_STATE_STOPPED));
 
    if (1 == me_ptr->satellite_up_down_status)
    {
@@ -1660,8 +1664,7 @@ ar_result_t olc_graph_close(cu_base_t *base_ptr)
    OLC_MSG(log_id,
            DBG_HIGH_PRIO,
            "CMD:CLOSE:Done executing close command, "
-           "current channel mask=0x%x. result=0x%lx.",
-           me_ptr ? base_ptr->curr_chan_mask : 0,
+           "result=0x%lx.",
            result);
 
    // Catch here so we don't print an error on AR_ETERMINATED.
@@ -1770,7 +1773,7 @@ ar_result_t olc_graph_disconnect(cu_base_t *base_ptr)
            "current channel mask=0x%x",
            base_ptr->curr_chan_mask);
 
-   TRY(result, cu_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_DISCONNECT, TOPO_SG_STATE_INVALID));
+   TRY(result, olc_handle_sg_mgmt_cmd(base_ptr, TOPO_SG_OP_DISCONNECT, TOPO_SG_STATE_INVALID));
 
    CATCH(result, OLC_MSG_PREFIX, log_id)
    {
@@ -1809,8 +1812,7 @@ ar_result_t olc_destroy_container(cu_base_t *base_ptr)
    OLC_MSG(log_id,
            DBG_HIGH_PRIO,
            "CMD:DESTROY:Done destroy to down stream service. "
-           "current channel mask=0x%x. result=0x%lx.",
-           me_ptr->cu.curr_chan_mask,
+           "result=0x%lx.",
            result);
 
    // send AR_ETERMINATED so calling routine knows the destroyer has been invoked.
@@ -1954,6 +1956,11 @@ ar_result_t olc_icb_info_from_downstream(cu_base_t *base_ptr)
    olc_t *  me_ptr = (olc_t *)base_ptr;
    uint32_t log_id = me_ptr->topo.gu.log_id;
 
+   gu_ext_out_port_t *gu_ext_out_port_ptr =
+      (gu_ext_out_port_t *)(((spf_msg_header_t *)base_ptr->cmd_msg.payload_ptr)->dst_handle_ptr);
+   spf_msg_header_t             *header_ptr      = (spf_msg_header_t *)base_ptr->cmd_msg.payload_ptr;
+   spf_msg_cmd_inform_icb_info_t *ds_icb_info_ptr = (spf_msg_cmd_inform_icb_info_t *)&header_ptr->payload_start;
+
    OLC_MSG(log_id,
            DBG_HIGH_PRIO,
            "CMD:FRAME_LEN_DS: ICB: Executing ICB from DS. "
@@ -1962,7 +1969,7 @@ ar_result_t olc_icb_info_from_downstream(cu_base_t *base_ptr)
 
    VERIFY(result, (1 == me_ptr->satellite_up_down_status));
 
-   TRY(result, cu_cmd_icb_info_from_downstream(base_ptr));
+   TRY(result, cu_ext_out_handle_icb_info_from_downstream(base_ptr, ds_icb_info_ptr, gu_ext_out_port_ptr));
 
    CATCH(result, OLC_MSG_PREFIX, log_id)
    {
@@ -2151,6 +2158,48 @@ ar_result_t olc_register_events_utils(cu_base_t *       base_ptr,
                                       bool_t *          capi_supports_v1_event_ptr)
 {
    ar_result_t result = AR_EOK;
+
+   return result;
+}
+
+
+static ar_result_t olc_handle_sg_mgmt_cmd(cu_base_t *base_ptr, uint32_t sg_ops, topo_sg_state_t sg_state)
+{
+   olc_t *me_ptr         = (olc_t *)base_ptr;
+   ar_result_t result = AR_EOK;
+   if (FALSE == is_olc_in_control_only_mode(me_ptr))
+   {
+      result = cu_handle_sg_mgmt_cmd(base_ptr, sg_ops, sg_state);
+   }
+   else
+   {
+      // in control only mode APM might give the Input/output handles assuming the offloaded modules are
+      // actually hosted by the OLC container. For example, if GC container has a connection to IPC RX module
+      // hosted by this OLC, then APM will give try to give the external input handle for the IPC Rx module
+      // assuming the module is hosted by the OLC itself.
+      spf_msg_header_t *header_ptr = (spf_msg_header_t *)base_ptr->cmd_msg.payload_ptr;
+      spf_msg_cmd_graph_mgmt_t *cmd_gmgmt_ptr = (spf_msg_cmd_graph_mgmt_t *)&header_ptr->payload_start;
+      spf_cntr_sub_graph_list_t *sg_list_ptr   = &cmd_gmgmt_ptr->sg_id_list;
+
+      OLC_MSG(base_ptr->gu_ptr->log_id,
+               DBG_LOW_PRIO,
+               "olc_handle_sg_mgmt_cmd: Received num_ip_port_handle %lu, num_op_port_handle %lu, num_ctrl_port_handle %lu, "
+               "num_data_links %lu "
+               "num_sub_graph %lu",
+               cmd_gmgmt_ptr->cntr_port_hdl_list.num_ip_port_handle,
+               cmd_gmgmt_ptr->cntr_port_hdl_list.num_op_port_handle,
+               cmd_gmgmt_ptr->cntr_port_hdl_list.num_ctrl_port_handle,
+               cmd_gmgmt_ptr->cntr_port_hdl_list.num_data_links,
+               sg_list_ptr->num_sub_graph);
+
+      // uint32_t num_ip_port_handle = cmd_gmgmt_ptr->cntr_port_hdl_list.num_ip_port_handle;
+      // uint32_t num_op_port_handle = cmd_gmgmt_ptr->cntr_port_hdl_list.num_op_port_handle;
+
+      cmd_gmgmt_ptr->cntr_port_hdl_list.num_ip_port_handle = 0;
+      cmd_gmgmt_ptr->cntr_port_hdl_list.num_op_port_handle = 0;
+
+      result = cu_handle_sg_mgmt_cmd(base_ptr, sg_ops, sg_state);
+   }
 
    return result;
 }

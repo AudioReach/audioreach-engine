@@ -21,6 +21,8 @@ INCLUDE FILES FOR MODULE
 //#define DEBUG_BUFPOOL
 //#define DEBUG_BUFPOOL_LOW
 
+#define BUF_POOL_MEMLEAK_DEBUG
+
 /* -----------------------------------------------------------------------
 ** Constant / Define Declarations
 ** ----------------------------------------------------------------------- */
@@ -172,6 +174,32 @@ void posal_bufpool_pool_destroy(uint32_t pool_handle)
    return;
 }
 
+void posal_bufpool_print_used_node_ptrs(posal_bufpool_pool_t *pool_ptr, uint32_t  node_arr_index)
+{
+   uint32_t list_bitmask = pool_ptr->nodes_ptr[node_arr_index].list_bitmask;
+   uint32_t node_index = 0;
+
+   while(list_bitmask)
+   {
+      if(list_bitmask & 1)
+      {
+         posal_bufpool_node_header_t *node_ptr =
+            (posal_bufpool_node_header_t *)((int8_t *)pool_ptr->nodes_ptr[node_arr_index].mem_start_addr +
+                                             pool_ptr->align_padding_size +
+                                             node_index * (sizeof(posal_bufpool_node_header_t) +
+                                                               pool_ptr->align_padding_size + pool_ptr->node_size));
+
+         void* leaked_buf_ptr           = (void *)((int8_t *)node_ptr + sizeof(posal_bufpool_node_header_t));
+
+      AR_MSG(DBG_ERROR_PRIO,
+             "Bufpool error: Leaked node %p pool_index %lu node_index %lu magic 0x%lX node_arr_index 0x%lx",
+              leaked_buf_ptr, node_ptr->pool_index ,node_ptr->node_index,  node_ptr->magic, node_ptr->node_arr_index );
+      }
+      list_bitmask = list_bitmask >> 1;
+      node_index++;
+   }
+}
+
 void posal_bufpool_pool_reset_to_base(uint32_t pool_handle)
 {
    uint32_t pool_index;
@@ -195,8 +223,14 @@ void posal_bufpool_pool_reset_to_base(uint32_t pool_handle)
              pool_index,
              pool_ptr->nodes_ptr[0].list_bitmask);
       pool_ptr->nodes_ptr[0].list_bitmask = 0;
+
+#ifndef BUF_POOL_MEMLEAK_DEBUG
       BUFPOOL_ASSERT();
+#else
+      posal_bufpool_print_used_node_ptrs(pool_ptr, 0);
+#endif
    }
+
    // free all other lists
    for (uint32_t i = 1; i < pool_ptr->num_of_node_arrays; i++)
    {
@@ -213,12 +247,21 @@ void posal_bufpool_pool_reset_to_base(uint32_t pool_handle)
                    i,
                    pool_ptr->nodes_ptr[i].list_bitmask);
             pool_ptr->nodes_ptr[i].list_bitmask = 0;
+
+#ifndef BUF_POOL_MEMLEAK_DEBUG
             BUFPOOL_ASSERT();
+#else
+            posal_bufpool_print_used_node_ptrs(pool_ptr, i);
+#endif
+         }
+         else
+         {
+            posal_bufpool_free_nodes_arr(pool_ptr, i);
          }
 
-         posal_bufpool_free_nodes_arr(pool_ptr, i);
       }
    }
+
    // Reset node counts
    pool_ptr->allocated_nodes = pool_ptr->nodes_per_arr;
    pool_ptr->used_nodes      = 0;

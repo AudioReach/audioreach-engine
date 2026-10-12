@@ -22,7 +22,6 @@
 ar_result_t sgm_shmem_alloc(uint32_t shmem_size, uint32_t satellite_proc_domain, sgm_shmem_handle_t *shmem)
 {
    ar_result_t            result = AR_EOK;
-   apm_offload_ret_info_t ret_info_ptr;
 
    if (NULL == shmem)
    {
@@ -30,7 +29,7 @@ ar_result_t sgm_shmem_alloc(uint32_t shmem_size, uint32_t satellite_proc_domain,
       return AR_EBADPARAM;
    }
 
-   void *shmem_buf_ptr = apm_offload_memory_malloc(satellite_proc_domain, shmem_size, &ret_info_ptr);
+   void *shmem_buf_ptr = apm_offload_memory_malloc(satellite_proc_domain, shmem_size, &shmem->mem_attr);
    if (NULL == shmem_buf_ptr)
    {
       // Failed to allocate memory; Error message would be printed by the caller
@@ -39,7 +38,6 @@ ar_result_t sgm_shmem_alloc(uint32_t shmem_size, uint32_t satellite_proc_domain,
    else
    {
       // Update the information in the shmem handle
-      shmem->mem_attr       = ret_info_ptr;
       shmem->shm_alloc_size = shmem_size;
       shmem->shm_mem_ptr    = shmem_buf_ptr;
    }
