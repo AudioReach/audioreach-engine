@@ -62,7 +62,7 @@ endif()
 # Kconfig related setup
 set(SPF_DOT_CONFIG_PATH ${PROJECT_BINARY_DIR}/.config)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-        ${PROJECT_BINARY_DIR} ${SPF_DOT_CONFIG_PATH})
+        ${SPF_DOT_CONFIG_PATH})
 
 if (NOT CONFIG)
    set (CONFIG "defconfig")
