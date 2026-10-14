@@ -116,7 +116,7 @@ function(spf_module_sources)
 			list(APPEND
 				post_build_commands
 				COMMAND
-				mkdir -p ${PROJECT_BINARY_DIR}/h2xml_autogen
+				${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/h2xml_autogen
 				COMMAND
 				${H2XML} -conf ${H2XML_CONFIG} ${H2XML_FLAGS} -o ${PROJECT_BINARY_DIR}/h2xml_autogen ${H2XML_INCLUDES} -t spfModule -a "@h2xml_processors{${PROC_DOMAIN_NAME}}" ${abs_path}
 			)
@@ -167,7 +167,7 @@ function(spf_module_sources)
 			list(APPEND
 				post_build_commands
 				COMMAND
-				mkdir -p ${PROJECT_BINARY_DIR}/h2xml_autogen
+				${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/h2xml_autogen
 				COMMAND
 				${H2XML} -conf ${H2XML_CONFIG} ${H2XML_FLAGS} -o ${PROJECT_BINARY_DIR}/h2xml_autogen ${H2XML_INCLUDES} -t spfModule -a "@h2xml_processors{${PROC_DOMAIN_NAME}}" ${abs_path}
 			)
@@ -238,7 +238,7 @@ function(spf_module_sources)
 			list(APPEND
 				post_build_commands
 				COMMAND
-				mkdir -p ${PROJECT_BINARY_DIR}/h2xml_autogen
+				${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/h2xml_autogen
 				COMMAND
 				${H2XML} -conf ${H2XML_CONFIG} ${H2XML_FLAGS} -o ${PROJECT_BINARY_DIR}/h2xml_autogen ${H2XML_INCLUDES} -t spfModule -a "@h2xml_processors{${PROC_DOMAIN_NAME}}" ${abs_path}
 			)
