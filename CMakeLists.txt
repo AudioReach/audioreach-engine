@@ -128,6 +128,7 @@ set(PROC_DOMAIN_NAME "PROC_DOMAIN_${CONFIG_PROC_DOMAIN}")
 if ( ARCH MATCHES "^(hexagon)")
    set(hexagon_INCLUDE
       ${PROJECT_SOURCE_DIR}/ar_osal/api
+      ${PROJECT_SOURCE_DIR}/fwk/api/ar_utils/hexagon/tgt/${STATIC_SHARED_DIR_NAME}/
       ${HEXAGON_LIB_DIR}
    )
    set(TGT_SPECIFIC_FOLDER hexagon)
@@ -165,12 +166,12 @@ include_directories(
    ${PROJECT_SOURCE_DIR}/fwk/api/apm/private
    ${PROJECT_SOURCE_DIR}/fwk/api/vcpm/
    ${PROJECT_SOURCE_DIR}/fwk/api/private
+   ${hexagon_INCLUDE}
    ${PROJECT_SOURCE_DIR}/fwk/api/ar_utils/
    ${PROJECT_SOURCE_DIR}/fwk/api/ar_utils/generic
    ${PROJECT_SOURCE_DIR}/fwk/platform/posal/inc/${TGT_SPECIFIC_FOLDER}/stringl
    ${PROJECT_SOURCE_DIR}/fwk/platform/posal/inc/${TGT_SPECIFIC_FOLDER}
    ${PROJECT_SOURCE_DIR}/fwk/platform/posal/inc
-   ${hexagon_INCLUDE}
    ${linux_INCLUDE}
    ${zephyr_INCLUDE}
    ${PROJECT_SOURCE_DIR}/fwk/platform/posal/inc/generic
