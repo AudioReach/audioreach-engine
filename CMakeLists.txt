@@ -20,7 +20,17 @@ include(scripts/cmake/zephyr-toolchain.cmake)
 endif()
 
 project(AR VERSION 1.0)
-set(H2XML "${PROJECT_SOURCE_DIR}/scripts/h2xml/h2xml")
+if(CMAKE_HOST_WIN32)
+    set(H2XML "${HEXAGON_SDK_ROOT}/addons/audio/spf/tools/h2xml/h2xml.exe")
+    if(NOT EXISTS "${H2XML}")
+        message(FATAL_ERROR
+            "H2XML not found at path: '${H2XML}'. Please verify that "
+            "HEXAGON_SDK_ROOT ('${HEXAGON_SDK_ROOT}') is set correctly and "
+            "that the audio add-on is installed.")
+    endif()
+else()
+    set(H2XML "${PROJECT_SOURCE_DIR}/scripts/h2xml/h2xml")
+endif()
 set(H2XML_CONFIG "${PROJECT_SOURCE_DIR}/scripts/h2xml/h2xml_config_spf.xml")
 set(H2XML_FLAGS -D __H2XML__)
 set(H2XML_INCLUDES "" )
@@ -62,7 +72,7 @@ endif()
 # Kconfig related setup
 set(SPF_DOT_CONFIG_PATH ${PROJECT_BINARY_DIR}/.config)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-        ${PROJECT_BINARY_DIR} ${SPF_DOT_CONFIG_PATH})
+        ${SPF_DOT_CONFIG_PATH})
 
 if (NOT CONFIG)
    set (CONFIG "defconfig")
@@ -259,7 +269,11 @@ target_link_libraries(spf PUBLIC ar-gpr)
 target_link_libraries(spf PUBLIC ar-osal)
 endif()
 
-target_link_libraries(spf PUBLIC "$<LINK_GROUP:RESCAN,${spf_static_libs}>" "-Wl,--allow-multiple-definition")
+if(ARCH MATCHES "^(hexagon)")
+    target_link_libraries(spf PUBLIC ${spf_static_libs} "-Wl,--allow-multiple-definition")
+else()
+    target_link_libraries(spf PUBLIC "$<LINK_GROUP:RESCAN,${spf_static_libs}>" "-Wl,--allow-multiple-definition")
+endif()
 
 # Install header APIs to support ARE on APPS. These APIs are needed by
 # audioreach-graphmgr (AGM) server to initialize audioreach-engine framework.
