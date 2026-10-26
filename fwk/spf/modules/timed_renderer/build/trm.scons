@@ -1,0 +1,14 @@
+'''
+/*==============================================================================
+@file trm.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.H2xmlFileGenerate(env.subst('${AVS_ROOT}/spf/modules/timed_renderer/api'))
+
+env.LoadSoftwareUnits()

@@ -21,9 +21,7 @@
 #include "amdb_parallel_loader.h"
 #include "posal_inline_mutex.h"
 
-#ifdef DL_INFO_DEFINED
 #include "posal_rtld.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {

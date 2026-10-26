@@ -48,15 +48,20 @@ capi_err_t gen_topo_capi_exit_island_metadata_create_with_tracking(void *       
                                                                    module_cmn_md_t **        md_pptr)
 {
    capi_err_t result = CAPI_EOK;
+   uint32_t log_id = 0;                 // SAFE default
+   
    INIT_EXCEPTION_HANDLING
-   gen_topo_module_t *module_ptr = (gen_topo_module_t *)context_ptr;
-   gen_topo_t *       topo_ptr   = module_ptr->topo_ptr;
-
+   
+   // Check context_ptr for NULL before dereferencing it
    if ((NULL == md_list_pptr) || (NULL == md_pptr) || (NULL == context_ptr))
    {
       THROW(result, AR_EBADPARAM)
    }
+   
+   gen_topo_module_t *module_ptr = (gen_topo_module_t *)context_ptr;
+   gen_topo_t *       topo_ptr   = module_ptr->topo_ptr;
 
+   log_id = topo_ptr->gu.log_id;        // cache before any TRY/THROW paths
    gen_topo_exit_lpi_temporarily_if_md_lib_in_nlpi(topo_ptr);
 
    TRY(result,
@@ -69,7 +74,7 @@ capi_err_t gen_topo_capi_exit_island_metadata_create_with_tracking(void *       
                                                    tracking_info_ptr,
                                                    md_pptr));
 
-   CATCH(result, TOPO_MSG_PREFIX, topo_ptr->gu.log_id)
+   CATCH(result, TOPO_MSG_PREFIX, log_id)
    {
    }
    return result;
@@ -138,15 +143,20 @@ capi_err_t gen_topo_capi_exit_island_metadata_propagate(void *                  
 {
 
    capi_err_t result = CAPI_EOK;
+   uint32_t log_id = 0;                 // SAFE default
+   
    INIT_EXCEPTION_HANDLING
-   gen_topo_module_t *module_ptr = (gen_topo_module_t *)context_ptr;
-   gen_topo_t *       topo_ptr   = module_ptr->topo_ptr;
-
+   
+   // Check context_ptr for NULL before dereferencing it
    if ((NULL == input_stream_ptr) || (NULL == context_ptr) || (NULL == output_stream_ptr))
    {
       return CAPI_EBADPARAM;
    }
+   
+   gen_topo_module_t *module_ptr = (gen_topo_module_t *)context_ptr;
+   gen_topo_t *       topo_ptr   = module_ptr->topo_ptr;
 
+   log_id = topo_ptr->gu.log_id;        // cache before any TRY/THROW paths
    gen_topo_vote_against_lpi_if_md_lib_in_nlpi(topo_ptr);
 
    TRY(result,
@@ -158,7 +168,7 @@ capi_err_t gen_topo_capi_exit_island_metadata_propagate(void *                  
                                         input_md_info_ptr,
                                         output_md_info_ptr));
 
-   CATCH(result, TOPO_MSG_PREFIX, topo_ptr->gu.log_id)
+   CATCH(result, TOPO_MSG_PREFIX, log_id)
    {
    }
    return result;

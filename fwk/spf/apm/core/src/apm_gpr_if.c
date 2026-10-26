@@ -14,6 +14,7 @@
 #include "spf_utils.h"
 #include "gpr_api_inline.h"
 #include "spf_cmn_if.h"
+#include "spf_inter_proc_md_utils.h"
 
 /* =======================================================================
 **                          Function Definitions
@@ -66,6 +67,14 @@ uint32_t apm_gpr_call_back_f(gpr_packet_t *gpr_pkt_ptr, void *cb_ctx_ptr)
             goto __bailout;
          }
 
+         break;
+      }
+      case EVENT_ID_IPC_METADATA_INCR_REF_COUNT:
+      case EVENT_ID_IPC_METADATA_DECR_REF_COUNT:
+      case EVENT_ID_MODULE_CMN_METADATA_CLONE_MD:
+      case EVENT_ID_MODULE_CMN_METADATA_TRACKING_EVENT:
+      {
+         result = spf_ipmd_gpr_callback_handler(gpr_pkt_ptr);
          break;
       }
       default:

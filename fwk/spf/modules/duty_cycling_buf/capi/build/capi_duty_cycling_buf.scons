@@ -1,0 +1,67 @@
+'''
+/*==============================================================================
+@file capi_trm.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+core_public_apis = [
+   'BOOT',
+   'DAL',
+   'DEBUGTOOLS',
+   'HAL',
+   'MPROC',
+   'POWER',
+   'SERVICES',
+   'SYSTEMDRIVERS',
+
+
+   # needs to be last also contains wrong comdef.h
+   'KERNEL',
+    ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS','SHARED_LIBRARY_INC_PATHS'])
+env.RequireProtectedApi('AVS')
+env.PublishPrivateApi('AVS',[
+        '../inc',		
+   		'${AVS_ROOT}/platform/private/api',  
+        ])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'duty_cycling_buf'
+LIBNAME_STUB = LIBNAME+'_stub'
+
+#import pdb; pdb.set_trace()
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+avs_reg_sources = env.GlobSourceFiles(['src/*.c'], SRCPATH,posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.c'], SRCPATH,posix=True)
+avs_fwk_sources = []
+
+bucket= ['AVS_ADSP','AVS_ADSP_USER']
+env.RequireRestrictedApi(['SHARED_LIBRARY_INC_PATHS'])
+
+if 'USES_AUDIO_IN_ISLAND' in env:
+    non_island_sources,island_sources = env.IslandFilter(avs_reg_sources)
+
+    if 'AVS_SINGLE_SO' in env:  
+        env.AddAvsLibrary(bucket, '${BUILDPATH}/'+LIBNAME, [non_island_sources, [], []])
+        get_island_lib = env.AddAvsLibrary(bucket, '${BUILDPATH}/'+LIBNAME+'_island', [island_sources, [], []])
+    else:
+        env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME, non_island_sources)
+        get_island_lib = env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME+'_island', [island_sources])
+        env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)
+        if 'USES_MEMSEG' in env:
+            env.TagLibraryForMemorySegment(bucket, 'va', get_island_lib)
+        elif 'USES_ISLAND' in env:
+            env.AddIslandLibrary(bucket, get_island_lib)
+else:
+    #import pdb; pdb.set_trace()
+    env.AddAvsLibrary(bucket, '${BUILDPATH}/'+LIBNAME,[avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC = True)

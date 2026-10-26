@@ -1,0 +1,48 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+
+Import('env')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS = '-ffunction-sections')
+
+core_public_apis = [
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS', 'CAPI_CMN_LIB'])
+env.RequireProtectedApi('AVS')
+env.PublishPrivateApi('AVS',[
+   '../inc',
+   ])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'capi_sh_mem_pull_push_mode'
+LIBNAME_STUB = LIBNAME+'_stub'
+#import pdb; pdb.set_trace()
+avs_fwk_sources =[]
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+avs_reg_sources = env.GlobSourceFiles(['src/*.c',], SRCPATH, posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.c'], SRCPATH, posix=True)
+bucket=['AVS_ADSP', 'AVS_ADSP_USER', 'AVS_ADSP_STUBS']
+env.RequireRestrictedApi(['SHARED_LIBRARY_INC_PATHS'])
+
+if 'USES_AVS_SHARED_LIBS' in env:
+    SRCPATH='..'
+    env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+    env.AddAvsSharedLibrary(['AVS_SHARED'],'${BUILDPATH}/'+LIBNAME, [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+else:
+    #import pdb; pdb.set_trace()
+    env.AddAvsLibrary(bucket, '${BUILDPATH}/'+LIBNAME,[avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+

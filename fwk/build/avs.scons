@@ -1,0 +1,42 @@
+#================================================================================
+#
+# GENERAL DESCRIPTION
+# Build script
+#
+#
+#===============================================================================
+Import('env')
+import os
+import sys
+
+env.Append(CFLAGS = ' -Os ')
+env.Append(CPPFLAGS = ' -Os ')
+
+if 'USES_SPF_SATELLITE' in env:
+  env.Append(CFLAGS = '-DSATELLITE ')
+  env.Append(CPPFLAGS = '-DSATELLITE ')
+
+if 'IMAGE_INSTANCE' in env and env['IMAGE_INSTANCE'] in ['0']:
+   env.Append(CFLAGS = ' -DADSP0_IMG ')
+   env.Append(CPPFLAGS = ' -DADSP0_IMG ')
+   #print ("This is ADSP 0 image")
+if 'IMAGE_INSTANCE' in env and env['IMAGE_INSTANCE'] in ['1']:
+   env.Append(CFLAGS = ' -DADSP1_IMG ')
+   env.Append(CPPFLAGS = ' -DADSP1_IMG ')
+   #print ("This is ADSP 1 image")
+if 'IMAGE_INSTANCE' in env and env['IMAGE_INSTANCE'] in ['2']:
+   env.Append(CFLAGS = ' -DADSP2_IMG ')
+   env.Append(CPPFLAGS = ' -DADSP2_IMG ')
+   #print ("This is ADSP 2 image")
+
+oem_root = os.environ.get('OEM_ROOT')
+if oem_root!=None:
+   oem_root_scons = env.FindFiles(['*.scons'],  env.RealPath((oem_root + '/build')))
+   if oem_root_scons == []:
+      env.PrintWarning("OEM_ROOT path is set to nonexistent path or where build/*.scons file is missing")
+   else:
+      env.LoadSConscripts(oem_root_scons[0])
+      print('OEM_ROOT is set. Loading scons file present at ', oem_root_scons[0])
+
+
+env.LoadSoftwareUnits()

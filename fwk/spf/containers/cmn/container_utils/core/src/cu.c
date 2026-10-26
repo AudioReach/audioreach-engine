@@ -519,6 +519,22 @@ ar_result_t cu_handle_frame_len_change(cu_base_t *base_ptr, icb_frame_length_t *
       }
    }
 
+   //ipc module
+   for (gu_ext_in_port_list_t *ipc_ext_in_port_list_ptr = base_ptr->gu_ptr->ipc_ext_in_port_list_ptr;
+      (NULL != ipc_ext_in_port_list_ptr);
+      LIST_ADVANCE(ipc_ext_in_port_list_ptr))
+   {
+      gu_ext_in_port_t *gu_ext_in_port_ptr = (gu_ext_in_port_t *)ipc_ext_in_port_list_ptr->ext_in_port_ptr;
+      cu_ext_in_port_t *ext_in_port_ptr =
+         (cu_ext_in_port_t *)(((uint8_t *)gu_ext_in_port_ptr + base_ptr->ext_in_port_cu_offset));
+
+      if (!ext_in_port_ptr->prop_info.did_inform_us_of_frame_len_and_var_ip || frame_len_changed || period_changed)
+      {
+         cu_ipc_rx_create_send_ipc_info_to_upstreams(base_ptr, ext_in_port_ptr, gu_ext_in_port_ptr);
+         ext_in_port_ptr->prop_info.did_inform_us_of_frame_len_and_var_ip = TRUE;
+      }
+   }
+
    if (frame_len_changed)
    {
       for (gu_ext_out_port_list_t *ext_out_port_list_ptr = base_ptr->gu_ptr->ext_out_port_list_ptr;

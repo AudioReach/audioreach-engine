@@ -1,0 +1,56 @@
+'''
+/*==============================================================================
+@file latency_lib.scons
+@brief
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+core_public_apis = [
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS'])
+env.RequireProtectedApi('AVS')
+
+env.PublishPrivateApi('AVS',[
+   '../inc',
+      ])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = ".."
+
+LIBNAME = 'latency_lib'
+LIBNAME_STUB = LIBNAME+'_stub'
+
+# Define LATENCY_DELAYLINE_UPDATE_ASM_COMPILATION to enable/disable assembly
+# compilation for latency_delayline_update(). For standalone spf compilation,
+# asm_macros.h header (present in spm) used in assembly code is not available.
+# With __qdsp__ flag enabled, define above flag to compile asm code for SCons
+# build and not define it to compile c code for CMake build.
+env.Append(CDEFINES="LATENCY_DELAYLINE_UPDATE_ASM_COMPILATION")
+env.Append(CPPDEFINES="LATENCY_DELAYLINE_UPDATE_ASM_COMPILATION")
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+avs_sources = env.GlobSourceFiles(['src/*.c', 'src/*.S'], SRCPATH,posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.c'], SRCPATH,posix=True)
+
+platform_public_apis = [
+    'STDDEF', # AEEDef
+    'HAPSDK', # HAP_debug, farf etc
+]
+
+# This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+env.RequirePublicApi(platform_public_apis, area='platform')
+
+
+env.AddLibrary(['AVS_ADSP','AVS_ADSP_USER', 'AVS_SHARED'], '${BUILDPATH}/'+LIBNAME, avs_sources)
+env.AddLibrary(['AVS_ADSP','AVS_ADSP_USER', 'AVS_SHARED'], '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)

@@ -1,0 +1,58 @@
+#===============================================================================
+#
+# AVS AU
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+Import('env')
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+LIBNAME = 'RATModule'
+
+items = env.GetSoftwareUnits()
+ 
+x = items.get('LIBS')
+
+avs_reg_sources = []
+avs_stub_sources = []
+avs_fwk_sources = list(x)
+island_sources = []
+island_stub_sources = []
+island_prop_sources = []
+
+for i in x: 
+    
+    if i.name == 'capi_rat.lib':
+        avs_reg_sources.append(i)
+        avs_fwk_sources.remove(i) 
+    if i.name == 'capi_rat_island.lib':
+        island_sources.append(i)
+        avs_fwk_sources.remove(i)   
+    if "_stub" in i.name:
+        avs_stub_sources.append(i)
+        avs_fwk_sources.remove(i)
+
+   
+#import pdb; pdb.set_trace()
+
+SRCPATH = ".."
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+if 'USES_AUDIO_IN_ISLAND' in env:
+   get_island_lib = env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME+'_island',
+                                      [island_sources, island_stub_sources, island_prop_sources],'MOD')
+   if 'USES_AVS_LIBRARY_BUILDER' in env:
+      x = env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+                            [avs_reg_sources, avs_stub_sources, avs_fwk_sources],'MOD')
+ 
+else:
+    if 'USES_AVS_LIBRARY_BUILDER' in env:
+       x = env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+                             [avs_reg_sources, avs_stub_sources, avs_fwk_sources],'MOD')
+							 
+env.H2xmlFileGenerate(env.subst('${AVS_ROOT}/spf/modules/rat/api'))

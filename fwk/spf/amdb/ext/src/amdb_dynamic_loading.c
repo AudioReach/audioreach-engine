@@ -399,30 +399,25 @@ void amdb_get_dl_info(amdb_module_handle_info_t *module_handle_info, // handle t
       AR_MSG(DBG_ERROR_PRIO, "AMDB: static node during dl_info");
       return;
    }
-   *is_dl              = TRUE;
-   amdb_dynamic_t *dyn = amdb_node_get_dyn(node);
+   *is_dl = TRUE;
 
-   int p = 0xABCD;
 #ifdef DL_INFO_DEFINED
-   int rc = posal_dlinfo(dyn->h_dlopen, RTLD_DI_LOAD_ADDR, &p);
-#else
-   int rc = 0; // dlinfo(node->dyn->h, RTLD_DI_LOAD_ADDR, &p);
-#endif
+   amdb_dynamic_t *dyn = amdb_node_get_dyn(node);
+   int             p   = 0xABCD;
 
+   int rc = posal_dlinfo(dyn->h_dlopen, RTLD_DI_LOAD_ADDR, &p);
    if (rc)
       return;
    *start_addr = (uint32_t *)p;
 
-#ifdef DL_INFO_DEFINED
    rc = posal_dlinfo(dyn->h_dlopen, RTLD_DI_LOAD_SIZE, &p);
-#endif
-
    if (rc)
    {
       *start_addr = NULL;
       return;
    }
    *so_size = p;
+#endif
 }
 
 ar_result_t amdb_resolve_symbols(amdb_node_t *node_ptr)

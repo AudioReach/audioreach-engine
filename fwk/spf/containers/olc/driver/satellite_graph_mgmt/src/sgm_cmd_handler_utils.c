@@ -641,9 +641,23 @@ static ar_result_t olc_create_satellite_graph_open_payload(spgm_info_t *        
    /**## 1. Populate the sub-graph ID list */
    /* all the sub graphs in Satellite Graph would be added to the OLC */
 
+#ifdef OLC_VERBOSE_DEBUGGING
+   OLC_SGM_MSG(OLC_SGM_ID,
+               DBG_HIGH_PRIO,
+               "GRAPH_OPEN: OLC create sat gmc_open payload: num_subgraphs: %lu ",
+               gmc_apm_open_cmd_ptr->num_sub_graphs);
+#endif
+
    for (arr_idx = 0; arr_idx < gmc_apm_open_cmd_ptr->num_sub_graphs; arr_idx++)
    {
       gmc_sat_open_cmd_ptr->sg_cfg_list_pptr[arr_idx] = gmc_apm_open_cmd_ptr->sg_cfg_list_pptr[arr_idx];
+
+#ifdef OLC_VERBOSE_DEBUGGING
+      OLC_SGM_MSG(OLC_SGM_ID,
+                  DBG_HIGH_PRIO,
+                  "GRAPH_OPEN: OLC create sat gmc_open payload: sg_id: 0x%lX ",
+                  gmc_apm_open_cmd_ptr->sg_cfg_list_pptr[arr_idx]);
+#endif
    }
 
    temp_arr_idx = 0;
@@ -657,12 +671,30 @@ static ar_result_t olc_create_satellite_graph_open_payload(spgm_info_t *        
    /** Store the pointer to array of pointers */
    gmc_sat_open_cmd_ptr->mod_list_pptr = (apm_modules_list_t **)msg_data_start_ptr;
 
-   for (arr_idx = 0; arr_idx < gmc_apm_open_cmd_ptr->num_modules_list; arr_idx++)
+#ifdef OLC_VERBOSE_DEBUGGING
+   OLC_SGM_MSG(OLC_SGM_ID,
+               DBG_HIGH_PRIO,
+               "GRAPH_OPEN: OLC create sat gmc_open payload: num_modules_list: %lu ",
+               gmc_apm_open_cmd_ptr->num_modules_list);
+#endif
+
+      for (arr_idx = 0; arr_idx < gmc_apm_open_cmd_ptr->num_modules_list; arr_idx++)
    {
       apm_modules_list_t *module_list_ptr = gmc_apm_open_cmd_ptr->mod_list_pptr[arr_idx];
       if (module_list_ptr->container_id != olc_container_id)
       {
          gmc_sat_open_cmd_ptr->mod_list_pptr[temp_arr_idx++] = gmc_apm_open_cmd_ptr->mod_list_pptr[arr_idx];
+
+#ifdef OLC_VERBOSE_DEBUGGING
+         OLC_SGM_MSG(OLC_SGM_ID,
+                     DBG_HIGH_PRIO,
+                     "GRAPH_OPEN: OLC create sat gmc_open payload: container_id: 0x%lX sub_graph_id: 0x%lX "
+                     "num_modules: "
+                     "%lu",
+                     module_list_ptr->container_id,
+                     module_list_ptr->sub_graph_id,
+                     module_list_ptr->num_modules);
+#endif
       }
    }
 
@@ -681,8 +713,15 @@ static ar_result_t olc_create_satellite_graph_open_payload(spgm_info_t *        
    /** Store the pointer to array of pointers */
    gmc_sat_open_cmd_ptr->mod_prop_cfg_list_pptr = (apm_module_prop_cfg_t **)msg_data_start_ptr;
 
-   /** Populate the module prop list config pointers */
-   for (arr_idx = 0; arr_idx < gmc_apm_open_cmd_ptr->num_mod_prop_cfg; arr_idx++)
+#ifdef OLC_VERBOSE_DEBUGGING
+   OLC_SGM_MSG(OLC_SGM_ID,
+               DBG_HIGH_PRIO,
+               "GRAPH_OPEN: OLC create sat gmc_open payload: num_modules_list: %lu ",
+               gmc_apm_open_cmd_ptr->num_mod_prop_cfg);
+#endif
+
+      /** Populate the module prop list config pointers */
+      for (arr_idx = 0; arr_idx < gmc_apm_open_cmd_ptr->num_mod_prop_cfg; arr_idx++)
    {
       apm_module_prop_cfg_t *module_prop_list_ptr = gmc_apm_open_cmd_ptr->mod_prop_cfg_list_pptr[arr_idx];
       if (check_if_module_is_in_list(spgm_ptr->gu_graph_info.satellite_module_list_ptr,
@@ -691,6 +730,14 @@ static ar_result_t olc_create_satellite_graph_open_payload(spgm_info_t *        
       {
          gmc_sat_open_cmd_ptr->mod_prop_cfg_list_pptr[temp_arr_idx++] =
             gmc_apm_open_cmd_ptr->mod_prop_cfg_list_pptr[arr_idx];
+
+#ifdef OLC_VERBOSE_DEBUGGING
+         OLC_SGM_MSG(OLC_SGM_ID,
+                     DBG_HIGH_PRIO,
+                     "GRAPH_OPEN: OLC create sat gmc_open payload: miid: 0x%lX num_props: %lu",
+                     module_prop_list_ptr->instance_id,
+                     module_prop_list_ptr->num_props);
+#endif
       }
    }
 
@@ -726,6 +773,16 @@ static ar_result_t olc_create_satellite_graph_open_payload(spgm_info_t *        
       if ((is_module_in_satellite[0] && is_module_in_satellite[1]))
       {
          gmc_sat_open_cmd_ptr->mod_conn_list_pptr[temp_arr_idx++] = gmc_apm_open_cmd_ptr->mod_conn_list_pptr[arr_idx];
+
+#ifdef OLC_VERBOSE_DEBUGGING
+         OLC_SGM_MSG(OLC_SGM_ID,
+                     DBG_HIGH_PRIO,
+                     "GRAPH_OPEN: OLC create sat gmc_open payload: Data connection: (0x%lx, 0x%lx) --> (0x%lx, 0x%lx)",
+                     cmd_conn_ptr->src_mod_inst_id,
+                     cmd_conn_ptr->src_mod_op_port_id,
+                     cmd_conn_ptr->dst_mod_inst_id,
+                     cmd_conn_ptr->dst_mod_ip_port_id);
+#endif
       }
    }
    gmc_sat_open_cmd_ptr->num_module_conn = temp_arr_idx;
@@ -796,6 +853,16 @@ static ar_result_t olc_create_satellite_graph_open_payload(spgm_info_t *        
 
       gmc_sat_open_cmd_ptr->mod_ctrl_link_cfg_list_pptr[temp_arr_idx++] =
          gmc_apm_open_cmd_ptr->mod_ctrl_link_cfg_list_pptr[arr_idx];
+
+#ifdef OLC_VERBOSE_DEBUGGING
+      OLC_SGM_MSG(OLC_SGM_ID,
+                  DBG_HIGH_PRIO,
+                  "GRAPH_OPEN: OLC create sat gmc_open payload: IMCL connection: (0x%lx, 0x%lx) <--> (0x%lx, 0x%lx)",
+                  cmd_ctrl_conn_ptr->peer_1_mod_iid,
+                  cmd_ctrl_conn_ptr->peer_1_mod_ctrl_port_id,
+                  cmd_ctrl_conn_ptr->peer_2_mod_iid,
+                  cmd_ctrl_conn_ptr->peer_2_mod_ctrl_port_id);
+#endif
    }
    gmc_sat_open_cmd_ptr->num_module_ctrl_links = temp_arr_idx;
    ///////////////////////////////////////////////////////////
@@ -826,6 +893,15 @@ static ar_result_t olc_create_satellite_graph_open_payload(spgm_info_t *        
       {
          gmc_sat_open_cmd_ptr->mod_prop_cfg_list_pptr[temp_arr_idx++] =
             gmc_apm_open_cmd_ptr->mod_prop_cfg_list_pptr[arr_idx];
+
+#ifdef OLC_VERBOSE_DEBUGGING
+         OLC_SGM_MSG(OLC_SGM_ID,
+                     DBG_HIGH_PRIO,
+                     "GRAPH_OPEN: OLC create sat gmc_open payload: Module set cfg: (0x%lx, 0x%lx, 0x%lu)",
+                     module_prop_list_ptr->module_instance_id,
+                     module_prop_list_ptr->param_id,
+                     module_prop_list_ptr->param_size);
+#endif
       }
    }
    gmc_sat_open_cmd_ptr->num_param_id_cfg = temp_arr_idx;
@@ -931,17 +1007,37 @@ ar_result_t olc_create_graph_open_payload(spgm_info_t *             spgm_ptr,
    /** Store the pointer to array of pointers */
    gmc_olc_open_cmd_ptr->mod_list_pptr = (apm_modules_list_t **)msg_data_start_ptr;
 
+   bool_t found_ipc_modules = FALSE;
+   bool_t does_cntr_host_modules = FALSE;
    for (arr_idx = 0; arr_idx < gmc_apm_open_cmd_ptr->num_modules_list; arr_idx++)
    {
       apm_modules_list_t *module_list_ptr = gmc_apm_open_cmd_ptr->mod_list_pptr[arr_idx];
-      TRY(result, add_module_list_to_graph_info(spgm_ptr, module_list_ptr, olc_container_id));
+      TRY(result, add_module_list_to_graph_info(spgm_ptr, module_list_ptr, olc_container_id, &found_ipc_modules, &does_cntr_host_modules));
       if (module_list_ptr->container_id == olc_container_id)
       {
          gmc_olc_open_cmd_ptr->mod_list_pptr[temp_arr_idx++] = gmc_apm_open_cmd_ptr->mod_list_pptr[arr_idx];
       }
    }
-
    gmc_olc_open_cmd_ptr->num_modules_list = temp_arr_idx;
+
+   if(found_ipc_modules || (OLC_MODE_CONTROL_ONLY ==spgm_ptr->mode_of_operation))
+   {
+      if(does_cntr_host_modules || (OLC_MODE_HOSTING_MODULES ==spgm_ptr->mode_of_operation))
+      {
+         OLC_SGM_MSG(OLC_SGM_ID,DBG_ERROR_PRIO, "MOD_PARSE: IPC modules present but no modules in host container");
+         THROW(result, AR_EFAILED);
+      }
+      else
+      {
+         OLC_SGM_MSG(OLC_SGM_ID,DBG_LOW_PRIO, "MOD_PARSE: Operating OLC in control only mode, because no modules present in the cntr and IPC modules are offloaded.");
+         spgm_ptr->mode_of_operation = OLC_MODE_CONTROL_ONLY;
+      }
+   }
+   else if(does_cntr_host_modules)
+   {
+      OLC_SGM_MSG(OLC_SGM_ID, DBG_LOW_PRIO, "MOD_PARSE: Module list parsed successfully");
+      spgm_ptr->mode_of_operation = OLC_MODE_HOSTING_MODULES;
+   }
 
    /** Reset the array index */
    temp_arr_idx = 0;
@@ -1796,5 +1892,261 @@ ar_result_t sgm_create_get_path_delay_client_payload(spgm_info_t *spgm_ptr,
       }
    }
 
+   return result;
+}
+
+
+static sgm_module_info_t *sgm_check_get_if_module_is_in_list(spf_list_node_t *mod_list_ptr, uint32_t module_instance_id)
+{
+   spf_list_node_t   *curr_node_ptr;
+   sgm_module_info_t *module_node_ptr;
+   /** Get the pointer to start of the list of module list nodes */
+   curr_node_ptr = mod_list_ptr;
+
+   /** Check if the module instance  exists */
+   while (curr_node_ptr)
+   {
+      module_node_ptr = (sgm_module_info_t *)curr_node_ptr->obj_ptr;
+
+      /** validate the instance pointer */
+      if (NULL == module_node_ptr)
+      {
+         return NULL;
+      }
+
+      if (module_instance_id == module_node_ptr->instance_id)
+      {
+         return module_node_ptr;
+      }
+
+      /** Else, keep traversing the list */
+      curr_node_ptr = curr_node_ptr->next_ptr;
+   }
+   return NULL;
+}
+
+ar_result_t sgm_respond_to_satellite_graph_open(gu_t            *gu_ptr,
+                                                spf_msg_t       *cmd_msg_ptr,
+                                                POSAL_HEAP_ID    heap_id,
+                                                spf_list_node_t *sat_module_list_ptr)
+{
+   INIT_EXCEPTION_HANDLING
+   ar_result_t                   result = AR_EOK;
+   spf_msg_t                     rsp_msg;
+   spf_msg_header_t             *cmd_header_ptr = (spf_msg_header_t *)cmd_msg_ptr->payload_ptr;
+   spf_msg_header_t *            rsp_header_ptr;
+   spf_cntr_port_connect_info_t *open_rsp_ptr;
+   spf_msg_cmd_graph_open_t *    open_cmd_ptr = (spf_msg_cmd_graph_open_t *)&cmd_header_ptr->payload_start;
+
+   uint32_t host_domain_id;
+   __gpr_cmd_get_host_domain_id(&host_domain_id);
+
+   // this allocates more than required in case SH MEM EP are involved.
+   // although ipc ext ports are being added here, currently there are no IPC modules that are directly
+   // placed hosted by OLC container
+   uint32_t num_ip_port_conn   = gu_ptr->num_ext_in_ports + gu_ptr->num_ipc_ext_in_ports;
+   uint32_t num_op_port_conn   = gu_ptr->num_ext_out_ports + gu_ptr->num_ipc_ext_out_ports;
+   uint32_t num_ctrl_port_conn = gu_ptr->num_ext_ctrl_ports;
+
+   // loop once to get the number of output/input ports opened in the satellite containers.
+   sgm_module_info_t *is_sat_module[2] = { 0 };
+   for (uint32_t i = 0; i < open_cmd_ptr->num_module_conn; i++)
+   {
+      apm_module_conn_cfg_t *cmd_conn_ptr = open_cmd_ptr->mod_conn_list_pptr[i];
+
+      // gu_module_t      *src_module_ptr      = gu_find_module(gu_ptr, cmd_conn_ptr->src_mod_inst_id);
+      // gu_module_t *     dst_module_ptr      = gu_find_module(gu_ptr, cmd_conn_ptr->dst_mod_inst_id);
+
+      is_sat_module[0] = sgm_check_get_if_module_is_in_list(sat_module_list_ptr, cmd_conn_ptr->src_mod_inst_id);
+      is_sat_module[1] = sgm_check_get_if_module_is_in_list(sat_module_list_ptr, cmd_conn_ptr->dst_mod_inst_id);
+
+      if(is_sat_module[0] && !is_sat_module[1])
+      {
+         num_op_port_conn++;
+      }
+      else if(!is_sat_module[0] && is_sat_module[1])
+      {
+         num_ip_port_conn++;
+      }
+   }
+
+   uint32_t rsp_size = sizeof(spf_cntr_port_connect_info_t) +
+                       (num_ip_port_conn + num_op_port_conn + num_ctrl_port_conn) * sizeof(spf_module_port_conn_t);
+   rsp_size = GET_SPF_MSG_REQ_SIZE(rsp_size);
+
+   TRY(result,
+       spf_msg_create_msg(&rsp_msg,
+                          &rsp_size,
+                          SPF_MSG_RSP_GRAPH_OPEN,
+                          cmd_header_ptr->rsp_handle_ptr,
+                          &cmd_header_ptr->token,
+                          NULL,
+                          heap_id));
+
+   rsp_header_ptr                           = (spf_msg_header_t *)rsp_msg.payload_ptr;
+   rsp_header_ptr->payload_size             = rsp_size;
+   open_rsp_ptr                             = (spf_cntr_port_connect_info_t *)&rsp_header_ptr->payload_start;
+   open_rsp_ptr->num_ip_data_port_conn      = 0;
+   open_rsp_ptr->num_op_data_port_conn      = 0;
+   open_rsp_ptr->num_ctrl_port_conn         = 0;
+   open_rsp_ptr->ip_data_port_conn_list_ptr = (spf_module_port_conn_t *)(open_rsp_ptr + 1);
+   open_rsp_ptr->op_data_port_conn_list_ptr = (open_rsp_ptr->ip_data_port_conn_list_ptr + num_ip_port_conn);
+   open_rsp_ptr->ctrl_port_conn_list_ptr    = (open_rsp_ptr->op_data_port_conn_list_ptr + num_op_port_conn);
+
+   /**
+    * This looping on open_cmd_ptr ensures we don't return SH MEM EP module's ports (which were created internally) to
+    * APM.
+    */
+   for (uint32_t i = 0; i < open_cmd_ptr->num_module_conn; i++)
+   {
+      apm_module_conn_cfg_t *cmd_conn_ptr = open_cmd_ptr->mod_conn_list_pptr[i];
+
+      // gu_module_t      *src_module_ptr      = gu_find_module(gu_ptr, cmd_conn_ptr->src_mod_inst_id);
+      // gu_module_t *     dst_module_ptr      = gu_find_module(gu_ptr, cmd_conn_ptr->dst_mod_inst_id);
+
+      // // gets both regular and IPC ports
+      // gu_output_port_t *src_output_port_ptr = gu_find_output_port(src_module_ptr, cmd_conn_ptr->src_mod_op_port_id);
+      // gu_input_port_t * dst_input_port_ptr  = gu_find_input_port(dst_module_ptr, cmd_conn_ptr->dst_mod_ip_port_id);
+
+      is_sat_module[0] = sgm_check_get_if_module_is_in_list(sat_module_list_ptr, cmd_conn_ptr->src_mod_inst_id);
+      is_sat_module[1] = sgm_check_get_if_module_is_in_list(sat_module_list_ptr, cmd_conn_ptr->dst_mod_inst_id);
+
+      OLC_SPGM_MSG(gu_ptr->log_id,
+                   DBG_LOW_PRIO,
+                   "GRAPH_OPEN: Satellite response handler external connection info (0x%lx, 0x%lx, %lu) --> (0x%lx, "
+                   "0x%lx, "
+                   "%lu) ",
+                   cmd_conn_ptr->src_mod_inst_id,
+                   cmd_conn_ptr->src_mod_op_port_id,
+                   (is_sat_module[0] ? 1 : 0),
+                   cmd_conn_ptr->dst_mod_inst_id,
+                   cmd_conn_ptr->dst_mod_ip_port_id,
+                   (is_sat_module[1] ? 1 : 0));
+
+      // if source is opened in satellite and destination is not opened in the satellite.
+      if (is_sat_module[0] && (NULL == is_sat_module[1]))
+      {
+         spf_module_port_conn_t *op_port_conn_list_ptr =
+            &open_rsp_ptr->op_data_port_conn_list_ptr[open_rsp_ptr->num_op_data_port_conn];
+
+         op_port_conn_list_ptr->self_mod_port_hdl.port_ctx_hdl = (spf_handle_t *)gu_ptr;
+
+         op_port_conn_list_ptr->self_mod_port_hdl.module_inst_id = cmd_conn_ptr->src_mod_inst_id;
+         op_port_conn_list_ptr->self_mod_port_hdl.module_port_id = cmd_conn_ptr->src_mod_op_port_id;
+         op_port_conn_list_ptr->self_mod_port_hdl.port_type      = PORT_TYPE_DATA_OP;
+         op_port_conn_list_ptr->self_mod_port_hdl.sub_graph_id   = is_sat_module[0]->sub_graph_id;
+
+         op_port_conn_list_ptr->peer_mod_port_hdl.port_ctx_hdl   = NULL;
+         op_port_conn_list_ptr->peer_mod_port_hdl.module_inst_id = cmd_conn_ptr->dst_mod_inst_id;
+         op_port_conn_list_ptr->peer_mod_port_hdl.module_port_id = cmd_conn_ptr->dst_mod_ip_port_id;
+         op_port_conn_list_ptr->peer_mod_port_hdl.port_type      = PORT_TYPE_DATA_IP;
+         op_port_conn_list_ptr->peer_mod_port_hdl.sub_graph_id   = 0; // this module doesn't belong to the container.
+
+         open_rsp_ptr->num_op_data_port_conn++;
+      }
+      else if ((NULL == is_sat_module[0]) && is_sat_module[1])
+      {
+         spf_module_port_conn_t *ip_port_conn_list_ptr =
+            &open_rsp_ptr->ip_data_port_conn_list_ptr[open_rsp_ptr->num_ip_data_port_conn];
+
+         // Important: APM expects a non-zero handle, so seems ok to return this handle as a workaround.
+         // currently APM or the peer cntr that gets this handle is not interpreting this.
+         // just need to ensure peer doesnt not use this info to interpreset at spf handle.
+         // it just needs to use this handle to ensure connect is completed with the peer.
+         ip_port_conn_list_ptr->self_mod_port_hdl.port_ctx_hdl = (spf_handle_t *)gu_ptr;
+
+         ip_port_conn_list_ptr->self_mod_port_hdl.module_inst_id = cmd_conn_ptr->dst_mod_inst_id;
+         ip_port_conn_list_ptr->self_mod_port_hdl.module_port_id = cmd_conn_ptr->dst_mod_ip_port_id;
+         ip_port_conn_list_ptr->self_mod_port_hdl.port_type      = PORT_TYPE_DATA_IP;
+         ip_port_conn_list_ptr->self_mod_port_hdl.sub_graph_id   = is_sat_module[1]->sub_graph_id;
+
+         ip_port_conn_list_ptr->peer_mod_port_hdl.port_ctx_hdl   = NULL;
+         ip_port_conn_list_ptr->peer_mod_port_hdl.module_inst_id = cmd_conn_ptr->src_mod_inst_id;
+         ip_port_conn_list_ptr->peer_mod_port_hdl.module_port_id = cmd_conn_ptr->src_mod_op_port_id;
+         ip_port_conn_list_ptr->peer_mod_port_hdl.port_type      = PORT_TYPE_DATA_OP;
+         ip_port_conn_list_ptr->peer_mod_port_hdl.sub_graph_id   = 0; // this module doesn't belong to the container.
+
+         open_rsp_ptr->num_ip_data_port_conn++;
+      }
+   }
+
+// OLC doesnt not host any modules with ctrl link hence not required to handle the response.
+#if 0
+   for (uint32_t i = 0; i < open_cmd_ptr->num_module_ctrl_links; i++)
+   {
+      apm_module_ctrl_link_cfg_t *cmd_ctrl_link_ptr = open_cmd_ptr->mod_ctrl_link_cfg_list_pptr[i];
+
+      gu_module_t *peer1_module_ptr = gu_find_module(gu_ptr, cmd_ctrl_link_ptr->peer_1_mod_iid);
+      gu_module_t *peer2_module_ptr = gu_find_module(gu_ptr, cmd_ctrl_link_ptr->peer_2_mod_iid);
+
+      gu_ctrl_port_t *peer1_port_ptr =
+         gu_find_ctrl_port_by_id(peer1_module_ptr, cmd_ctrl_link_ptr->peer_1_mod_ctrl_port_id);
+      gu_ctrl_port_t *peer2_port_ptr =
+         gu_find_ctrl_port_by_id(peer2_module_ptr, cmd_ctrl_link_ptr->peer_2_mod_ctrl_port_id);
+
+      if (peer1_module_ptr && peer1_port_ptr && peer1_port_ptr->ext_ctrl_port_ptr)
+      {
+         gu_ext_ctrl_port_t *ext_ctrl_port_ptr = peer1_port_ptr->ext_ctrl_port_ptr;
+
+         spf_module_port_conn_t *ctrl_port_conn_list_ptr =
+            &open_rsp_ptr->ctrl_port_conn_list_ptr[open_rsp_ptr->num_ctrl_port_conn];
+
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.port_ctx_hdl   = &ext_ctrl_port_ptr->this_handle;
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.module_inst_id = cmd_ctrl_link_ptr->peer_1_mod_iid;
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.module_port_id = cmd_ctrl_link_ptr->peer_1_mod_ctrl_port_id;
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.domain_id      = host_domain_id;
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.port_type      = PORT_TYPE_CTRL_IO;
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.sub_graph_id   = peer1_port_ptr->module_ptr->sg_ptr->id;
+
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.port_ctx_hdl   = NULL;
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.module_inst_id = cmd_ctrl_link_ptr->peer_2_mod_iid;
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.module_port_id = cmd_ctrl_link_ptr->peer_2_mod_ctrl_port_id;
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.domain_id      = ext_ctrl_port_ptr->peer_domain_id;
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.port_type      = PORT_TYPE_CTRL_IO;
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.sub_graph_id   = 0; // this module doesn't belong to the container.
+
+         open_rsp_ptr->num_ctrl_port_conn++;
+      }
+
+      if (peer2_module_ptr && peer2_port_ptr && peer2_port_ptr->ext_ctrl_port_ptr)
+      {
+         gu_ext_ctrl_port_t *ext_ctrl_port_ptr = peer2_port_ptr->ext_ctrl_port_ptr;
+
+         spf_module_port_conn_t *ctrl_port_conn_list_ptr =
+            &open_rsp_ptr->ctrl_port_conn_list_ptr[open_rsp_ptr->num_ctrl_port_conn];
+
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.port_ctx_hdl   = &ext_ctrl_port_ptr->this_handle;
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.module_inst_id = cmd_ctrl_link_ptr->peer_2_mod_iid;
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.module_port_id = cmd_ctrl_link_ptr->peer_2_mod_ctrl_port_id;
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.domain_id      = host_domain_id;
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.port_type      = PORT_TYPE_CTRL_IO;
+         ctrl_port_conn_list_ptr->self_mod_port_hdl.sub_graph_id   = peer2_port_ptr->module_ptr->sg_ptr->id;
+
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.port_ctx_hdl   = NULL;
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.module_inst_id = cmd_ctrl_link_ptr->peer_1_mod_iid;
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.module_port_id = cmd_ctrl_link_ptr->peer_1_mod_ctrl_port_id;
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.domain_id      = ext_ctrl_port_ptr->peer_domain_id;
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.port_type      = PORT_TYPE_CTRL_IO;
+         ctrl_port_conn_list_ptr->peer_mod_port_hdl.sub_graph_id   = 0; // this module doesn't belong to the container.
+
+         open_rsp_ptr->num_ctrl_port_conn++;
+      }
+   }
+#endif
+
+   OLC_SPGM_MSG(gu_ptr->log_id,
+          DBG_MED_PRIO,
+          "GRAPH_OPEN: sending response num_ip_hdl %lu, num_op_hdl %lu, num_ctr_hdl %lu",
+          open_rsp_ptr->num_ip_data_port_conn,
+          open_rsp_ptr->num_op_data_port_conn,
+          open_rsp_ptr->num_ctrl_port_conn);
+
+   TRY(result, spf_msg_send_response(&rsp_msg));
+
+   spf_msg_return_msg(cmd_msg_ptr);
+
+   CATCH(result, OLC_SPGM_MSG_PREFIX, gu_ptr->log_id)
+   {
+   }
    return result;
 }

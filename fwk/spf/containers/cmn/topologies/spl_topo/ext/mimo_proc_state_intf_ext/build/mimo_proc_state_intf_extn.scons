@@ -1,0 +1,69 @@
+'''
+/*==============================================================================
+@file mimo_proc_state_intf_extn.scons
+@brief 
+==============================================================================*/
+
+'''
+
+Import('env')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS = '-ffunction-sections')
+
+core_public_apis = [
+   'DAL',
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+platform_public_apis = [
+    'QAIC',
+    'STDDEF',
+    'HAPSDK'
+    ]
+
+env.RequirePublicApi(platform_public_apis, area='platform') # This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS', 'CAPI_LIBRARY_FACTORY', 'MODULE_INTERFACES_UTILS'])
+env.RequireProtectedApi('AVS')
+env.RequirePublicApi(['AMDB',])
+env.RequireRestrictedApi('AVS_CONVERTER_PROFILE')
+env.RequireRestrictedApi(['AVS','SHARED_LIBRARY_INC_PATHS'])
+env.RequireProtectedApi('AVS')
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = ".."
+LIBNAME = 'spl_topo_mimo_proc_state_intf_extn'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+# Generate regular source file list
+if env.get('hy22') == True:
+   avs_reg_sources = env.GlobSourceFiles(['src/*.c', 'src/public/*.c'], SRCPATH,posix=True)
+else:
+   avs_reg_sources = env.GlobSourceFiles(['src/*.c', 'src/prop/*.c'], SRCPATH,posix=True)
+  
+# Generate stub source file list
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.c', 'stub_src/*.S'], SRCPATH,posix=True)
+
+# Genate  source file list
+avs_fwk_sources = []
+non_island_reg_sources= []
+island_reg_sources = []
+if 'USES_AUDIO_IN_ISLAND' in env:
+    non_island_reg_sources,island_reg_sources = env.IslandFilter(avs_reg_sources)
+    non_island_stub_sources,island_stub_sources = env.IslandFilter(avs_stub_sources)
+    if 'USES_AVS_LIBRARY_BUILDER' in env:
+        env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME, [non_island_reg_sources, non_island_stub_sources, avs_fwk_sources], PACK_SRC=True)
+    if (len(island_reg_sources) > 0) or (len(island_stub_sources) > 0):   
+        get_island_lib = env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME+'_island', [island_reg_sources,island_stub_sources, avs_fwk_sources], PACK_SRC=True)
+    
+else:
+    env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME, [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+    
+   
+   

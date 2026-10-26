@@ -1,0 +1,18 @@
+'''
+/*==============================================================================
+@file module_interfaces.api
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+env.Replace(AVS_ROOT = '${INC_ROOT}/${AVS_AU_NAME}/fwk')
+
+   
+env.PublishRestrictedApi('AVS',[
+   '${AVS_ROOT}/spf/interfaces/fwk/api'
+   ])  
+   
+env.LoadAPIUnits()
