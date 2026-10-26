@@ -491,7 +491,7 @@ static void *posal_data_alloc_log_buffer_internal(uint32_t                buf_si
     * Returns NULL if log code is disabled on the GUI
     */
 
-   log_pkt_ptr = log_alloc(log_code, log_pkt_size);
+   log_pkt_ptr = (void *)(uintptr_t) log_alloc(log_code, log_pkt_size);
    if (NULL == log_pkt_ptr)
    {
       AR_MSG(DBG_ERROR_PRIO, "posal_data_alloc(): Invalid log ptr allocation log_pkt_ptr = %p", log_pkt_ptr);
