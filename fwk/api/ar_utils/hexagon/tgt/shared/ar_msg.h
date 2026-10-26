@@ -15,12 +15,6 @@
 #include "ar_guids.h"
 #include "HAP_farf.h"
 
-/** MSG to FARF converter & Diag utilities needed only for .so files.*/
-/* Include Diag message utitlity headers */
-#include "msg.h"
-#include "msgcfg.h"
-
-
 //map elite to Diag mask
 #define DBG_LOW_PRIO   MSG_LEGACY_LOW    /**< Low priority debug message. */
 #define DBG_MED_PRIO   MSG_LEGACY_MED    /**< Medium priority debug message. */
@@ -35,6 +29,45 @@
 #endif
 
 #define AR_MSG_ISLAND AR_MSG   //for now - pending discussion to add hap_debug_v2_uimage
+
+/*@{*/ /* start group MSG_MASK definitions for legacy MSG macros */
+/*!
+  If the message mask is MSG_LEGACY_LOW client would only see the message if
+  run time mask for low  is turned on
+*/
+#define MSG_LEGACY_LOW MSG_MASK_0
+
+/*!
+  If the message mask is MSG_LEGACY_MED client would only see the message if
+  run time mask for med  is turned on for the subsystem id
+*/
+#define MSG_LEGACY_MED MSG_MASK_1
+
+/*!
+  If the message mask is MSG_LEGACY_HIGH client would only see the message if
+  run time mask for high  is turned on for the subsystem id
+*/
+#define MSG_LEGACY_HIGH MSG_MASK_2
+
+/*!
+  If the message mask is MSG_LEGACY_ERROR client would only see the message if
+  run time mask for error is turned on for the subsystem id
+*/
+#define MSG_LEGACY_ERROR MSG_MASK_3
+
+/*!
+  If the message mask is MSG_LEGACY_FATAL client would only see the message if
+  run time mask for fatal is turned on for the subsystem id
+*/
+#define MSG_LEGACY_FATAL MSG_MASK_4
+/*@}*/ /* end group MSG_MASK definitions for legacy MSG macros */
+/*@{*/ /* start group MSG_MASK definitions for MSG 2.0 macros */
+#define MSG_MASK_0 (0x00000001)
+#define MSG_MASK_1 (0x00000002)
+#define MSG_MASK_2 (0x00000004)
+#define MSG_MASK_3 (0x00000008)
+#define MSG_MASK_4 (0x00000010)
+/*@}*/ /* end group MSG_MASK definitions for MSG 2.0 macros */
 
 static inline uint16 diag_to_farf_mask_map(uint16 xx_ss_mask) {
     switch(xx_ss_mask) {
