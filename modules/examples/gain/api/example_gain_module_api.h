@@ -41,6 +41,7 @@
 #define MODULE_ID_EXAMPLE_GAIN_MODULE 0x0700106F
 /** @h2xmlm_module       {"MODULE_ID_EXAMPLE_GAIN_MODULE",
                            MODULE_ID_EXAMPLE_GAIN_MODULE}
+    @h2xmlm_builtIn     {FALSE}
     @h2xmlm_displayName {"Example - Gain"}
     @h2xmlm_description  {Gain Module \n
                           - Supports following params:

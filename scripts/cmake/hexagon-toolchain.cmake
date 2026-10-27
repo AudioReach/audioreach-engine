@@ -7,6 +7,9 @@
 #
 # HEXAGON_SDK_ROOT: Full path to hexagon SDK
 
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR hexagon)
+
 if (NOT HEXAGON_SDK_ROOT AND NOT CONFIG_HEXAGON_SDK_ROOT)
 	#message(FATAL_ERROR
 #		"Please specify path to HEXAGON_SDK_ROOT either in config or in cmdline.\n")
