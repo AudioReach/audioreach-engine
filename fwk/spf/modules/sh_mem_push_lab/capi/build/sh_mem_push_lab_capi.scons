@@ -1,0 +1,69 @@
+'''
+/*==============================================================================
+@file sh_mem_push_lab_capi.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS = '-ffunction-sections')
+
+core_public_apis = [
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequireRestrictedApi(['MODULE_INTERFACES_API', 'MODULE_INTERFACES_UTILS', 'CAPI_CMN_LIB'])
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS'])
+env.RequireRestrictedApi('SVA_COMMON_SHARED_INCS')
+env.RequireProtectedApi('AVS')
+env.PublishPrivateApi('AVS',[
+   '../inc',
+   '../../lib/inc',
+   ])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'capi_sh_mem_push_lab'
+LIBNAME_STUB = LIBNAME+'_stub'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+avs_sources = env.GlobSourceFiles(['src/*.c'], SRCPATH,posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.c'], SRCPATH,posix=True)
+
+if 'USES_SH_MEM_PUSH_LAB_UNIT_TEST' in env:
+   avs_sources = env.GlobSourceFiles(['src/*.c','tst/*.c'], SRCPATH,posix=True)
+
+platform_public_apis = [
+  'STDDEF', # AEEDef
+  'HAPSDK', # HAP_debug, farf etc
+    ]
+
+# This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+env.RequirePublicApi(platform_public_apis, area='platform')
+
+bucket= ['AVS_ADSP','AVS_ADSP_USER']
+if 'USES_AVS_SHARED_LIBS' in env:
+    bucket = 'AVS_SHARED'
+
+if 'USES_AUDIO_IN_ISLAND' in env:
+    non_island_sources,island_sources = env.IslandFilter(avs_sources)
+    env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME, non_island_sources)
+    get_island_lib = env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME+'_island', [island_sources])
+    env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)
+    if 'USES_MEMSEG' in env:
+      env.TagLibraryForMemorySegment(bucket, 'va', get_island_lib)
+    elif 'USES_ISLAND' in env:
+      env.AddIslandLibrary(bucket, get_island_lib)
+else:      
+    env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME, avs_sources) 
+    env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)

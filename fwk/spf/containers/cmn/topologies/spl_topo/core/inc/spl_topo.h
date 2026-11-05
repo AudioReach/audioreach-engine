@@ -257,8 +257,13 @@ typedef union spl_topo_simp_topo_L1_flags_t
 
       uint32_t any_source_module        : 1;  // set if there is any source module in the topo.
 
+      uint32_t requires_ipc_port_extn: 1; // set if there is any module that requires ipc fwk extension/virtual ports.
+                                          // currently ipc modules cannot be supported in simp topo since source modules
+                                          // are supported. and ipc rx behaves as source module.
+
       // uint32_t active_tp             : 1;  // flag to check if there is active data trigger policy in the topo
                                               // duplicate of topo.t_base.num_data_tpm
+
    };
    uint32_t word;
 } spl_topo_simp_topo_L1_flags_t;

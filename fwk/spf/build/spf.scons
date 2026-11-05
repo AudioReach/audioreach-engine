@@ -1,0 +1,25 @@
+'''
+/*==============================================================================
+@file spf.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+import os
+
+if 'USES_CONTAINER_ASYNC_CMD_HANDLING' in env:
+   env.Append(CPPDEFINES="CONTAINER_ASYNC_CMD_HANDLING")
+
+if 'USES_PASS_THRU_CONTAINER' in env:
+   env.Append(CPPDEFINES="USES_PASS_THRU_CONTAINER")
+
+env.RequireRestrictedApi(['MODULE_INTERFACES_API', 'CAPI_APPI_WRAPPER', 'MODULE_INTERFACES_UTILS', 'APPI_CMN_LIB', 'CAPI_CMN_LIB', 'SHARED_LIBRARY_INC_PATHS'])
+env.PublishProtectedApi('AVS',[
+'${AVS_ROOT}/platform/init/pd/inc',
+'${AVS_ROOT}/utest/framework/apm/inc',
+'${AVS_ROOT}/utest/core_drv/inc'
+   ])
+env.LoadSoftwareUnits()

@@ -81,8 +81,15 @@ typedef struct pt_cntr_module_t
    // TODO: for memory opt storing per module, ideally should be stored per port, can change this if such requirement
    // comes in future.
    /**<  alloc/free fn valid only for sink eps which support extn INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE*/
-   intf_extn_get_module_input_buf_func_t     get_input_buf_fn;
-   intf_extn_return_module_output_buf_func_t return_output_buf_fn;
+   intf_extn_get_module_input_buf_func_t     get_input_buf_fn; // todo_mdf: rename to get_buf_fn to unify with V2 event
+   intf_extn_return_module_output_buf_func_t return_output_buf_fn; // todo_mdf: rename to get_buf_fn to unify with V2 event
+
+   // // fns related INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE_V2
+   // // todo_mdf: unify INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE_V2 & INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE_V1
+   // // needs to update all modules to V2 tdm, push/pull, codec dma, usb etc.
+   // intf_extn_get_module_port_buf_func_t     get_port_buf_fn;
+   // intf_extn_return_module_port_buf_func_t return_port_buf_fn;
+
    uint32_t                                  buffer_mgr_cb_handle;
    capi_err_t (*process)(capi_t *_pif, capi_stream_data_t *input[], capi_stream_data_t *output[]);
 
@@ -165,6 +172,8 @@ to reduce malloc overheads we do one single allocation
 #define PT_CNTR_GET_EXT_IN_PORT_Q_ADDR(x) (CU_PTR_PUT_OFFSET(x, ALIGN_8_BYTES(sizeof(pt_cntr_ext_in_port_t))))
 #define PT_CNTR_GET_EXT_OUT_PORT_Q_ADDR(x) (CU_PTR_PUT_OFFSET(x, ALIGN_8_BYTES(sizeof(pt_cntr_ext_out_port_t))))
 
+#define PT_CNTR_EXT_IN_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(pt_cntr_ext_in_port_t)))
+#define PT_CNTR_EXT_OUT_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(pt_cntr_ext_out_port_t)))
 #define PT_CNTR_EXT_CTRL_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(pt_cntr_ext_ctrl_port_t)))
 #define PT_CNTR_INT_CTRL_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(pt_cntr_int_ctrl_port_t)))
 

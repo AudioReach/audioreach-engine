@@ -98,7 +98,7 @@ ar_result_t gen_cntr_st_prepare_input_buffers_per_port(gen_cntr_t *me_ptr, gen_c
       }
 
       /** try to fill buf for Signal trigger */
-      ext_in_port_ptr->vtbl_ptr->on_trigger(me_ptr, ext_in_port_ptr);
+      ext_in_port_ptr->vtbl_ptr->on_trigger(&me_ptr->cu, (gu_ext_in_port_t *)ext_in_port_ptr);
 
       if (AR_DID_FAIL(result))
       {
@@ -135,6 +135,22 @@ ar_result_t gen_cntr_st_prepare_input_buffers(gen_cntr_t *me_ptr)
       gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)in_port_list_ptr->ext_in_port_ptr;
 
       result |= gen_cntr_st_prepare_input_buffers_per_port(me_ptr, ext_in_port_ptr);
+   }
+
+   /* Iterate through all exterior input ports and pop the buffer from the queue */
+   for (gu_ext_in_port_list_t *ipc_in_port_list_ptr = me_ptr->topo.gu.ipc_ext_in_port_list_ptr;
+        (NULL != ipc_in_port_list_ptr);
+        LIST_ADVANCE(ipc_in_port_list_ptr))
+   {
+      gen_topo_input_port_t *in_port_ptr =
+         (gen_topo_input_port_t *)ipc_in_port_list_ptr->ext_in_port_ptr->int_in_port_ptr;
+
+      if (TOPO_PORT_STATE_STARTED != in_port_ptr->common.state)
+      {
+         continue;
+      }
+
+      result |= cu_poll_and_setup_ipc_input_port_buffer(&me_ptr->cu, ipc_in_port_list_ptr->ext_in_port_ptr, NULL, ALLOW_UNDERRUN);
    }
 
    return result;
@@ -186,7 +202,7 @@ ar_result_t gen_cntr_st_prepare_output_buffers_per_ext_out_port(gen_cntr_t      
       return result;
    }
 
-   result = ext_out_port_ptr->vtbl_ptr->setup_bufs(me_ptr, ext_out_port_ptr);
+   result = ext_out_port_ptr->vtbl_ptr->setup_bufs(&me_ptr->cu, (gu_ext_out_port_t *)ext_out_port_ptr);
 
    // assigns ext buffer to topo buffer if possible, else topo buffer will be assigned during module process context
    if (ext_out_port_ptr->vtbl_ptr->setup_topo_buf)
@@ -207,6 +223,22 @@ ar_result_t gen_cntr_st_prepare_output_buffers(gen_cntr_t *me_ptr)
    {
       gen_cntr_ext_out_port_t *ext_out_port_ptr = (gen_cntr_ext_out_port_t *)out_port_list_ptr->ext_out_port_ptr;
       gen_cntr_st_prepare_output_buffers_per_ext_out_port(me_ptr, ext_out_port_ptr);
+   }
+
+   for (gu_ext_out_port_list_t *ipc_out_port_list_ptr = me_ptr->topo.gu.ipc_ext_out_port_list_ptr;
+        (NULL != ipc_out_port_list_ptr);
+        LIST_ADVANCE(ipc_out_port_list_ptr))
+   {
+      gen_topo_output_port_t *out_port_ptr =
+         (gen_topo_output_port_t *)ipc_out_port_list_ptr->ext_out_port_ptr->int_out_port_ptr;
+
+      if (TOPO_PORT_STATE_STARTED != out_port_ptr->common.state)
+      {
+         continue;
+      }
+
+      result |=
+         cu_poll_and_setup_ipc_output_port_buffer(&me_ptr->cu, ipc_out_port_list_ptr->ext_out_port_ptr, NULL, ALLOW_OVERRUN);
    }
 
    return result;

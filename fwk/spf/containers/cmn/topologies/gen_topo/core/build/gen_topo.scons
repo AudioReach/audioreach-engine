@@ -1,0 +1,87 @@
+'''
+/*==============================================================================
+@file gen_topo.scons
+@brief
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+CBSP_API = [
+   'BOOT',
+   'DAL',
+   'DEBUGTOOLS',
+   'HAL',
+   'MPROC',
+   'POWER',
+   'SERVICES',
+   'SYSTEMDRIVERS',
+
+   # needs to be last also contains wrong comdef.h
+   'KERNEL',
+]
+
+env.RequirePublicApi(CBSP_API,area='core')
+env.RequireRestrictedApi(['AVS', 'MODULE_INTERFACES_API', 'SHARED_LIBRARY_INC_PATHS'])
+env.RequireProtectedApi('AVS')
+
+platform_public_apis = [
+    'QAIC',
+    'STDDEF',
+    'HAPSDK'
+    ]
+
+env.RequirePublicApi([
+  'AMDB',
+])
+env.RequirePublicApi(platform_public_apis, area='platform') # This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+
+
+
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = ".."
+LIBNAME = 'gen_topo_core'
+
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+# Generate regular source file list
+
+avs_reg_sources = env.GlobSourceFiles(['src/*.c'], SRCPATH, posix=True)
+
+# Generate stub source file list
+avs_stub_sources = []
+
+# Genate  source file list
+avs_fwk_sources = []
+
+non_island_reg_sources= []
+island_reg_sources = []
+if 'USES_AUDIO_IN_ISLAND' in env:
+    non_island_reg_sources,island_reg_sources = env.IslandFilter(avs_reg_sources)
+    non_island_stub_sources,island_stub_sources = env.IslandFilter(avs_stub_sources)
+
+    if 'USES_METADATA_IN_NLPI' in env:
+        adv_island_sources = env.AvsPatternFilter(island_reg_sources, "*_md_island*")[1]
+        island_reg_sources = list(set(island_reg_sources) - set(adv_island_sources))
+        non_island_reg_sources = list(set(avs_reg_sources) - set(island_reg_sources))
+
+    if 'USES_TGP_CHANGE_IN_NLPI' in env:
+        adv_island_sources = env.AvsPatternFilter(island_reg_sources, "*_trigger_policy_change_island*")[1]
+        island_reg_sources = list(set(island_reg_sources) - set(adv_island_sources))
+        non_island_reg_sources = list(set(avs_reg_sources) - set(island_reg_sources))
+
+    if 'USES_AVS_LIBRARY_BUILDER' in env:
+        env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+        [non_island_reg_sources, non_island_stub_sources, avs_fwk_sources], PACK_SRC=True)
+    get_island_lib = env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME+'_island', [island_reg_sources,island_stub_sources, avs_fwk_sources], PACK_SRC=True)
+
+else:
+    env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+      [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+
+

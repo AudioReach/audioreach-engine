@@ -1,0 +1,52 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+
+Import('env')
+
+core_public_apis = [
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS'])
+env.RequireRestrictedApi('SVA_COMMON_SHARED_INCS')
+env.RequireProtectedApi('AVS')
+env.PublishPrivateApi('AVS',[
+   '../inc',
+      ])   
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = ".."
+
+LIBNAME = 'gain_module_lib'
+LIBNAME_STUB = LIBNAME+'_stub'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+avs_sources = env.GlobSourceFiles(['src/*.cpp', 'src/*.c'], SRCPATH,posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.cpp', 'stub_src/*.c'], SRCPATH,posix=True)
+
+platform_public_apis = [
+    'STDDEF', # AEEDef
+    'HAPSDK', # HAP_debug, farf etc
+]
+
+# This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+env.RequirePublicApi(platform_public_apis, area='platform')
+
+if env.get('OEM_ROOT'):
+    bucket = ['AVS_ADSP','AVS_ADSP_USER','HAP_AVS_ADSP']
+else:
+    bucket = ['AVS_ADSP','AVS_ADSP_USER', 'AVS_SHARED']
+
+env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME, avs_sources) 
+env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)

@@ -349,39 +349,50 @@ bool_t gen_topo_is_module_active(gen_topo_module_t *module_ptr, bool_t need_to_i
          return FALSE;
       }
 
-      for (gu_input_port_list_t *in_port_list_ptr = module_ptr->gu.input_port_list_ptr; (NULL != in_port_list_ptr);
-           LIST_ADVANCE(in_port_list_ptr))
+      gu_input_port_list_t *in_port_lists[] = { module_ptr->gu.input_port_list_ptr,
+                                                module_ptr->gu.ipc_input_port_list_ptr };
+      for (uint32_t i = 0; i < SIZE_OF_ARRAY(in_port_lists); i++)
       {
-         gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
-         // If the input port is not started or doesn't have a buffer (media-fmt prop didn't happen)
-         // then process cannot be called on the module.
-         if ((TOPO_PORT_STATE_STARTED != in_port_ptr->common.state))
+         for (gu_input_port_list_t *in_port_list_ptr = in_port_lists[i]; in_port_list_ptr != NULL;
+              LIST_ADVANCE(in_port_list_ptr))
          {
-            continue;
-         }
-         else
-         {
-            atleast_one_active_input = TRUE;
-            break;
+            gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
+            // If the input port is not started or doesn't have a buffer (media-fmt prop didn't happen)
+            // then process cannot be called on the module.
+            if ((TOPO_PORT_STATE_STARTED != in_port_ptr->common.state))
+            {
+               continue;
+            }
+            else
+            {
+               atleast_one_active_input = TRUE;
+               break;
+            }
          }
       }
 
-      for (gu_output_port_list_t *out_port_list_ptr = module_ptr->gu.output_port_list_ptr; (NULL != out_port_list_ptr);
-           LIST_ADVANCE(out_port_list_ptr))
+      gu_output_port_list_t *out_port_lists[] = { module_ptr->gu.output_port_list_ptr,
+                                                  module_ptr->gu.ipc_output_port_list_ptr };
+      for (uint32_t i = 0; i < SIZE_OF_ARRAY(out_port_lists); i++)
       {
-         gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
+         for (gu_output_port_list_t *out_port_list_ptr = out_port_lists[i]; (NULL != out_port_list_ptr);
+              LIST_ADVANCE(out_port_list_ptr))
+         {
+            gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
 
-         if (!(TOPO_PORT_STATE_STARTED == out_port_ptr->common.state))
-         {
-            continue;
-         }
-         else
-         {
-            atleast_one_active_output = TRUE;
-            break;
+            if (TOPO_PORT_STATE_STARTED != out_port_ptr->common.state)
+            {
+               continue;
+            }
+            else
+            {
+               atleast_one_active_output = TRUE;
+               break;
+            }
          }
       }
    }
+
    /**
     * at least one input or output must be active or module must support STM ext (=HW-EP mainly, in which case even if
     * input or output is not present we can call the module)

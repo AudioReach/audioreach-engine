@@ -876,7 +876,7 @@ void *apm_offload_memory_malloc_v1(uint32_t sat_domain_id, uint32_t req_size, ap
       if (APM_OFFLOAD_INVALID_VAL == master_idx)
       {
 #ifdef APM_OFFLOAD_MEMORY_DBG
-         AR_MSG(DBG_ERROR_PRIO, "apm_offload_memory_malloc_v1: sat book at index %lu not valid", i);
+         AR_MSG(DBG_HIGH_PRIO, "apm_offload_memory_malloc_v1: Warning! sat book at index %lu not valid", i);
 #endif
          continue;
       }

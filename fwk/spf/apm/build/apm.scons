@@ -1,0 +1,77 @@
+'''
+/*==============================================================================
+@file apm.scons
+@brief 
+
+================================================================================
+
+'''
+
+Import('env')
+if 'CSMD_COSIM' in env:
+  env.Append(CFLAGS = '-DCOSIM')
+  env.Append(CPPFLAGS = '-DCOSIM')
+
+env.PublishPrivateApi('AVS',[
+   '${AVS_ROOT}/spf/apm/core/inc',
+   '${AVS_ROOT}/spf/apm/core/src',
+   '${AVS_ROOT}/spf/apm/ext/cmn/inc',
+   '${AVS_ROOT}/spf/apm/ext/offload/inc',
+   '${AVS_ROOT}/spf/apm/ext/offload/src',
+   #'${AVS_ROOT}/spf/apm/ext/proxy/inc',
+   '${AVS_ROOT}/spf/apm/ext/data_path/inc',
+   '${AVS_ROOT}/spf/apm/ext/close_all/inc',
+   '${AVS_ROOT}/spf/apm/ext/shared_mem/inc',
+   '${AVS_ROOT}/utest/framework/inc',
+   '${AVS_ROOT}/spf/apm/ext/proxy/proxy_cmn/inc',
+   '${AVS_ROOT}/spf/apm/ext/proxy/proxy_irm/inc',
+   '${AVS_ROOT}/spf/apm/ext/proxy/proxy_vcpm/inc',
+   '${AVS_ROOT}/spf/apm/ext/graph_utils/inc',
+   '${AVS_ROOT}/spf/apm/ext/err_hdlr/inc',
+   '${AVS_ROOT}/spf/apm/ext/sys_util/inc',
+   '${AVS_ROOT}/spf/apm/ext/pwr_mgr/inc',
+   '${AVS_ROOT}/spf/apm/ext/gpr_cmd_rsp_hdlr/inc', 
+   '${AVS_ROOT}/spf/apm/ext/set_get_cfg/inc',
+   '${AVS_ROOT}/spf/apm/ext/spf_cmd_hdlr/inc',
+   '${AVS_ROOT}/spf/apm/ext/cntr_peer_heap_utils/inc',
+   '${AVS_ROOT}/spf/apm/ext/runtime_link_hdlr/inc',
+   '${AVS_ROOT}/spf/apm/ext/parallel_cmd_utils/inc',
+   '${AVS_ROOT}/spf/apm/ext/apm_db_query/inc',
+   '${AVS_ROOT}/spf/apm/ext/debug_info_dump/inc',
+   '${AVS_ROOT}/spf/apm/ext/debug_info_cfg/inc',
+   '${AVS_ROOT}/spf/apm/ext/multi_client/inc',
+   ])
+
+CBSP_API = [
+   'BOOT',
+   'DAL',
+   'DEBUGTOOLS',
+   'HAL',
+   'MPROC',
+   'POWER',
+   'SERVICES',
+   'SYSTEMDRIVERS',
+
+   # needs to be last also contains wrong comdef.h
+   'KERNEL',   
+]
+
+env.RequirePublicApi(CBSP_API,area='core')
+env.RequireRestrictedApi(['AVS'])
+env.RequireProtectedApi('AVS')
+env.RequirePrivateApi(['AVS'])
+
+platform_public_apis = [
+    'QAIC',
+    'STDDEF',
+    'HAPSDK'
+    ]
+
+env.RequirePublicApi([
+  'AMDB',
+])
+
+
+env.LoadSoftwareUnits()  
+
+

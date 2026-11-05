@@ -1,0 +1,27 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#-------------------------------------------------------------------------------
+#
+#  $Header:
+#  $DateTime: 2024/04/17 08:59:38 $
+#  $Author: hbansal $
+#  $Change: 53340776 $
+#                      EDIT HISTORY FOR FILE
+#
+#  This section contains comments describing changes made to the module.
+#  Notice that changes are listed in reverse chronological order.
+#
+#
+#===============================================================================
+
+Import('env')
+
+env.PublishRestrictedApi('AVS',[
+   '../api',
+   ])
+
+env.LoadAPIUnits()

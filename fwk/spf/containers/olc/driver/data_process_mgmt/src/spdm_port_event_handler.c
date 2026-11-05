@@ -164,7 +164,7 @@ ar_result_t spgm_handle_tracking_md_event(spgm_info_t *spgm_ptr, gpr_packet_t *p
          {
             OLC_SGM_MSG(OLC_SGM_ID,
                         DBG_HIGH_PRIO,
-                        "MD_DBG: tr_md_event , node not in list. Not expected in general, "
+                        "MD_DBG: tr_md_event, node not in list. Not expected in general, "
                         "unless flush happended on the read queue before.");
             return result;
          }
@@ -223,11 +223,13 @@ ar_result_t spgm_handle_tracking_md_event(spgm_info_t *spgm_ptr, gpr_packet_t *p
                bool_t                pool_used  = FALSE;
                if (ref_md_ptr)
                {
+                  // incrementing ref count just so that when tracking event function decrements
+                  // with spf_ref_counter_remove_ref() count is non zero
                   if ((1 < md_node_ref_ptr->num_ref_count) && (1 < md_node_ref_ptr->max_ref_count))
                   {
                      spf_ref_counter_add_ref((void *)ref_md_ptr->tracking_ptr);
                   }
-                  gen_topo_raise_tracking_event(spgm_ptr->cu_ptr->topo_ptr,
+                  gen_topo_raise_tracking_event(spgm_ptr->cu_ptr->gu_ptr->log_id,
                                                 md_te_ptr->source_module_instance,
                                                 node_ptr,
                                                 !is_dropped,

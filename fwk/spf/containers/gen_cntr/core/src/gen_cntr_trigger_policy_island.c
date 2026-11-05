@@ -330,24 +330,34 @@ bool_t gen_cntr_wait_for_any_ext_trigger(gen_cntr_t *me_ptr, bool_t called_from_
     */
    if (!is_entry && me_ptr->topo.num_data_tpm && process_info_ptr->anything_changed)
    {
-#ifdef VERBOSE_DEBUGGING
       // curr_trigger needs to be set b4 calling gen_cntr_ext_in_port_needs_data_buffer
       if (GEN_TOPO_SIGNAL_TRIGGER == me_ptr->topo.proc_context.curr_trigger)
       {
+#ifdef VERBOSE_DEBUGGING
          GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
                       DBG_LOW_PRIO,
                       "After processing of signal trigger, changed trigger to data trigger");
-      }
 #endif
-      // At the end of Signal trigger processing, we must be transition to data trigger before
-      // continuing to update mask/continue processing data tpm triggers. Else we can end up in infinite loop,
-      // because calling topo process with curr_trigger=SIGNAL_TRIGGER can cause underruns at ext inputs.
-      // And anything_changed will remain TRUE due to unintended underruns.
-      me_ptr->topo.proc_context.curr_trigger = GEN_TOPO_DATA_TRIGGER;
 
-      if (1 == me_ptr->cu.gu_ptr->num_parallel_paths)
+         if (1 == me_ptr->cu.gu_ptr->num_parallel_paths)
+         {
+            process_info_ptr->probing_for_tpm_activity = TRUE;
+         }
+
+
+         // At the end of Signal trigger processing, we must be transition to data trigger before
+         // continuing to update mask/continue processing data tpm triggers. Else we can end up in infinite loop,
+         // because calling topo process with curr_trigger=SIGNAL_TRIGGER can cause underruns at ext inputs.
+         // And anything_changed will remain TRUE due to unintended underruns.
+         me_ptr->topo.proc_context.curr_trigger = GEN_TOPO_DATA_TRIGGER;
+      }
+      /* For data triggered containers if there is only one module in the topo then probing is possible. */
+      else if(me_ptr->topo.gu.sorted_module_list_ptr && (NULL == me_ptr->topo.gu.sorted_module_list_ptr->next_ptr))
       {
-         process_info_ptr->probing_for_tpm_activity = TRUE;
+         if (1 == me_ptr->cu.gu_ptr->num_parallel_paths)
+         {
+            process_info_ptr->probing_for_tpm_activity = TRUE;
+         }
       }
    }
 
@@ -357,9 +367,9 @@ bool_t gen_cntr_wait_for_any_ext_trigger(gen_cntr_t *me_ptr, bool_t called_from_
         (NULL != ext_in_port_list_ptr);
         LIST_ADVANCE(ext_in_port_list_ptr))
    {
-      bool_t                  is_input_data_tpm     = FALSE;
+      bool_t                  is_input_data_tpm = FALSE;
+      gen_cntr_ext_in_port_t *ext_in_port_ptr   = (gen_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
 
-      gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
       // probe ext input only if input triggered tpm module is present
       if (process_info_ptr->probing_for_tpm_activity)
       {
@@ -572,6 +582,12 @@ bool_t gen_cntr_wait_for_any_ext_trigger(gen_cntr_t *me_ptr, bool_t called_from_
 #endif
         return CONTINUE_PROCESSING;
       }
+   }
+
+   // if container has IPC ports check their trigger and update the wait mask.
+   if (me_ptr->topo.gu.ipc_ext_in_port_list_ptr || me_ptr->topo.gu.ipc_ext_out_port_list_ptr)
+   {
+      gen_cntr_ipc_ports_update_wait_mask(me_ptr, &in_wait_mask, &out_wait_mask, &stop_mask, &optional_wait_mask);
    }
 
    /*

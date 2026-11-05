@@ -1,0 +1,55 @@
+'''
+/*==============================================================================
+@file capi_library_internal_buffer.scons
+@brief 
+==============================================================================*/
+
+'''
+
+Import('env')
+
+core_public_apis = [
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+
+restricted_apis = [
+    'AVS',
+    'SHARED_LIBRARY_INC_PATHS',
+    'MODULE_INTERFACES_UTILS',
+	  'AMDB',
+	  'MODULE_MGMT'	
+    ]   
+
+env.RequireRestrictedApi(restricted_apis)
+
+env.PublishPrivateApi('CAPI_LIBRARY_INTERNAL_BUFFER',['../inc', '${AVS_ROOT}/amdb/src'])   
+  
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = ".."
+LIBNAME = 'capi_library_internal_buffer'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+# Generate regular source file list
+reg_sources = env.GlobSourceFiles(['/src/*.cpp', '/src/*.c', '/src/*.S'], SRCPATH,posix=True)
+
+# Generate stub source file list
+stub_sources = env.GlobSourceFiles(['/stub_src/*.cpp', '/stub_src/*.c', '/stub_src/*.S'], SRCPATH,posix=True)
+
+# Genate source file list
+prop_sources = []
+
+#import pdb; pdb.set_trace()
+if 'USES_AUDIO_IN_ISLAND' in env:   
+   env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME+'_island',
+         [reg_sources, stub_sources, prop_sources])
+else:
+   if 'USES_AVS_LIBRARY_BUILDER' in env:
+      env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+         [reg_sources, stub_sources, prop_sources])

@@ -29,16 +29,17 @@ ar_result_t gen_topo_intf_extn_data_ports_hdl_at_init(gen_topo_t *topo_ptr, gen_
    VERIFY(result, module_ptr->capi_ptr);
 
    // Open all the input ports of the module in one shot.
-   if (module_ptr->gu.num_input_ports)
+   uint32_t num_input_ports = module_ptr->gu.num_input_ports + module_ptr->gu.num_ipc_input_ports;
+   if (num_input_ports)
    {
-      uint32_t size = sizeof(intf_extn_data_port_operation_t) +
-                      sizeof(intf_extn_data_port_id_idx_map_t) * module_ptr->gu.num_input_ports;
+      uint32_t size =
+         sizeof(intf_extn_data_port_operation_t) + sizeof(intf_extn_data_port_id_idx_map_t) * num_input_ports;
 
       MALLOC_MEMSET(in_port_op_ptr, intf_extn_data_port_operation_t, size, topo_ptr->heap_id, result);
 
       in_port_op_ptr->is_input_port                      = TRUE;
       in_port_op_ptr->opcode                             = INTF_EXTN_DATA_PORT_OPEN;
-      in_port_op_ptr->num_ports                          = module_ptr->gu.num_input_ports;
+      in_port_op_ptr->num_ports                          = num_input_ports;
       in_port_op_ptr->opcode_payload_buf.data_ptr        = NULL;
       in_port_op_ptr->opcode_payload_buf.actual_data_len = 0;
       in_port_op_ptr->opcode_payload_buf.max_data_len    = 0;
@@ -50,6 +51,16 @@ ar_result_t gen_topo_intf_extn_data_ports_hdl_at_init(gen_topo_t *topo_ptr, gen_
          gu_input_port_t *ip_port_ptr = in_port_list_ptr->ip_port_ptr;
          id_idx_map_ptr[j].port_id    = ip_port_ptr->cmn.id;
          id_idx_map_ptr[j].port_index = ip_port_ptr->cmn.index;
+         j++;
+      }
+
+      for (gu_input_port_list_t *ipc_in_port_list_ptr = module_ptr->gu.ipc_input_port_list_ptr;
+           (NULL != ipc_in_port_list_ptr);
+           LIST_ADVANCE(ipc_in_port_list_ptr))
+      {
+         gu_input_port_t *vir_ip_port_ptr = ipc_in_port_list_ptr->ip_port_ptr;
+         id_idx_map_ptr[j].port_id        = vir_ip_port_ptr->cmn.id;
+         id_idx_map_ptr[j].port_index     = vir_ip_port_ptr->cmn.index;
          j++;
       }
 
@@ -68,16 +79,17 @@ ar_result_t gen_topo_intf_extn_data_ports_hdl_at_init(gen_topo_t *topo_ptr, gen_
    }
 
    // Open all the output ports of the module in one shot.
-   if (module_ptr->gu.num_output_ports)
+   uint32_t num_output_ports = module_ptr->gu.num_output_ports + module_ptr->gu.num_ipc_output_ports;
+   if (num_output_ports)
    {
-      uint32_t size = sizeof(intf_extn_data_port_operation_t) +
-                      sizeof(intf_extn_data_port_id_idx_map_t) * module_ptr->gu.num_output_ports;
+      uint32_t size =
+         sizeof(intf_extn_data_port_operation_t) + sizeof(intf_extn_data_port_id_idx_map_t) * num_output_ports;
 
       MALLOC_MEMSET(out_port_op_ptr, intf_extn_data_port_operation_t, size, topo_ptr->heap_id, result);
 
       out_port_op_ptr->is_input_port                      = FALSE;
       out_port_op_ptr->opcode                             = INTF_EXTN_DATA_PORT_OPEN;
-      out_port_op_ptr->num_ports                          = module_ptr->gu.num_output_ports;
+      out_port_op_ptr->num_ports                          = num_output_ports;
       out_port_op_ptr->opcode_payload_buf.data_ptr        = NULL;
       out_port_op_ptr->opcode_payload_buf.actual_data_len = 0;
       out_port_op_ptr->opcode_payload_buf.max_data_len    = 0;
@@ -89,6 +101,16 @@ ar_result_t gen_topo_intf_extn_data_ports_hdl_at_init(gen_topo_t *topo_ptr, gen_
          gu_output_port_t *out_port_ptr = out_port_list_ptr->op_port_ptr;
          id_idx_map_ptr[j].port_id      = out_port_ptr->cmn.id;
          id_idx_map_ptr[j].port_index   = out_port_ptr->cmn.index;
+         j++;
+      }
+
+      for (gu_output_port_list_t *ipc_out_port_list_ptr = module_ptr->gu.ipc_output_port_list_ptr;
+           (NULL != ipc_out_port_list_ptr);
+           LIST_ADVANCE(ipc_out_port_list_ptr))
+      {
+         gu_output_port_t *ipc_out_port_ptr = ipc_out_port_list_ptr->op_port_ptr;
+         id_idx_map_ptr[j].port_id           = ipc_out_port_ptr->cmn.id;
+         id_idx_map_ptr[j].port_index        = ipc_out_port_ptr->cmn.index;
          j++;
       }
 

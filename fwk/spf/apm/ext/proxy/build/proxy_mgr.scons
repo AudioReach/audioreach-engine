@@ -1,0 +1,52 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+Import('env')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS = '-ffunction-sections')
+
+CBSP_API = [
+   'BOOT',
+   'DAL',
+   'DEBUGTOOLS',
+   'HAL',
+   'MPROC',
+   'POWER',
+   'SERVICES',
+   'SYSTEMDRIVERS',
+
+   # needs to be last also contains wrong comdef.h
+   'KERNEL',   
+]
+
+env.PublishPrivateApi('AVS',[
+   '${AVS_ROOT}/spf/apm/ext/proxy/proxy_cmn/inc',
+   '${AVS_ROOT}/spf/apm/ext/proxy/proxy_cmn/src',
+   '${AVS_ROOT}/spf/apm/ext/proxy/proxy_vcpm/inc',
+   '${AVS_ROOT}/spf/apm/ext/proxy/proxy_vcpm/src',
+   ])
+
+env.RequirePublicApi(CBSP_API,area='core')
+env.RequireRestrictedApi(['AVS'])
+env.RequireProtectedApi('AVS')
+env.RequirePrivateApi(['AVS'])
+
+platform_public_apis = [
+    'QAIC',
+    'STDDEF',
+    'HAPSDK'
+    ]
+
+env.RequirePublicApi([
+  'AMDB',
+])
+   
+
+env.LoadSoftwareUnits()  
+
+

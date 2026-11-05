@@ -215,8 +215,7 @@ static capi_err_t capi_gate_get_properties(capi_t *_pif, capi_proplist_t *props_
    }
    capi_prop_t *prop_ptr = props_ptr->prop_ptr;
 
-   uint32_t fwk_extn_ids[GATE_NUM_FRAMEWORK_EXTENSIONS] = { 0 };
-   fwk_extn_ids[0]                                      = FWK_EXTN_CONTAINER_PROC_DURATION;
+   uint32_t fwk_extn_ids[GATE_NUM_FRAMEWORK_EXTENSIONS] = { FWK_EXTN_CONTAINER_PROC_DURATION, FWK_EXTN_CONTAINER_FRAME_DURATION };
 
    capi_basic_prop_t mod_prop;
    mod_prop.init_memory_req    = sizeof(capi_gate_t);
@@ -374,8 +373,8 @@ static capi_err_t capi_gate_set_param(capi_t *                _pif,
          param_id_gate_deadline_offset_t *payload_ptr =
             (param_id_gate_deadline_offset_t *)params_ptr->data_ptr;
 
-         const int32_t max_deadline_offset_in_us = 10000;
-         const int32_t min_deadline_offset_in_us = -10000;
+         const int32_t max_deadline_offset_in_us = 15000;
+         const int32_t min_deadline_offset_in_us = -15000;
          if ((payload_ptr->deadline_offset_us > max_deadline_offset_in_us) ||
              (payload_ptr->deadline_offset_us < min_deadline_offset_in_us))
          {
@@ -386,6 +385,31 @@ static capi_err_t capi_gate_set_param(capi_t *                _pif,
          me_ptr->deadline_offset_us = payload_ptr->deadline_offset_us;
 
          AR_MSG(DBG_HIGH_PRIO, "capi_gate: Setting deadline offset in us %d", payload_ptr->deadline_offset_us);
+         break;
+      }
+      case PARAM_ID_GATE_ENC_PROC_TIME_SCALING:
+      {
+         if (params_ptr->actual_data_len < sizeof(param_id_gate_enc_proc_time_scale_factor_t))
+         {
+            AR_MSG(DBG_HIGH_PRIO,
+                   "capi_gate: Invalid payload size for param %x, size %d",
+                   param_id,
+                   params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
+         }
+
+         param_id_gate_enc_proc_time_scale_factor_t *payload_ptr =
+            (param_id_gate_enc_proc_time_scale_factor_t *)params_ptr->data_ptr;
+
+         if (payload_ptr->enc_proc_time_scale_factor > 32)
+         {
+            AR_MSG(DBG_ERROR_PRIO,
+                   "capi_gate: Invalid end proc time scale factor value %d", payload_ptr->enc_proc_time_scale_factor);
+            return CAPI_EBADPARAM;
+         }
+         me_ptr->frame_size_scale_factor_override = payload_ptr->enc_proc_time_scale_factor;
+
+         AR_MSG(DBG_HIGH_PRIO, "capi_gate: Setting end proc time scale factor value %d", payload_ptr->enc_proc_time_scale_factor);
          break;
       }
       case FWK_EXTN_PARAM_ID_CONTAINER_PROC_DURATION:
@@ -406,6 +430,29 @@ static capi_err_t capi_gate_set_param(capi_t *                _pif,
          me_ptr->proc_dur_received = TRUE;
 
          AR_MSG(DBG_HIGH_PRIO, "capi_gate: Setting proc delay %d", payload_ptr->proc_duration_us);
+         break;
+      }
+      case FWK_EXTN_PARAM_ID_CONTAINER_FRAME_DURATION:
+	  {
+         if (params_ptr->actual_data_len < sizeof(fwk_extn_param_id_container_frame_duration_t))
+         {
+            AR_MSG(DBG_ERROR_PRIO,
+	               "capi gate: Invalid payload size for param_id=0x%lx actual_data_len=%lu  ",
+                   param_id,
+                   params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
+         }
+
+         fwk_extn_param_id_container_frame_duration_t *cfg_ptr =
+            (fwk_extn_param_id_container_frame_duration_t *)params_ptr->data_ptr;
+
+         // It is important not to handle redundant events, since check_alloc_held_input_buffer will reallocate the
+         // buffer and flush any buffered data.
+         if (me_ptr->frame_size_us != cfg_ptr->duration_us)
+         {
+            me_ptr->frame_size_us = cfg_ptr->duration_us;
+            AR_MSG(DBG_HIGH_PRIO, "capi gate: Nominal frame duration = %lu is set.", me_ptr->frame_size_us);
+         }
          break;
       }
       case INTF_EXTN_PARAM_ID_IMCL_PORT_OPERATION:

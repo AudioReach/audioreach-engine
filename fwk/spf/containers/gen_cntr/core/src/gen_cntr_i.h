@@ -53,6 +53,10 @@ INCLUDE FILES FOR MODULE
 #include "gen_cntr_err_check.h"
 #include "gen_cntr_tgt_specific.h"
 #include "thin_topo_cntr_utils.h"
+#include "ipc_tx_rx_api.h"
+#include "gen_cntr_ipc_fwk_ext.h"
+#include "cu_ipc_fwk_ext.h"
+
 #define GEN_CNTR_STATIC static
 
 /**
@@ -81,9 +85,11 @@ resource allocation and initialization.
 #define GEN_CNTR_EXT_OUT_PORT_SIZE_W_QS (ALIGNED_SIZE_W_QUEUES(gen_cntr_ext_out_port_t, 1))
 #define GEN_CNTR_INT_CTRL_PORT_SIZE_W_QS (ALIGNED_SIZE_W_QUEUES(gen_cntr_int_ctrl_port_t, 0))
 
-#define GEN_CNTR_GET_EXT_IN_PORT_Q_ADDR(x) (CU_PTR_PUT_OFFSET(x, ALIGN_8_BYTES(sizeof(gen_cntr_ext_in_port_t))))
 #define GEN_CNTR_GET_EXT_OUT_PORT_Q_ADDR(x) (CU_PTR_PUT_OFFSET(x, ALIGN_8_BYTES(sizeof(gen_cntr_ext_out_port_t))))
+#define GEN_CNTR_GET_EXT_IN_PORT_Q_ADDR(x) (CU_PTR_PUT_OFFSET(x, ALIGN_8_BYTES(sizeof(gen_cntr_ext_in_port_t))))
 
+#define GEN_CNTR_EXT_IN_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(gen_cntr_ext_in_port_t)))
+#define GEN_CNTR_EXT_OUT_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(gen_cntr_ext_out_port_t)))
 #define GEN_CNTR_EXT_CTRL_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(gen_cntr_ext_ctrl_port_t)))
 #define GEN_CNTR_INT_CTRL_PORT_Q_OFFSET (ALIGN_8_BYTES(sizeof(gen_cntr_int_ctrl_port_t)))
 
@@ -205,7 +211,7 @@ typedef struct gen_cntr_fwk_module_vtable_t
 
 typedef struct gen_cntr_ext_in_vtable_t
 {
-   ar_result_t (*on_trigger)(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
+   ar_result_t (*on_trigger)(cu_base_t *base_ptr, gu_ext_in_port_t *ext_in_port_ptr);
    ar_result_t (*read_data)(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr, uint32_t *bytes_copied_per_buf_ptr);
    /**
     * whether the pending buffer is a data buffer
@@ -220,7 +226,7 @@ typedef struct gen_cntr_ext_in_vtable_t
 typedef struct gen_cntr_ext_out_vtable_t
 {
    // set up bufs on trigger.
-   ar_result_t (*setup_bufs)(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
+   ar_result_t (*setup_bufs)(cu_base_t *me_ptr, gu_ext_out_port_t *ext_out_port_ptr);
    ar_result_t (*write_data)(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 
    // below is only for RD SH MEM EP
@@ -376,12 +382,19 @@ typedef struct gen_cntr_stm_t
    uint32_t                           signal_miss_counter;  /**< Counter to keep track of number of signal miss encountered */
    void                               *stm_ts_ctxt_ptr; /**< ptr to the dev handle of different ep-modules */
    stm_get_ts_fn_ptr_t                update_stm_ts_fptr;   /**< function pointer to get the STM timestamp */
+
+   gu_module_list_t                  *pending_start_stm_list_ptr; /**< STM modules that needs to started */
 #ifdef ENABLE_SIGNAL_MISS_CRASH
    int32_t                            steady_state_interrupt_counter; /**< Counter incremented in process context similar to
                                                                            processed_interrupt_counter but reset after any command handling.
                                                                            used for detecting when signal miss occurs after counter is greater
                                                                            than 1000 */
 #endif
+
+#ifdef ENABLE_CNTR_PROC_TIME_PROFILING
+   uint64_t    isr_callback_ts;
+#endif
+
 } gen_cntr_stm_t;
 
 /** This object is created for each async signal added to the container channel mask.
@@ -407,6 +420,24 @@ typedef struct gen_cntr_flags_t
    uint32_t is_thread_prio_bumped_up : 1; /**< temp flag which avoids bumping up priority if already done. */
 } gen_cntr_flags_t;
 
+#ifdef ENABLE_CNTR_PROC_TIME_PROFILING
+
+#define MAX_FRAMES_TO_TRACK 100
+
+typedef struct gen_cntr_process_time_tracking_t
+{
+  uint32_t profile_curr_frame;
+  uint32_t print_curr_frame;
+  uint32_t next_index_to_update;
+  uint64_t curr_fwk_start_ts;
+  uint64_t dma_irq_latched_ts[MAX_FRAMES_TO_TRACK];
+  uint64_t isr_callback_ts[MAX_FRAMES_TO_TRACK];
+  uint64_t fwk_start_ts[MAX_FRAMES_TO_TRACK];
+  uint64_t fwk_end_ts[MAX_FRAMES_TO_TRACK];
+}gen_cntr_process_time_tracking_t;
+
+#endif //ENABLE_CNTR_PROC_TIME_PROFILING
+
 /** instance struct of GEN_CNTR */
 typedef struct gen_cntr_t
 {
@@ -419,6 +450,11 @@ typedef struct gen_cntr_t
    uint32_t         *wait_mask_arr;             /**< wait mask for each parallel path. (me_ptr->cu.gu_ptr->num_parallel_paths)
                                                      this is bitmask where each bit corresponds to an external port.*/
    spf_list_node_t  *async_signal_list_ptr;     /**< list of async signals created for the container, node type is gen_cntr_async_signal_t */
+
+
+#ifdef ENABLE_CNTR_PROC_TIME_PROFILING
+   gen_cntr_process_time_tracking_t ts_stats;
+#endif
 } gen_cntr_t;
 
 typedef struct gen_cntr_render_eos_cb_context_t
@@ -611,6 +647,7 @@ static inline bool_t gen_cntr_is_ext_in_v2(gen_cntr_ext_in_port_t *ext_port_ptr)
    return is_v2;
 }
 
+// important: this function must be not queried for IPC external ports
 static inline bool_t gen_cntr_ext_out_port_has_buffer(gu_ext_out_port_t *gu_ext_out_port_ptr)
 {
    // ext_in_port_ptr NULLness check has to be made outside.
@@ -639,6 +676,7 @@ static inline bool_t gen_cntr_ext_out_port_has_buffer(gu_ext_out_port_t *gu_ext_
 }
 
 // data buffer: note MF is not populated in data_ptr
+// Important: this function must be not queried for IPC external ports
 static inline bool_t gen_cntr_ext_in_port_has_data_buffer(gu_ext_in_port_t *gu_ext_in_port_ptr)
 {
    // ext_in_port_ptr NULLness check has to be made outside.
@@ -747,7 +785,19 @@ void        gen_cntr_reset_process_info(gen_cntr_t *me_ptr);
 
 ar_result_t gen_cntr_ext_out_port_int_reset(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 
-void     gen_cntr_clear_ext_out_bufs(gen_cntr_ext_out_port_t *ext_port_ptr, bool_t clear_max);
+void     gen_cntr_clear_ext_out_bufs_util_(gen_cntr_ext_out_port_t *ext_port_ptr, bool_t clear_max);
+
+static inline void gen_cntr_clear_ext_out_bufs(gen_cntr_ext_out_port_t *ext_port_ptr, bool_t clear_max)
+{
+   // nothing to do for IPC ext output ports
+   if(gu_is_ipc_ext_output_port(&ext_port_ptr->gu))
+   {
+      return;
+   }
+
+   return gen_cntr_clear_ext_out_bufs_util_(ext_port_ptr, clear_max);
+}
+
 bool_t   gen_cntr_is_data_present_in_ext_in_bufs(gen_cntr_ext_in_port_t *ext_in_port_ptr);
 bool_t   gen_cntr_is_data_present_in_ext_out_bufs(gen_cntr_ext_out_port_t *ext_out_port_ptr);
 void     gen_cntr_get_ext_out_total_actual_max_data_len(gen_cntr_ext_out_port_t *ext_out_port_ptr,
@@ -776,6 +826,7 @@ static inline void gen_cntr_check_and_send_prebuffers(gen_cntr_t *             m
 ar_result_t gen_cntr_workloop_async_signal_trigger_handler(cu_base_t *base_ptr, uint32_t bit_mask);
 ar_result_t gen_cntr_fwk_extn_async_signal_enable(gen_cntr_t *me_ptr, gen_topo_module_t *module_ptr);
 ar_result_t gen_cntr_fwk_extn_async_signal_disable(gen_cntr_t *me_ptr, gen_topo_module_t *module_ptr);
+ar_result_t gen_cntr_stm_fwk_extn_handle_enable(gen_cntr_t *me_ptr, gen_topo_module_t *module_ptr);
 
 void gen_cntr_set_stm_ts_to_module(gen_cntr_t *me_ptr);
 
@@ -787,6 +838,88 @@ ar_result_t gen_cntr_clear_borrowed_ext_in_buffer_from_int_ports(gen_cntr_t     
 ar_result_t gen_cntr_clear_borrowed_ext_out_buffer_from_int_ports(gen_cntr_t              *me_ptr,
                                                                   gen_cntr_ext_out_port_t *ext_out_port_ptr,
                                                                   gen_topo_output_port_t  *out_port_ptr);
+
+#ifdef ENABLE_CNTR_PROC_TIME_PROFILING
+
+static inline void gen_cntr_cache_n_print_cntr_proc_time_stats(gen_cntr_t* me_ptr)
+{
+   uint32_t fwk_end_ts = posal_timer_get_time();
+
+   if(me_ptr->ts_stats.profile_curr_frame)
+   {
+      if (me_ptr->st_module.st_module_ts_ptr)
+      {
+         me_ptr->ts_stats.dma_irq_latched_ts[me_ptr->ts_stats.next_index_to_update] = me_ptr->st_module.st_module_ts_ptr->timestamp;
+         me_ptr->ts_stats.isr_callback_ts[me_ptr->ts_stats.next_index_to_update] = me_ptr->st_module.isr_callback_ts;
+      }
+      me_ptr->ts_stats.fwk_start_ts[me_ptr->ts_stats.next_index_to_update] = me_ptr->ts_stats.curr_fwk_start_ts;
+      me_ptr->ts_stats.fwk_end_ts[me_ptr->ts_stats.next_index_to_update] = fwk_end_ts;
+
+      uint32_t i = me_ptr->ts_stats.next_index_to_update;
+
+      me_ptr->ts_stats.next_index_to_update++;
+
+      // caches every 15th frame's timestamp
+      if(me_ptr->ts_stats.next_index_to_update >= MAX_FRAMES_TO_TRACK)
+      {
+         me_ptr->ts_stats.next_index_to_update = 0;
+      }
+
+      // prints every 256 frames
+      if(me_ptr->ts_stats.print_curr_frame)
+      {
+         GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                        DBG_LOW_PRIO,
+                        "TS_STATS[%ld]: dma_irq_latched_ts (%lu, %lu)  isr_callback_ts (%lu, %lu)", i,
+                        (uint32_t)(me_ptr->ts_stats.dma_irq_latched_ts[i] >> 32),
+                        (uint32_t)(me_ptr->ts_stats.dma_irq_latched_ts[i]),
+                        (uint32_t)(me_ptr->ts_stats.isr_callback_ts[i] >> 32),
+                        (uint32_t)(me_ptr->ts_stats.isr_callback_ts[i]));
+
+         GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                        DBG_LOW_PRIO,
+                        "TS_STATS[%ld]: cntr_process_start_ts (%lu, %lu) cntr_process_end_ts (%lu, %lu) delta (%lu)", i,
+                        (uint32_t)(me_ptr->ts_stats.fwk_start_ts[i] >> 32),
+                        (uint32_t)(me_ptr->ts_stats.fwk_start_ts[i]),
+                        (uint32_t)(me_ptr->ts_stats.fwk_end_ts[i] >> 32),
+                        (uint32_t)(me_ptr->ts_stats.fwk_end_ts[i]),
+                        (uint32_t)(me_ptr->ts_stats.fwk_end_ts[i] - me_ptr->ts_stats.dma_irq_latched_ts[i]));
+      }
+   }
+}
+
+static inline void gen_cntr_print_all_cached_cntr_proc_time_stats(gen_cntr_t *me_ptr)
+{
+      // loop around all the ts stats of the array size MAX_FRAMES_TO_TRACK
+   // and print the timestamps.
+   for (uint32_t i = 0; i < MAX_FRAMES_TO_TRACK; i++)
+   {
+      GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                   DBG_HIGH_PRIO,
+                   "TS_STATS[%ld]: dma_irq_latched_ts (%lu, %lu) isr_callback_ts (%lu, %lu)",
+                   i,
+                   (uint32_t)(me_ptr->ts_stats.dma_irq_latched_ts[i] >> 32),
+                   (uint32_t)(me_ptr->ts_stats.dma_irq_latched_ts[i]),
+                   (uint32_t)(me_ptr->ts_stats.isr_callback_ts[i] >> 32),
+                   (uint32_t)(me_ptr->ts_stats.isr_callback_ts[i]));
+
+      uint32_t delta = (uint32_t)(me_ptr->ts_stats.fwk_end_ts[i] - me_ptr->ts_stats.dma_irq_latched_ts[i]);
+      GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                   DBG_HIGH_PRIO,
+                   "TS_STATS[%ld]: cntr_process_start_ts (%lu, %lu) cntr_process_end_ts (%lu, %lu) delta=%lu",
+                   i,
+                   (uint32_t)(me_ptr->ts_stats.fwk_start_ts[i] >> 32),
+                   (uint32_t)(me_ptr->ts_stats.fwk_start_ts[i]),
+                   (uint32_t)(me_ptr->ts_stats.fwk_end_ts[i] >> 32),
+                   (uint32_t)(me_ptr->ts_stats.fwk_end_ts[i]),
+                   delta);
+   }
+}
+#endif // ENABLE_CNTR_PROC_TIME_PROFILING
+ar_result_t gen_cntr_handle_module_buffer_access_event(gen_topo_t        *topo_ptr,
+                                                       gen_topo_module_t *mod_ptr,
+                                                       capi_event_info_t *event_info_ptr);
+
 #ifdef __cplusplus
 }
 #endif //__cplusplus

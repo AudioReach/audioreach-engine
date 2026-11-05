@@ -65,6 +65,31 @@ capi_err_t capi_gate_until_deadline_process(capi_gate_t *       me_ptr,
          // EP runs at 1ms frame size, if packetized encoded frame size length in time is not multiple of 1ms then it should be rounded up.
          // if encoded frame size length in time after COP pack is 5.3ms then it will take 6 ep intrrupts to transmit this frame completely.
          uint32_t rounded_up_ep_transmit_delay_us = capi_gate_rounded_up_time(me_ptr->ep_transmit_delay_us);
+         // Hard override of scale factor to derive proc duration as 1/8th of frame interval.
+         // Scale proc_duration if scale override is provided and use it instead of calculated or fwk provided proc_duration.
+         if (me_ptr->frame_size_scale_factor_override)
+         {
+			 uint32_t scaled_proc_dur_us = me_ptr->frame_interval_us / me_ptr->frame_size_scale_factor_override;
+			 if (scaled_proc_dur_us && (me_ptr->proc_dur_us != scaled_proc_dur_us))
+			 {
+				 AR_MSG(DBG_HIGH_PRIO, "capi_gate: scaled_proc_dur %d ,proc_dur %d", scaled_proc_dur_us, me_ptr->proc_dur_us);
+				 me_ptr->proc_dur_us = scaled_proc_dur_us;
+			 }
+
+			 switch (me_ptr->frame_interval_us)
+			 {
+				 case 7500:
+                     me_ptr->deadline_offset_us += 0;
+                     break;
+				 case 10000:
+                     me_ptr->deadline_offset_us += 0;
+                     break;
+				 default:
+                     break;
+			 }
+			 //AR_MSG(DBG_HIGH_PRIO, "capi_gate: adjusted const delay %d based on frame %d ,proc_dur %d", scaled_proc_dur_us, me_ptr->proc_dur_us);
+	      }
+
 
          cur_time_us = (uint64_t)posal_timer_get_time();
          deadline_us = me_ptr->deadline_time_us;
@@ -125,7 +150,12 @@ capi_err_t capi_gate_until_deadline_process(capi_gate_t *       me_ptr,
          time_to_reach_deadline_us = me_ptr->deadline_time_us - calc_deadline_time_us;
 
          // Open the gate within 1ms, this works only when encoder sets req data buff to TRUE
-         if (time_to_reach_deadline_us > GATE_NUM_US_PER_MS)
+         // If frame size configuration is not set or set as zero by process call, set it to default 1ms
+         if (0 == me_ptr->frame_size_us)
+         {
+			 me_ptr->frame_size_us = GATE_NUM_US_PER_MS;
+		 }
+         if (time_to_reach_deadline_us > me_ptr->frame_size_us)
          {
             result = CAPI_ENEEDMORE;
 

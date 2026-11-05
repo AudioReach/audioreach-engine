@@ -105,6 +105,9 @@ typedef struct pull_push_mode_t
    bool_t                                   is_mod_buf_access_enabled;
    void                                    *curr_shared_buf_ptr;
    uint32_t                                 next_read_index;
+   uint32_t                                 buffer_level_bytes;          /**< Buffer level interval for periodic events */
+   uint32_t                                 next_buffer_level_bytes;           /**< Next buffer level to check for buffer level event */
+   uint32_t                                 prev_buffer_level_bytes;           /**< Previous buffer level position for calculating bytes written */
 } pull_push_mode_t;
 
 typedef struct capi_pm_media_fmt_t
@@ -153,7 +156,7 @@ typedef struct capi_pm_t
    // UTC timestamp handling
    capi_push_ts_data_t ts_data;
    uint64_t  last_valid_timestamp; // tracks last valid timestamp received in current batch
-   
+
 } capi_pm_t;
 
 /*------------------------------------------------------------------------
@@ -218,6 +221,30 @@ static inline capi_err_t pull_push_mode_check_send_watermark_event(capi_pm_t *me
    }
 
    return pull_push_mode_check_send_watermark_event_util_(me_ptr, startLevel, endLevel);
+}
+
+capi_err_t pull_push_mode_watermark_levels_init(pull_push_mode_t *pm_ptr,
+                                                uint32_t          num_water_mark_levels,
+                                                event_cfg_sh_mem_pull_push_mode_watermark_level_t *water_mark_levels,
+                                                uint32_t                                           heap_id);
+
+capi_err_t pull_push_mode_buffer_level_init(pull_push_mode_t *pm_ptr,
+                                            uint32_t          buffer_level_bytes);
+
+capi_err_t pull_push_mode_check_send_buffer_level_event_util_(capi_pm_t *capi_ptr,
+                                                               uint32_t startLevel,
+                                                               uint32_t endLevel);
+
+static inline capi_err_t pull_push_mode_check_send_buffer_level_event(capi_pm_t *me_ptr,
+                                                                       uint32_t   startLevel,
+                                                                       uint32_t   endLevel)
+{
+   if (me_ptr->pull_push_mode_info.buffer_level_bytes == 0)
+   {
+      return CAPI_EOK;
+   }
+
+   return pull_push_mode_check_send_buffer_level_event_util_(me_ptr, startLevel, endLevel);
 }
 
 #ifdef __cplusplus

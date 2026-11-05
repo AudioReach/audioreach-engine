@@ -80,7 +80,9 @@ bool_t check_if_module_is_in_list(spf_list_node_t *mod_list_ptr,
                                   uint32_t         module_instance_id);
 ar_result_t add_module_list_to_graph_info(spgm_info_t *       spgm_ptr,
                                           apm_modules_list_t *mod_list_ptr,
-                                          uint32_t            host_container_id);
+                                          uint32_t            host_container_id,
+                                          bool_t             *is_ipc_module_present,
+                                          bool_t             *does_host_has_modules);
 bool_t olc_get_cmd_hndl_node(spf_list_node_t *      cmd_hndl_list_ptr,
                              uint32_t               num_cmd_hndl_list,
                              spgm_cmd_hndl_node_t **cmd_hndl_node_pptr,

@@ -103,12 +103,12 @@ static inline bool_t pt_cntr_any_process_call_events(gen_topo_t *topo_ptr)
 /**
  * when inplace nblc end is assigned as pointer to ext-in port, it may not be 4 byte aligned.
  */
-#define FEF_PRINT_BUF_INFO_ALL_CHS_FLAG (FALSE)
+#define PTC_PRINT_BUF_INFO_ALL_CHS_FLAG (FALSE)
 
 #define FEF_PRINT_PORT_INFO_AT_PROCESS(m_iid, port_id, sdata_ptr, result, str1, str2, origin)                          \
    do                                                                                                                  \
    {                                                                                                                   \
-      uint32_t num_chs_to_print = FEF_PRINT_BUF_INFO_ALL_CHS_FLAG ? sdata_ptr->bufs_num : 1;                           \
+      uint32_t num_chs_to_print = PTC_PRINT_BUF_INFO_ALL_CHS_FLAG ? sdata_ptr->bufs_num : 1;                           \
       for (uint32_t i = 0; i < num_chs_to_print; i++)                                                                  \
       {                                                                                                                \
          if (sdata_ptr->buf_ptr[i].data_ptr)                                                                           \
@@ -116,14 +116,13 @@ static inline bool_t pt_cntr_any_process_call_events(gen_topo_t *topo_ptr)
             TOPO_MSG_ISLAND(topo_ptr->gu.log_id,                                                                       \
                             DBG_HIGH_PRIO,                                                                             \
                             " Module 0x%lX: " str1 " port id 0x%lx, process ch[%lu]" str2                              \
-                            ": length_per_buf %lu of %lu. buff addr: 0x%p, origin: %lu result 0x%lx",                  \
+                            ": length_per_buf %lu of %lu. buff addr: 0x%p, result 0x%lx",                              \
                             m_iid,                                                                                     \
                             port_id,                                                                                   \
                             i,                                                                                         \
                             sdata_ptr->buf_ptr[i].actual_data_len,                                                     \
                             sdata_ptr->buf_ptr[i].max_data_len,                                                        \
                             sdata_ptr->buf_ptr[i].data_ptr,                                                            \
-                            origin,                                                                                    \
                             result);                                                                                   \
             uint64_t temp_num = (uint64_t)sdata_ptr->buf_ptr[0].data_ptr;                                              \
             if (!(temp_num & 0xF))                                                                                     \
@@ -162,12 +161,13 @@ static inline bool_t pt_cntr_any_process_call_events(gen_topo_t *topo_ptr)
                                                                                                                        \
       TOPO_MSG_ISLAND(topo_ptr->gu.log_id,                                                                             \
                       DBG_HIGH_PRIO,                                                                                   \
-                      " Module 0x%lX: " str1 " timestamp: %ld (0x%lx%lx), Flags0x%lX",                                 \
+                      " Module 0x%lX: " str1 " timestamp: %ld (0x%lx%lx), Flags0x%lX origin %lu",                      \
                       m_iid,                                                                                           \
                       (uint32_t)sdata_ptr->timestamp,                                                                  \
                       (uint32_t)(sdata_ptr->timestamp >> 32),                                                          \
                       (uint32_t)sdata_ptr->timestamp,                                                                  \
-                      sdata_ptr->flags.word);                                                                          \
+                      sdata_ptr->flags.word,                                                                           \
+                      origin);                                                                                         \
    } while (0)
 
 static inline void pt_cntr_set_bufs_actual_len_to_zero(capi_stream_data_v2_t *sdata_ptr)
@@ -195,7 +195,7 @@ static inline void pt_cntr_ext_input_return_buffer(uint32_t log_id, pt_cntr_ext_
 
 static inline bool_t pt_cntr_is_inplace_or_disabled_siso(pt_cntr_module_t *module_ptr)
 {
-   return ((module_ptr->gc.topo.flags.inplace ||
+   return ((module_ptr->gc.topo.flags.inplace || module_ptr->gc.topo.flags.dynamic_inplace ||
             (module_ptr->gc.topo.bypass_ptr && (module_ptr->gc.topo.num_proc_loops == 1))) &&
            (module_ptr->gc.topo.gu.num_input_ports == 1) && (module_ptr->gc.topo.gu.num_output_ports == 1));
 }

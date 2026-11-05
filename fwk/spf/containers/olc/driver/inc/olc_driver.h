@@ -57,6 +57,15 @@ typedef struct spgm_event_info_t
    uint32_t olc_event_reg_token;
 } spgm_event_info_t;
 
+typedef enum olc_mode_t
+{
+    OLC_MODE_UNSET = 0,
+    /** Hosting modules mode */
+    OLC_MODE_HOSTING_MODULES = 1,
+    /** Control only mode */
+    OLC_MODE_CONTROL_ONLY = 2
+} olc_mode_t;
+
 typedef struct spgm_info_t
 {
    spf_handle_t          spf_handle;
@@ -79,6 +88,7 @@ typedef struct spgm_info_t
    spf_list_node_t *     event_reg_list_ptr; // obj ptr of type (spgm_event_info_t)
    sgm_path_delay_info_t path_delay_list;
    uint32_t             p_cmd_exec_ts;
+   olc_mode_t           mode_of_operation;
 } spgm_info_t;
 
 ar_result_t olc_create_graph_open_payload(spgm_info_t *             spgm_ptr,
@@ -274,6 +284,11 @@ ar_result_t sgm_set_servreg_error_notify_cmd_rsp_fn_handler(spgm_info_t *spgm_pt
 
 ar_result_t spgm_handle_event_clone_md(spgm_info_t *spgm_ptr, gpr_packet_t *packet_ptr);
 ar_result_t spgm_handle_tracking_md_event(spgm_info_t *spgm_ptr, gpr_packet_t *packet_ptr);
+
+ar_result_t sgm_respond_to_satellite_graph_open(gu_t            *gu_ptr,
+                                                spf_msg_t       *cmd_msg_ptr,
+                                                POSAL_HEAP_ID    heap_id,
+                                                spf_list_node_t *sat_module_list_ptr);
 
 #ifdef __cplusplus
 }

@@ -1878,18 +1878,17 @@ ar_result_t spl_cntr_recreate_ext_out_buffers(void *ctx_ptr, gu_ext_out_port_t *
 ar_result_t spl_cntr_handle_ext_buffer_size_change(void *ctx_ptr)
 {
    INIT_EXCEPTION_HANDLING
-   ar_result_t             result                = AR_EOK;
-   spl_cntr_t             *me_ptr                = (spl_cntr_t *)ctx_ptr;
-   gu_ext_in_port_list_t  *ext_in_port_list_ptr  = NULL;
-   gu_ext_out_port_list_t *ext_out_port_list_ptr = NULL;
-   ext_in_port_list_ptr                          = me_ptr->topo.t_base.gu.ext_in_port_list_ptr;
-   bool_t IS_MAX_TRUE                            = TRUE;
+   ar_result_t             result                    = AR_EOK;
+   spl_cntr_t             *me_ptr                    = (spl_cntr_t *)ctx_ptr;
+   gu_ext_in_port_list_t  *ext_in_port_list_ptr      = me_ptr->topo.t_base.gu.ext_in_port_list_ptr;
+   gu_ext_out_port_list_t *ext_out_port_list_ptr     = me_ptr->topo.t_base.gu.ext_out_port_list_ptr;
+   gu_ext_out_port_list_t *ipc_ext_out_port_list_ptr = me_ptr->topo.t_base.gu.ipc_ext_out_port_list_ptr;
+   bool_t                  IS_MAX_TRUE               = TRUE;
 
    // Need to dermine external input max sizes in case of DM.
    TRY(result, spl_topo_get_required_input_samples(&me_ptr->topo, IS_MAX_TRUE));
 
    // Check and resize external input port buffers.
-   ext_in_port_list_ptr = me_ptr->topo.t_base.gu.ext_in_port_list_ptr;
    while (ext_in_port_list_ptr)
    {
       spl_cntr_ext_in_port_t *ext_in_port_ptr = (spl_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
@@ -1914,11 +1913,19 @@ ar_result_t spl_cntr_handle_ext_buffer_size_change(void *ctx_ptr)
    }
 
    // Check and resize external output port buffers.
-   ext_out_port_list_ptr = me_ptr->topo.t_base.gu.ext_out_port_list_ptr;
    while (ext_out_port_list_ptr)
    {
       TRY(result, spl_cntr_recreate_ext_out_buffers((void *)&me_ptr->cu, ext_out_port_list_ptr->ext_out_port_ptr));
       ext_out_port_list_ptr = ext_out_port_list_ptr->next_ptr;
+   }
+
+   while (ipc_ext_out_port_list_ptr)
+   {
+      TRY(result,
+          cu_ext_out_handle_icb_info_from_downstream((cu_base_t *)&me_ptr->cu,
+                                                     NULL,
+                                                     ipc_ext_out_port_list_ptr->ext_out_port_ptr));
+      ipc_ext_out_port_list_ptr = ipc_ext_out_port_list_ptr->next_ptr;
    }
 
    CATCH(result, SPL_CNTR_MSG_PREFIX, me_ptr->topo.t_base.gu.log_id)

@@ -29,6 +29,7 @@ INCLUDE FILES FOR MODULE
 #include "test_util.h"
 #endif
 #include "dam_batch_metadata_api.h"
+#include "sh_pull_push_mode_i.h"
 
 // Important: Disabling code to bump up thread priority whenever position buffer gets updated.
 // Initially priority change was introduced for the thread to be able to update position buffer
@@ -119,6 +120,31 @@ capi_err_t pull_push_mode_watermark_levels_init(pull_push_mode_t *pm_ptr,
          }
       }
    }
+
+   return CAPI_EOK;
+}
+
+capi_err_t pull_push_mode_buffer_level_init(pull_push_mode_t *pm_ptr,
+                                            uint32_t          buffer_level_bytes)
+{
+   uint32_t miid = pm_ptr->miid;
+
+   if (buffer_level_bytes == 0)
+   {
+      PULL_PUSH_MSG(miid, DBG_HIGH_PRIO, "Buffer level tracking disabled (level = 0)");
+      pm_ptr->buffer_level_bytes = 0;
+      pm_ptr->next_buffer_level_bytes = 0;
+      pm_ptr->prev_buffer_level_bytes = 0;
+      return CAPI_EOK;
+   }
+
+   pm_ptr->buffer_level_bytes = buffer_level_bytes;
+   pm_ptr->next_buffer_level_bytes = buffer_level_bytes;
+   pm_ptr->prev_buffer_level_bytes = 0;
+
+   PULL_PUSH_MSG(miid, DBG_HIGH_PRIO,
+                 "pull_push_mode_buffer_level_init: Buffer Level %lu bytes",
+                 buffer_level_bytes);
 
    return CAPI_EOK;
 }
@@ -379,6 +405,9 @@ void pull_push_mode_deinit(pull_push_mode_t *pm_ptr)
       {
          posal_memory_free(pm_ptr->water_mark_levels_ptr);
       }
+      pm_ptr->buffer_level_bytes = 0;
+      pm_ptr->next_buffer_level_bytes = 0;
+      pm_ptr->prev_buffer_level_bytes = 0;
    }
 }
 
@@ -419,6 +448,7 @@ capi_err_t pull_mode_read_input(capi_t *_pif, capi_stream_data_t *input[], capi_
       if (me_ptr->curr_shared_buf_ptr)
       {
          pull_push_mode_check_send_watermark_event(capi_ptr, pos_buf_ptr->index, curr_read_index);
+         pull_push_mode_check_send_buffer_level_event(capi_ptr, pos_buf_ptr->index, curr_read_index);
          if (curr_read_index == me_ptr->shared_circ_buf_size)
          {
             curr_read_index = 0;
@@ -548,6 +578,7 @@ capi_err_t pull_mode_read_input(capi_t *_pif, capi_stream_data_t *input[], capi_
       read_index += bytes_to_copy_now;
 
       pull_push_mode_check_send_watermark_event(capi_ptr, temp_rd_ind, read_index);
+      pull_push_mode_check_send_buffer_level_event(capi_ptr, temp_rd_ind, read_index);
       if (read_index == me_ptr->shared_circ_buf_size)
       {
          read_index = 0;
@@ -787,13 +818,15 @@ capi_err_t push_mode_end_header_batch(capi_pm_t *_pif, uint64_t timestamp)
       if(0 != capi_ptr->batch_write_index)
       {
          write_ptr   = (int8_t *)(me_ptr->shared_circ_buf_start_ptr);
-         temp_wr_ind = 0;
 #ifndef DISABLE_CACHE_OPERATIONS
          posal_cache_flush_v2(&write_ptr, capi_ptr->batch_bytes_written - rem_lin_size);
 #endif
-         pull_push_mode_check_send_watermark_event(capi_ptr, temp_wr_ind, capi_ptr->batch_write_index);
+         pull_push_mode_check_send_watermark_event(capi_ptr, 0, capi_ptr->batch_write_index);
       }
    }
+
+   // Check for buffer level event
+   pull_push_mode_check_send_buffer_level_event(capi_ptr, temp_wr_ind, capi_ptr->batch_write_index);
 
    /** update position buffer with new index*/
    pull_mode_update_pos_buffer(pos_buf_ptr, me_ptr->ist_priority, capi_ptr->batch_write_index , timestamp);
@@ -946,6 +979,7 @@ capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], cap
       temp_wr_ind = write_index;
       write_index += bytes_copied;
       pull_push_mode_check_send_watermark_event(capi_ptr, temp_wr_ind, write_index);
+      pull_push_mode_check_send_buffer_level_event(capi_ptr, temp_wr_ind, write_index);
       if (write_index >= me_ptr->shared_circ_buf_size)
       {
          write_index = 0;
@@ -1050,6 +1084,7 @@ capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], cap
             temp_wr_ind = write_index;
             write_index += bytes_to_copy;
             pull_push_mode_check_send_watermark_event(capi_ptr, temp_wr_ind, write_index);
+            pull_push_mode_check_send_buffer_level_event(capi_ptr, temp_wr_ind, write_index);
          }
          else
          {
@@ -1105,7 +1140,13 @@ capi_err_t push_mode_write_output(capi_t *_pif, capi_stream_data_t *input[], cap
          }
       }
 
-      if(is_batch_completed)
+       /* Skip batch header finalization if no header was written for this batch.
+        * is_update_header == TRUE indicates the header is still pending (not yet written).
+        * Invoking push_mode_end_header_batch in this state corrupts the previous batch's
+          actual_size field in DDR, since pcm_param_actual_size_ptr still points to it.
+        * This occurs on 0-byte EOS/DFG frames triggered by timestamp discontinuities. */
+
+      if(is_batch_completed && !capi_ptr->is_update_header)
       {
          push_mode_end_header_batch(capi_ptr, timestamp);
       }
@@ -1183,6 +1224,88 @@ capi_err_t pull_push_mode_check_send_watermark_event_util_(capi_pm_t *capi_ptr, 
          }
       }
    }
+   return result;
+}
+
+capi_err_t pull_push_mode_check_send_buffer_level_event_util_(capi_pm_t *capi_ptr,
+                                                               uint32_t startLevel,
+                                                               uint32_t endLevel)
+{
+   capi_err_t        result = CAPI_EOK;
+   pull_push_mode_t *pm_ptr = &(capi_ptr->pull_push_mode_info);
+   uint32_t          miid   = pm_ptr->miid;
+   uint32_t          level;
+   uint32_t          next_buffer_level_bytes = pm_ptr->next_buffer_level_bytes;
+   uint32_t          prev_buffer_level_bytes = pm_ptr->prev_buffer_level_bytes;
+
+   /** If the buffer level threshold is within start and end level, raise an event*/
+   if (((endLevel >= startLevel) && (next_buffer_level_bytes > startLevel) && (next_buffer_level_bytes <= endLevel)) ||
+       ((endLevel < startLevel) && ((next_buffer_level_bytes > startLevel) || (next_buffer_level_bytes <= endLevel))))
+   {
+      // Calculate bytes written since last event
+      if (endLevel >= prev_buffer_level_bytes)
+      {
+         level = endLevel - prev_buffer_level_bytes;
+      }
+      else
+      {
+         level = pm_ptr->shared_circ_buf_size - prev_buffer_level_bytes + endLevel;
+      }
+
+      // Buffer level value exceeds shared circular buffer size, restricting buffer level to shared_circ_buf_size
+      if (level > pm_ptr->shared_circ_buf_size)
+      {
+         PULL_PUSH_MSG(miid,
+                       DBG_HIGH_PRIO,
+                       "pm_check_send_buffer_level_event: Buffer level value %lu exceeds shared circular buffer size %lu, restricting buffer level to shared_circ_buf_size",
+                       level,
+                       pm_ptr->shared_circ_buf_size);
+         level = pm_ptr->shared_circ_buf_size;
+      }
+
+      // form the payload for the event
+      event_sh_mem_pull_push_mode_buffer_level_t buffer_level_event;
+      buffer_level_event.buffer_level_bytes = level;
+
+      result = capi_pm_raise_event_to_clients(capi_ptr,
+                                              EVENT_ID_SH_MEM_PULL_PUSH_MODE_BUFFER_LEVEL,
+                                              &buffer_level_event,
+                                              sizeof(event_sh_mem_pull_push_mode_buffer_level_t));
+
+      if (CAPI_FAILED(result))
+      {
+         PULL_PUSH_MSG(miid,
+                       DBG_ERROR_PRIO,
+                       "pm_check_send_buffer_level_event: Failed to send buffer level event!");
+      }
+      else
+      {
+         PULL_PUSH_MSG(miid,
+                       DBG_LOW_PRIO,
+                       "pm_check_send_buffer_level_event: Sent Buffer Level event to the client start %lu, level %lu, end %lu",
+                       startLevel,
+                       level,
+                       endLevel);
+      }
+
+      // Update tracking variables
+      pm_ptr->prev_buffer_level_bytes = endLevel;
+
+      if (pm_ptr->buffer_level_bytes > pm_ptr->shared_circ_buf_size)
+      {
+         pm_ptr->next_buffer_level_bytes = endLevel + pm_ptr->shared_circ_buf_size;
+      }
+      else
+      {
+         pm_ptr->next_buffer_level_bytes = endLevel + pm_ptr->buffer_level_bytes;
+      }
+
+      if (pm_ptr->next_buffer_level_bytes >= pm_ptr->shared_circ_buf_size)
+      {
+         pm_ptr->next_buffer_level_bytes -= pm_ptr->shared_circ_buf_size;
+      }
+   }
+
    return result;
 }
 

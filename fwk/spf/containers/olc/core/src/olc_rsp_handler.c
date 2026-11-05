@@ -81,7 +81,19 @@ static ar_result_t olc_handle_rest_of_graph_open(cu_base_t *base_ptr, void *ctx_
    cu_reset_handle_rest(base_ptr);
 
    // in success case, ack to APM is sent from this func.
-   TRY(result, gu_respond_to_graph_open(&me_ptr->topo.gu, &me_ptr->cu.cmd_msg, me_ptr->cu.heap_id));
+   if (is_olc_in_control_only_mode(me_ptr))
+   {
+      TRY(result,
+          sgm_respond_to_satellite_graph_open(&me_ptr->topo.gu,
+                                              &me_ptr->cu.cmd_msg,
+                                              me_ptr->cu.heap_id,
+                                              me_ptr->spgm_info.gu_graph_info.satellite_module_list_ptr));
+   }
+   else
+   {
+      // in success case, ack to APM is sent from this func.
+      TRY(result, gu_respond_to_graph_open(&me_ptr->topo.gu, &me_ptr->cu.cmd_msg, me_ptr->cu.heap_id));
+   }
 
    cu_register_with_pm(&me_ptr->cu, FALSE /* is_duty_cycling_allowed */);
 
@@ -100,8 +112,7 @@ static ar_result_t olc_handle_rest_of_graph_open(cu_base_t *base_ptr, void *ctx_
 
    OLC_MSG(me_ptr->topo.gu.log_id,
            DBG_HIGH_PRIO,
-           "CMD:GRAPH_OPEN: Done executing graph open command. "
-           "current channel mask=0x%x. result=0x%lx.",
+           "CMD:GRAPH_OPEN: Done executing graph open command. current channel mask=0x%x. result=0x%lx.",
            me_ptr->cu.curr_chan_mask,
            result);
 
@@ -118,8 +129,7 @@ ar_result_t olc_graph_set_get_packed_cfg_rsp_h(cu_base_t *base_ptr, spgm_cmd_rsp
 
    OLC_MSG(me_ptr->topo.gu.log_id,
            DBG_HIGH_PRIO,
-           "GRAPH_MGMT: Executing graph set_get_cfg command."
-           " current channel mask=0x%x",
+           "GRAPH_MGMT: Executing graph set_get_cfg command. current channel mask=0x%x",
            me_ptr->cu.curr_chan_mask);
 
    gpr_packet_t *packet_ptr           = (gpr_packet_t *)rsp_info_ptr->cmd_msg->payload_ptr;
@@ -306,7 +316,11 @@ ar_result_t olc_graph_open_rsp_h(cu_base_t *base_ptr, spgm_cmd_rsp_node_t *rsp_i
    /* Allocate memory for voice info structure, for voice call use cases*/
    TRY(result, cu_create_voice_info(&me_ptr->cu, open_cmd_ptr));
 
-   TRY(result, cu_init_external_ports(&me_ptr->cu, ALIGN_8_BYTES(sizeof(olc_ext_ctrl_port_t))));
+   TRY(result,
+       cu_init_external_ports(&me_ptr->cu,
+                              OLC_EXT_IN_PORT_Q_OFFSET,
+                              OLC_EXT_OUT_PORT_Q_OFFSET,
+                              OLC_EXT_CTRL_PORT_Q_OFFSET));
 
    // Check if RT and set frame size
    for (ext_in_port_list_ptr = me_ptr->topo.gu.ext_in_port_list_ptr; ext_in_port_list_ptr;

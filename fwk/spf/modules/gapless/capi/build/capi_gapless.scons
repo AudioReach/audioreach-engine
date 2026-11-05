@@ -1,0 +1,47 @@
+'''
+/*==============================================================================
+@file capi_gapless.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS = '-ffunction-sections')
+
+core_public_apis = [
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS', 'CAPI_CMN_LIB'])
+env.RequireProtectedApi('AVS')
+env.PublishPrivateApi('AVS', [
+    '${AVS_ROOT}/api/modules',
+	'${AVS_ROOT}/spf/modules/gapless/capi/inc',
+])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'capi_gapless'
+LIBNAME_STUB = LIBNAME+'_stub'
+
+#import pdb; pdb.set_trace()
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+avs_reg_sources = env.GlobSourceFiles(['src/*.c'], SRCPATH,posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.c'], SRCPATH,posix=True)
+avs_fwk_sources = []
+
+env.RequireRestrictedApi(['SHARED_LIBRARY_INC_PATHS'])
+bucket = ['AVS_ADSP','AVS_ADSP_USER']
+#import pdb; pdb.set_trace()
+env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME, avs_fwk_sources+avs_reg_sources)
+env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)

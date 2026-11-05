@@ -63,8 +63,10 @@ void spl_topo_update_module_info(gu_module_t *gu_module_ptr)
          module_ptr->flags.is_skip_process = TRUE;
       }
    }
-   else if ((module_ptr->t_base.gu.max_input_ports > 0 && module_ptr->t_base.gu.num_input_ports == 0) ||
-            (module_ptr->t_base.gu.max_output_ports > 0 && module_ptr->t_base.gu.num_output_ports == 0))
+   else if ((module_ptr->t_base.gu.max_input_ports > 0 &&
+             ((0 == module_ptr->t_base.gu.num_input_ports) && (0 == module_ptr->t_base.gu.num_ipc_input_ports))) ||
+            (module_ptr->t_base.gu.max_output_ports > 0 &&
+             ((0 == module_ptr->t_base.gu.num_output_ports) && (0 == module_ptr->t_base.gu.num_ipc_output_ports))))
    {
 #if SPL_TOPO_DEBUG_LEVEL >= SPL_TOPO_DEBUG_LEVEL_3
       TOPO_MSG(module_ptr->t_base.topo_ptr->gu.log_id,
@@ -1209,6 +1211,7 @@ ar_result_t spl_topo_update_simp_module_connections(spl_topo_t *topo_ptr)
    topo_ptr->simpt1_flags.any_modules_skip_process = FALSE;
    topo_ptr->simpt1_flags.any_state_not_started    = FALSE;
    topo_ptr->simpt1_flags.any_source_module        = FALSE;
+   topo_ptr->simpt1_flags.requires_ipc_port_extn   = FALSE;
 
    // delete the simplified topo list
    spf_list_delete_list((spf_list_node_t **)&topo_ptr->simpt_sorted_module_list_ptr, TRUE);
@@ -1229,6 +1232,11 @@ ar_result_t spl_topo_update_simp_module_connections(spl_topo_t *topo_ptr)
          if (0 == module_ptr->t_base.gu.max_input_ports)
          {
             topo_ptr->simpt1_flags.any_source_module = TRUE;
+         }
+
+         if (module_ptr->t_base.flags.need_ipc_port_extn)
+         {
+            topo_ptr->simpt1_flags.requires_ipc_port_extn = TRUE;
          }
 
          // reset the simplified topo ports connection to the gu connection.
