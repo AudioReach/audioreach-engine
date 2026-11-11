@@ -63,21 +63,34 @@ ar_result_t spf_thread_pool_worker_thread_entry(void *ctx_ptr) // todo: rename m
 
       posal_mutex_unlock(wt_ptr->tp_inst_ptr->wt_sync_lock);
 
+
       if (msg.payload_ptr)
       {
-         job_ptr = (spf_thread_pool_job_t *)msg.payload_ptr;
+         job_ptr                = (spf_thread_pool_job_t *)msg.payload_ptr;
          wt_ptr->active_job_ptr = job_ptr;
 
-         if (job_ptr->job_func_ptr)
+         // job ptr may be destoryed in the context of job itself hence cannot use the job ptr after completing the job
+         // if job ptr gets freed in the job context, there is no way to return on
+         spf_thread_pool_job_t temp_job = *job_ptr;
+
+         spf_thread_pool_job_t *temp_job_ptr = job_ptr;
+         if (job_ptr->job_handle_freed_in_job_context)
          {
-            ar_result_t result = job_ptr->job_func_ptr(job_ptr->job_context_ptr);
+            temp_job     = *job_ptr;
+            temp_job_ptr = &temp_job;
+         }
+
+         if (temp_job_ptr->job_func_ptr)
+         {
+            //posal_signal_t temp_signal = temp_job_ptr->job_signal_ptr;
+            ar_result_t    result      = temp_job_ptr->job_func_ptr(temp_job_ptr->job_context_ptr);
 
             if (result != AR_ETERMINATED)
             {
-               job_ptr->job_result = result;
-               if (job_ptr->job_signal_ptr)
+               temp_job_ptr->job_result = result;
+               if (temp_job_ptr->job_signal_ptr)
                {
-                  posal_signal_send(job_ptr->job_signal_ptr);
+                  posal_signal_send(temp_job_ptr->job_signal_ptr);
                }
             }
          }

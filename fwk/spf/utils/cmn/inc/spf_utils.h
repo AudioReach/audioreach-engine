@@ -28,6 +28,7 @@ INCLUDE FILES FOR MODULE
 #include "spf_list_utils.h"
 #include "spf_lpi_pool_utils.h"
 #include "offload_apm_api.h"
+#include "posal_timer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,6 +65,57 @@ static inline void spf_set_bits(uint32_t *x_ptr, uint32_t val, uint32_t mask, ui
    val    = (val << shift) & mask;
    *x_ptr = (*x_ptr & ~mask) | val;
 }
+
+/**
+  Utility function to convert tick to timestamp as per Q-timer with 19.2MHz.
+
+  @param[in] tick_count   tick_count Tick Count by DMA..
+
+  @return
+  Time stamp in Nano-Seconds.
+
+  @dependencies
+  None. @newpage
+ */
+static inline uint64_t spf_util_tick_to_time_ns(uint64_t tick) {
+  return (uint64_t)((tick * 10000ull) / 192ul);
+}
+
+/**
+  Utility function to convert tick to timestamp as per Q-timer with 19.2MHz.
+
+  @param[in] tick_count   tick_count Tick Count by DMA..
+
+  @return
+  Time stamp in Nano-Seconds.
+
+  @dependencies
+  None. @newpage
+ */
+static inline uint64_t spf_util_get_time_ns(void)
+{
+  return spf_util_tick_to_time_ns(posal_timer_get_hw_ticks());
+}
+
+#define SPF_UTIL_GET_CODE_EXECUTION_TIME(log_id, CONTEXT, get_delta, enable_print, XX_CODE_SECTION_XX) \
+   uint64_t get_delta;                                                       \
+   do {                                                                      \
+      uint64_t __start_tick = posal_timer_get_hw_ticks();                    \
+      XX_CODE_SECTION_XX                                                      \
+      uint64_t __end_tick   = posal_timer_get_hw_ticks();                    \
+      uint64_t __start_ns   = spf_util_tick_to_time_ns(__start_tick);     \
+      uint64_t __end_ns     = spf_util_tick_to_time_ns(__end_tick);       \
+      uint64_t __delta_ns   = __end_ns - __start_ns;                         \
+      get_delta = __delta_ns;                                                \
+      if (enable_print) {                                                    \
+         AR_MSG_ISLAND(DBG_LOW_PRIO,                                         \
+            "TS_STATS[0x%lx]:" CONTEXT " start_time (%lu, %lu) end_time (%lu, %lu) delta (%lu)",\
+             log_id, (uint32_t)(__start_ns >> 32), (uint32_t)(__start_ns),   \
+            (uint32_t)(__end_ns   >> 32), (uint32_t)(__end_ns),              \
+            (uint32_t)(__delta_ns));          \
+      }                                                                      \
+   } while (0)
+
 
 #ifdef __cplusplus
 }

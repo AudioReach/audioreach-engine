@@ -11,7 +11,7 @@
  */
 
 #include "spdm_i.h"
-#include "offload_metatdata_api.h"
+#include "offload_metadata_api.h"
 /* =======================================================================
 Static Function Definitions
 ========================================================================== */

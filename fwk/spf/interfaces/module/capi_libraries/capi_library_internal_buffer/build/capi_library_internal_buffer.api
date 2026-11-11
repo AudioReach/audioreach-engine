@@ -1,0 +1,21 @@
+'''
+/*==============================================================================
+@file capi_library_internal_buffer.api
+@brief 
+
+================================================================================
+@copyright
+Copyright (c) 2020 Qualcomm Technologies, Inc.
+All Rights Reserved.
+Confidential and Proprietary - Qualcomm Technologies, Inc.
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.PublishRestrictedApi('CAPI_LIBRARY_INTERNAL_BUFFER',[
+   '${AVS_ROOT}/interfaces/module/capi_libraries/capi_library_internal_buffer/inc'
+   ])   
+   
+env.LoadAPIUnits()

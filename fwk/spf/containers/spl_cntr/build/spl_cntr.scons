@@ -1,0 +1,50 @@
+'''
+/*==============================================================================
+@file spl_cntr.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS = '-ffunction-sections')
+
+core_public_apis = [
+   'DAL',
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'CDF', 'SHARED_LIBRARY_INC_PATHS', 'CAPI_LIBRARY_FACTORY', 'MODULE_INTERFACES_UTILS'])
+env.RequireProtectedApi('AVS')
+env.RequirePublicApi([
+  'AMDB',
+])
+env.RequireRestrictedApi('AVS_CONVERTER_PROFILE')
+
+platform_public_apis = [
+    'QAIC',
+    'STDDEF',
+    'HAPSDK'
+    ]
+
+env.RequirePublicApi(platform_public_apis, area='platform') # This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+
+env.PublishPrivateApi('AVS',[
+   '../core/inc',
+   '../core/src',
+   '../core/build',
+   '../cmn/inc',
+   '../ext/sync_fwk_ext/inc',
+   '../ext/voice_delivery_fwk_ext/inc',
+   '../ext/cntr_proc_dur_fwk_ext/inc',
+   '../ext/cntr_frame_dur_fwk_ext/inc',
+   '../ext/ipc_fwk_ext/inc',
+   ])
+
+env.LoadSoftwareUnits()

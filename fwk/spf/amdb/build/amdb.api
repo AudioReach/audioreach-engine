@@ -1,0 +1,38 @@
+'''
+/*==============================================================================
+@file amdb.api
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.Replace(AVS_ROOT = '${INC_ROOT}/${AVS_AU_NAME}/fwk')
+
+
+#-------------------------------------------------------------------------------
+# Publish include dirs
+#-------------------------------------------------------------------------------
+comp_name = env.subst('${AU_NAME}')
+
+env.PublishPublicApi('AMDB', [
+   '${INC_ROOT}/'+comp_name+'/fwk/spf/amdb/core/inc/',
+   '${INC_ROOT}/'+comp_name+'/fwk/spf/amdb/ext/inc'
+])
+
+env.PublishRestrictedApi('AMDB', [
+   '${INC_ROOT}/'+comp_name+'/fwk/spf/amdb/ext/src'
+])
+
+if "MDSPMODE" in env:
+    env.PublishPublicApi('AMDB', [
+       '${INC_ROOT}/avs_spf/fwk/spf/amdb/core/inc/',
+       '${INC_ROOT}/'+comp_name+'/fwk/spf/amdb/core/inc/'
+    ])
+
+
+
+   
+

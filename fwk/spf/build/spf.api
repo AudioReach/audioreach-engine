@@ -1,0 +1,36 @@
+'''
+/*==============================================================================
+@file spf.api
+@brief
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.PublishRestrictedApi('AVS',[
+   '${AVS_ROOT}/spf/apm/core/inc',
+   '${AVS_ROOT}/spf/apm/ext/proxy/proxy_cmn/inc',
+   '${AVS_ROOT}/spf/apm/ext/proxy/proxy_vcpm/inc',
+   '${AVS_ROOT}/spf/apm/ext/offload/inc',
+   '${AVS_ROOT}/spf/containers/cmn/inc',
+   '${AVS_ROOT}/spf/utils/watchdog_svc/inc',
+   '${AVS_ROOT}/spf/utils/thread_pool/inc',
+   '${AVS_ROOT}/spf/utils/list/inc',
+   '${AVS_ROOT}/spf/utils/circular_buffer/inc',
+   '${AVS_ROOT}/spf/utils/interleaver/inc',
+   '${AVS_ROOT}/spf/utils/stream_buffering/inc',
+   '${AVS_ROOT}/spf/utils/cmn/inc',
+   '${AVS_ROOT}/spf/utils/cmn/api',
+   '${AVS_ROOT}/spf/utils/lpi_pool/inc',
+   '${AVS_ROOT}/spf/utils/inter_proc_metadata/inc',
+   '${AVS_ROOT}/spf/interfaces/fwk/api',
+   '${AVS_ROOT}/spf/dls/api',
+   '${AVS_ROOT}/spf/dls/inc',
+   '${AVS_ROOT}/../spm/pp/upd/det/api',
+   '${AVS_ROOT}/../spm/pp/upd/cmn/api',
+   '${AVS_ROOT}/spf/apm/ext/debug_info_dump/inc'
+   ])
+
+env.LoadAPIUnits()

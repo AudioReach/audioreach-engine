@@ -70,13 +70,46 @@ struct param_id_gate_deadline_offset_t
    /**< @h2xmle_description   {Deadline offset value in micro seconds.
     *                          Positive or negative offset}
          @h2xmle_default      {0}
-         @h2xmle_range        {-10000..10000}*/
+         @h2xmle_range        {-15000..15000}*/
  
 }
 #include "spf_end_pack.h"
 ;
 /* Structure for PARAM_ID_GATE_DEADLINE_OFFSET parameter. */
 typedef struct param_id_gate_deadline_offset_t param_id_gate_deadline_offset_t;
+
+/**
+    ID of the deadline offset parameter, used by the Gate Module
+ */
+
+#define PARAM_ID_GATE_ENC_PROC_TIME_SCALING 0x0801000D
+/** @h2xmlp_parameter   {"PARAM_ID_GATE_ENC_PROC_TIME_SCALING", PARAM_ID_GATE_ENC_PROC_TIME_SCALING}
+    @h2xmlp_description {Structure for PARAM_ID_GATE_ENC_PROC_TIME_SCALING parameter.
+                         This parameter provides a scale factor value to derive realistic encoder processing
+                         time. This scale factor is used to divide the encoder frame size value received as
+                         part of primer sideband to derive the final processing time for the frame. This helps
+                         to fine tune the ISO alignment in combination with a constant tuning offset that can
+                         be set using PARAM_ID_GATE_DEADLINE_OFFSET }
+   @h2xmlp_toolPolicy              {Calibration}                         */
+#include "spf_begin_pack.h"
+/** Payload of the PARAM_ID_GATE_ENC_PROC_TIME_SCALING parameter.
+ */
+struct param_id_gate_enc_proc_time_scale_factor_t
+{
+   uint32_t enc_proc_time_scale_factor;
+   /**< @h2xmle_description   {Scale factor value to divide
+                               enc frame size to derive frame proc duration.
+                               Setting zero means this factor is not used.}
+         @h2xmle_default      {0}
+         @h2xmle_range        {0..32}*/
+
+}
+#include "spf_end_pack.h"
+;
+/* Structure for PARAM_ID_GATE_ENC_PROC_TIME_SCALING parameter. */
+typedef struct param_id_gate_enc_proc_time_scale_factor_t param_id_gate_enc_proc_time_scale_factor_t;
+
+
  
 /*==============================================================================
    Module
@@ -133,6 +166,8 @@ typedef struct param_id_gate_deadline_offset_t param_id_gate_deadline_offset_t;
     @h2xmlm_toolPolicy          {Calibration}
     @{                          <-- Start of the Module -->
     @h2xml_Select               {"param_id_gate_deadline_offset_t"}
+    @h2xmlm_InsertParameter
+    @h2xml_Select               {"param_id_gate_enc_proc_time_scale_factor_t"}
     @h2xmlm_InsertParameter
     @}                          <-- End of the Module -->
 */

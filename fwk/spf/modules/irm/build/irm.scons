@@ -1,0 +1,71 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+
+Import('env')
+
+if 'CSMD_COSIM' in env:
+  env.Append(CFLAGS = '-DCSMD_COSIM')
+
+from glob import glob
+from os.path import join, basename
+
+CBSP_API = [
+   'BOOT',
+   'DAL',
+   'DEBUGTOOLS',
+   'HAL',
+   'MPROC',
+   'POWER',
+   'SERVICES',
+   'SYSTEMDRIVERS',
+
+   # needs to be last also contains wrong comdef.h
+   'KERNEL',   
+]
+
+env.RequirePublicApi(CBSP_API,area='core')
+env.RequireRestrictedApi(['SHARED_LIBRARY_INC_PATHS', 'AVS'])
+env.RequireProtectedApi('AVS')
+env.RequirePublicApi('ADSP_SYSMON', area='performance')
+
+env.RequirePublicApi([
+  'AMDB',
+])
+
+
+env.PublishPublicApi('IRM',[
+   '${AVS_ROOT}/spf/modules/irm/inc/hexagon/',
+   ])
+   
+env.PublishPrivateApi('IRM',[
+   '${AVS_ROOT}/spf/modules/irm/inc',
+   '${AVS_ROOT}/spf/interfaces/module/internal_api/modules_prv/api',
+   ])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = "${AVS_ROOT}/spf/modules/irm"
+LIBNAME_IRM = 'irm'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+srcpath = env.RealPath(SRCPATH, posix=True)
+
+irm_sources = env.GlobFiles([srcpath+'/src/*.c'], posix=True)
+irm_stub_sources = env.GlobFiles([srcpath+'/stub_src/*.c'], posix=True)
+
+if 'AVS_SINGLE_SO' in env:
+   irm_sources += env.GlobSourceFiles(['src/avs_single_so/*.c'], SRCPATH,posix=True)
+
+irm_sources = [source.replace(srcpath, '${BUILDPATH}') for source in irm_sources]
+irm_stub_sources = [source.replace(srcpath, '${BUILDPATH}') for source in irm_stub_sources]
+
+env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME_IRM, [irm_sources,irm_stub_sources,[]], PACK_SRC=True)
+
+env.H2xmlFileGenerate(env.subst('${AVS_ROOT}/spf/modules/irm/api'))

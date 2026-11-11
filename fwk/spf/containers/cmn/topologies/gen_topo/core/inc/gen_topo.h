@@ -58,6 +58,8 @@
 #include "gen_topo_pure_st.h"
 #include "rtm_logging_api.h"
 #include "thin_topo.h"
+#include "gen_topo_ipc_fwk_ext.h"
+#include "gen_topo_mod_buf_access_ext.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -79,7 +81,6 @@ extern "C" {
 
 #ifdef USES_DEBUG_DEV_ENV
 /** Debug masks */
-
 
 #if 0 //frequently needed ones
 #define VERBOSE_DEBUGGING
@@ -262,6 +263,9 @@ typedef struct topo_to_cntr_vtable_t
    ar_result_t (*module_buffer_access_event)(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr, capi_event_info_t *event_info_ptr);
 
    ar_result_t (*check_if_any_ext_in_has_to_preserve_prebuffer)(gen_topo_t *topo_ptr, bool_t *has_to_preserve_prebuffer);
+
+   ar_result_t (*handle_ipc_data_link_info_event)(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr, capi_event_info_t *event_info_ptr);
+
 } topo_to_cntr_vtable_t;
 
 
@@ -512,6 +516,7 @@ typedef struct gen_topo_graph_init_t
    /** input */
    spf_handle_t *             spf_handle_ptr;
    gpr_callback_t             gpr_cb_fn;
+   gpr_callback_t             ipc_ext_gpr_cb_fn;
 
    topo_capi_callback_f       capi_cb;          /**< CAPI callback function */
 
@@ -619,6 +624,18 @@ typedef struct gen_topo_flags_t
                                                flag is used to re-enter the topo process as external trigger may have already been satisfied. */
 } gen_topo_flags_t;
 
+#ifdef ENABLE_CAPI_PROC_TIME_PROFILING
+#define MAX_MODULES_TO_TRACK 20
+
+typedef struct gen_topo_capi_proc_time_profiling_t
+{
+  uint32_t profile_curr_frame;
+  uint32_t num_modules;
+  uint32_t module_iid[MAX_MODULES_TO_TRACK];
+  uint64_t mod_proc_delta[MAX_MODULES_TO_TRACK];
+}gen_topo_capi_proc_time_profiling_t;
+
+#endif
 
 typedef struct gen_topo_port_mf_utils_t
 {
@@ -683,6 +700,10 @@ typedef struct gen_topo_t
    /**This memory will be allocated by thin topo only if its GC & signal triggered container.
       Unlike the exit flags field, this struct is allocated only if thin cntr is signal triggered.
       it contains information related to thin topo process context.*/
+#endif
+
+#ifdef ENABLE_CAPI_PROC_TIME_PROFILING
+   gen_topo_capi_proc_time_profiling_t mod_ts;
 #endif
 
 } gen_topo_t;
@@ -773,6 +794,7 @@ typedef union gen_topo_module_flags_t
       uint64_t need_sync_extn           : 1;    /**< FWK_EXTN_SYNC */
       uint64_t need_async_st_extn       : 1;    /**< FWK_EXTN_ASYNC_SIGNAL_TRIGGER */
       uint64_t need_global_shmem_extn   : 1;    /**< FWK_EXTN_GLOBAL_SHMEM_MSG */
+      uint64_t need_ipc_port_extn       : 1;    /**< FWK_EXTN_IPC_PORT_HANDLER */
 
       /** Flags which record the interface extensions supported by the module
        * Other extensions such as INTF_EXTN_IMCL, INTF_EXTN_PATH_DELAY are not stored */
@@ -833,6 +855,13 @@ typedef struct gen_topo_module_t
    uint8_t                                   serial_num;                      /**< serial number assigned to the module, when it's first created (See LOG_ID_LOG_MODULE_INSTANCES_MASK) */
    uint8_t                                   err_msg_proc_failed_counter;     /**<Process failed since last failure printed.*/
    uint8_t                                   num_proc_loops;      /**< in case LCM thresh is used, then num process loop that need to be called per module */
+
+   fwk_extn_ipc_port_trigger_t              *ext_port_trigger_shared_ptr;
+   // appliable only in the case of IPC port module.
+   // Currently assuming only one IPC port module hence storing at the module level.
+
+   intf_extn_event_id_module_buffer_access_enable_v2_t *mod_buf_extn_ptr;
+
 } gen_topo_module_t;
 
 /**
@@ -909,7 +938,7 @@ typedef union gen_topo_port_flags_t
       uint32_t       is_pcm_unpacked :  2; /**< GEN_TOPO_MF_PCM_UNPACKED_V1=0x1 indicates unpacked V1,
                                                 GEN_TOPO_MF_PCM_UNPACKED_V2=0x2 indicates unpacked V2 */
 
-      uint32_t       supports_buffer_resuse_extn: 2; /**< GEN_TOPO_MODULE_* bit mask */
+      uint32_t       supports_buffer_reuse_extn: 2; /**< GEN_TOPO_MODULE_* bit mask */
 #ifdef USES_THIN_TOPO
       uint32_t       thin_topo_can_assign_ext_in_buffer:1;
       uint32_t       thin_topo_can_assign_ext_out_buffer:1;
@@ -1375,6 +1404,15 @@ static inline ar_result_t gen_topo_reset_output_port(gen_topo_t *topo_ptr, gen_t
    }
    return topo_shared_reset_output_port(topo_ptr, topo_out_port_ptr, TRUE);
 }
+
+
+ar_result_t gen_topo_input_port_algo_reset(gen_topo_module_t     *module_ptr,
+                                           gen_topo_input_port_t *ip_port_ptr,
+                                           uint32_t               log_id);
+
+ar_result_t gen_topo_output_port_algo_reset(gen_topo_module_t      *module_ptr,
+                                            gen_topo_output_port_t *out_port_ptr,
+                                            uint32_t                log_id);
 
 ar_result_t gen_topo_reset_all_out_ports(gen_topo_module_t *module_ptr);
 ar_result_t gen_topo_reset_all_in_ports(gen_topo_module_t *module_ptr);
@@ -2090,6 +2128,7 @@ capi_err_t gen_topo_change_signal_trigger_policy_cb_fn( void *                  
                                                                uint32_t                          num_groups,
                                                                fwk_extn_port_trigger_group_t *   triggerable_groups_ptr);
 
+
 //function to check if module requires fixed frame len for trigger.
 static inline bool_t gen_topo_does_module_requires_fixed_frame_len(gen_topo_module_t *module_ptr)
 {
@@ -2128,6 +2167,12 @@ void st_topo_drop_stale_data(gen_topo_t *topo_ptr, gen_topo_output_port_t *out_p
 static inline bool_t gen_topo_output_has_data(gen_topo_output_port_t *out_port_ptr)
 {
    return (NULL != out_port_ptr->common.bufs_ptr[0].data_ptr) && (out_port_ptr->common.bufs_ptr[0].actual_data_len);
+}
+
+static inline bool_t gen_topo_output_has_empty_buffer(gen_topo_output_port_t *out_port_ptr)
+{
+   return (NULL != out_port_ptr->common.bufs_ptr[0].data_ptr) &&
+          (0 == out_port_ptr->common.bufs_ptr[0].actual_data_len);
 }
 
 static inline bool_t gen_topo_input_has_data_or_md(gen_topo_input_port_t *in_port_ptr)
@@ -2234,6 +2279,153 @@ ar_result_t gen_topo_validate_port_sdata(uint32_t                log_id,
                                          gen_topo_module_t*      module_ptr,
                                          bool_t                  PROCESS_DONE);
 
+static inline capi_err_t gen_topo_capi_process_wrapper(gen_topo_t *topo_ptr,
+                                                      gen_topo_module_t *module_ptr,
+                                                      capi_stream_data_t **input_sdata_pptr,
+                                                      capi_stream_data_t **output_sdata_pptr)
+{
+#if defined(ENABLE_CAPI_PROC_TIME_PROFILING) && (ENABLE_CAPI_PROC_TIME_PROFILING > 0)
+   if(topo_ptr->mod_ts.profile_curr_frame)
+   {
+      topo_ptr->mod_ts.module_iid[topo_ptr->mod_ts.num_modules] = module_ptr->gu.module_instance_id;
+
+      capi_err_t result;
+      SPF_UTIL_GET_CODE_EXECUTION_TIME(module_ptr->gu.module_instance_id, "gen_topo_capi_process_wrapper", get_delta, FALSE,
+      result =
+         module_ptr->capi_ptr->vtbl_ptr->process(module_ptr->capi_ptr, input_sdata_pptr, output_sdata_pptr);
+      );
+      topo_ptr->mod_ts.mod_proc_delta[topo_ptr->mod_ts.num_modules++] = get_delta;
+      return result;
+   }
+#endif // ENABLE_CAPI_PROC_TIME_PROFILING
+
+   return module_ptr->capi_ptr->vtbl_ptr->process(module_ptr->capi_ptr, input_sdata_pptr, output_sdata_pptr);;
+}
+
+#if defined(ENABLE_CAPI_PROC_TIME_PROFILING) && (ENABLE_CAPI_PROC_TIME_PROFILING > 0)
+static inline void gen_topo_print_mod_proc_time_profiling_stats(gen_topo_t *topo_ptr)
+{
+   if(topo_ptr->mod_ts.profile_curr_frame)
+   {
+      uint32_t k=0;
+      while(k < topo_ptr->mod_ts.num_modules)
+      {
+         TOPO_MSG_ISLAND(topo_ptr->gu.log_id,
+                        DBG_LOW_PRIO,
+                        "TS_STATS: Module IID 0x%lx capi delta (%lu) | Module IID 0x%lx capi delta (%lu) | Module IID 0x%lx capi delta (%lu)",
+                        topo_ptr->mod_ts.module_iid[k],
+                        (uint32_t)(topo_ptr->mod_ts.mod_proc_delta[k]),
+                        topo_ptr->mod_ts.module_iid[k+1],
+                        (uint32_t)(topo_ptr->mod_ts.mod_proc_delta[k+1]),
+                        topo_ptr->mod_ts.module_iid[k+2],
+                        (uint32_t)(topo_ptr->mod_ts.mod_proc_delta[k+2]));
+         k = k+3;
+      }
+
+      // reset tracking counter.
+      topo_ptr->mod_ts.num_modules =0;
+   }
+}
+#endif // ENABLE_CAPI_PROC_TIME_PROFILING
+
+static inline fwk_extn_ipc_port_trigger_t gen_topo_get_ipc_port_trigger_from_module(gen_topo_t  *topo_ptr,
+                                                                                    gen_topo_module_t *module_ptr,
+                                                                                    bool_t        is_input,
+                                                                                    uint32_t      port_id,
+                                                                                    gen_topo_common_port_t *cmn_port_ptr)
+{
+
+   fwk_extn_ipc_port_trigger_t trigger;
+
+   if (TOPO_PORT_STATE_STARTED != cmn_port_ptr->state)
+   {
+      trigger = FWK_EXTN_IPC_PORT_BUFFER_NOT_NEEDED;
+   }
+   else
+   {
+      trigger = *(module_ptr->ext_port_trigger_shared_ptr);
+   }
+
+#ifdef VERBOSE_DEBUGGING
+   if (is_input)
+   {
+      TOPO_MSG(topo_ptr->gu.log_id,
+              DBG_HIGH_PRIO,
+             "External input (MIID, port_id) (0x%lx, 0x%lx) data trigger: %lu ",
+             module_ptr->gu.module_instance_id,
+             port_id,
+             trigger);
+   }
+   else
+   {
+      TOPO_MSG(topo_ptr->gu.log_id,
+              DBG_HIGH_PRIO,
+             "External output (MIID, port_id) (0x%lx, 0x%lx) data trigger: %lu ",
+             module_ptr->gu.module_instance_id,
+             port_id,
+             trigger);
+   }
+#endif
+
+   return trigger;
+}
+
+
+static inline ar_result_t gen_topo_mod_buf_mgr_extn_wrapper_get_buf(gen_topo_t             *topo_ptr,
+                                                                    gen_topo_module_t      *module_ptr,
+                                                                    bool_t                  is_input,
+                                                                    uint32_t                port_index,
+                                                                    gen_topo_common_port_t *cmn_port_ptr)
+{
+   if (module_ptr->mod_buf_extn_ptr->get_port_buf_fn)
+   {
+      return module_ptr->mod_buf_extn_ptr->get_port_buf_fn(module_ptr->mod_buf_extn_ptr->buffer_mgr_cb_handle,
+                                                           port_index,
+                                                           &cmn_port_ptr->sdata.bufs_num,
+                                                           (capi_buf_t *)cmn_port_ptr->bufs_ptr);
+   }
+#ifdef VERBOSE_DEBUGGING
+   TOPO_MSG(topo_ptr->gu.log_id,
+            DBG_HIGH_PRIO,
+            "Getting buffer from Module 0x%lX is_input %lu port_index 0x%lx bufs_num:%lu data_ptr:0x%lx",
+            module_ptr->gu.module_instance_id,
+            is_input,
+            port_index,
+            cmn_port_ptr->sdata.bufs_num,
+            cmn_port_ptr->bufs_ptr);
+#endif
+   return AR_EFAILED;
+}
+
+static inline ar_result_t gen_topo_mod_buf_mgr_extn_wrapper_return_buf(gen_topo_t        *topo_ptr,
+                                                                       gen_topo_module_t *module_ptr,
+                                                                       bool_t             is_input,
+                                                                       uint32_t           port_index,
+                                                                       uint32_t          *num_bufs,
+                                                                       capi_buf_t        *bufs_ptr)
+{
+
+#ifdef VERBOSE_DEBUGGING
+   TOPO_MSG(topo_ptr->gu.log_id,
+            DBG_HIGH_PRIO,
+            "MOD_BUF_ACCESS_DEBUG: Returning port's buffer from Module 0x%lX is_input %lu port_index 0x%lx "
+            "bufs_num:%lu data_ptr:0x%lx",
+            module_ptr->gu.module_instance_id,
+            is_input,
+            port_index,
+            *num_bufs,
+            bufs_ptr->data_ptr);
+#endif
+   if (module_ptr->mod_buf_extn_ptr->return_port_buf_fn)
+   {
+      return module_ptr->mod_buf_extn_ptr->return_port_buf_fn(module_ptr->mod_buf_extn_ptr->buffer_mgr_cb_handle,
+                                                              port_index,
+                                                              num_bufs,
+                                                              bufs_ptr);
+   }
+   return AR_EFAILED;
+}
+
 /**
  * when inplace nblc end is assigned as pointer to ext-in port, it may not be 4 byte aligned.
  */
@@ -2288,12 +2480,13 @@ ar_result_t gen_topo_validate_port_sdata(uint32_t                log_id,
       }                                                                                                                \
       TOPO_MSG_ISLAND(topo_ptr->gu.log_id,                                                                             \
                       DBG_LOW_PRIO,                                                                                    \
-                      " Module 0x%lX: " str1 " timestamp: %ld (0x%lx%lx), Flags0x%lX",                                 \
+                      " Module 0x%lX: " str1 " timestamp: %ld (0x%lx%lx), Flags0x%lX origin %lu",                      \
                       m_iid,                                                                                           \
                       (uint32_t)cmn_port.sdata.timestamp,                                                              \
                       (uint32_t)(cmn_port.sdata.timestamp >> 32),                                                      \
                       (uint32_t)cmn_port.sdata.timestamp,                                                              \
-                      cmn_port.sdata.flags.word);                                                                      \
+                      cmn_port.sdata.flags.word,                                                                       \
+                      (uint32_t)cmn_port.flags.buf_origin);                                                            \
    } while (0)
 
 #ifdef __cplusplus

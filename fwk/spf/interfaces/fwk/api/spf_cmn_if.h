@@ -188,7 +188,6 @@ typedef struct spf_msg_header_t
 
 /** @} */ /* end_spf_msg_datatypes */
 
-
 /** Heap ID mask indicating that the heap ID belongs to a container */
 #define CONTAINER_HEAP_ID_MASK AR_NON_GUID(0xFFFFF000)
 

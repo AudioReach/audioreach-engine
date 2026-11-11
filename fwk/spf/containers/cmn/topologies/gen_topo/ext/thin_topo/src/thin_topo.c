@@ -34,6 +34,15 @@ void thin_topo_reset_handle(gen_topo_t *topo_ptr, bool_t free_handle_memory)
    spf_list_delete_list((spf_list_node_t **)&topo_ptr->thin_topo_ptr->active_ext_in_list_ptr, TRUE);
    // free list of started  ext out ports
    spf_list_delete_list((spf_list_node_t **)&topo_ptr->thin_topo_ptr->active_ext_out_list_ptr, TRUE);
+   // free list of started IPC ext in ports
+   spf_list_delete_list((spf_list_node_t **)&topo_ptr->thin_topo_ptr->active_ipc_ext_in_list_ptr, TRUE);
+   // free list of started IPC ext out ports
+   spf_list_delete_list((spf_list_node_t **)&topo_ptr->thin_topo_ptr->active_ipc_ext_out_list_ptr, TRUE);
+
+   // free list of active GEN_TOPO_MODULE_INPUT_BUF_ACCESS supporting input ports
+   spf_list_delete_list((spf_list_node_t **)&topo_ptr->thin_topo_ptr->active_input_buf_access_port_list_ptr, TRUE);
+   // free list of active GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS supporting output ports
+   spf_list_delete_list((spf_list_node_t **)&topo_ptr->thin_topo_ptr->active_output_buf_access_port_list_ptr, TRUE);
 
    if (free_handle_memory)
    {

@@ -212,7 +212,7 @@ ar_result_t spdm_flush_read_meta_data(spgm_info_t *                             
                   }
                   OLC_SDM_MSG(OLC_SDM_ID, DBG_MED_PRIO, "flush read md, process here 11");
                   module_cmn_md_list_t *temp_node_ptr = (module_cmn_md_list_t *)(md_node_ref_ptr->md_ptr);
-                  gen_topo_raise_tracking_event(spgm_ptr->cu_ptr->topo_ptr,
+                  gen_topo_raise_tracking_event(spgm_ptr->cu_ptr->gu_ptr->log_id,
                                                 rd_client_module_iid,
                                                 temp_node_ptr,
                                                 TRUE,
@@ -263,7 +263,7 @@ ar_result_t spdm_flush_read_meta_data(spgm_info_t *                             
                   }
                   OLC_SDM_MSG(OLC_SDM_ID, DBG_MED_PRIO, "flush read md, process here 1");
                   module_cmn_md_list_t *temp_node_ptr = (module_cmn_md_list_t *)(md_node_ref_ptr->md_ptr);
-                  gen_topo_raise_tracking_event(spgm_ptr->cu_ptr->topo_ptr,
+                  gen_topo_raise_tracking_event(spgm_ptr->cu_ptr->gu_ptr->log_id,
                                                 rd_client_module_iid,
                                                 temp_node_ptr,
                                                 TRUE,

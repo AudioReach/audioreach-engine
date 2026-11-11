@@ -35,7 +35,6 @@ typedef struct gen_topo_eos_cargo_t
    uint32_t                      ref_count;                 /**< every time split happens (inside the container) this is incremented. */
 } gen_topo_eos_cargo_t;
 
-
 /**
  * EOS MD specific event payload
  */
@@ -183,14 +182,15 @@ ar_result_t gen_topo_metadata_create(gen_topo_t            *topo_ptr,
                                      bool_t                 is_out_band,
                                      module_cmn_md_t      **md_pptr);
 
-capi_err_t gen_topo_capi_metadata_destroy(void *                 context_ptr,
-                                          module_cmn_md_list_t * md_list_ptr,
+capi_err_t gen_topo_capi_metadata_destroy(void                  *context_ptr,
+                                          module_cmn_md_list_t  *md_list_ptr,
                                           bool_t                 is_dropped,
                                           module_cmn_md_list_t **head_pptr,
-										  uint32_t               md_actual_sink_miid,
-										  bool_t                 override_ctrl_to_disable_tracking_event);
-capi_err_t gen_topo_capi_metadata_modify_at_data_flow_start(void *                 context_ptr,
-                                                            module_cmn_md_list_t * md_node_pptr,
+                                          uint32_t               md_actual_sink_miid,
+                                          bool_t                 override_ctrl_to_disable_tracking_event);
+
+capi_err_t gen_topo_capi_metadata_modify_at_data_flow_start(void                  *context_ptr,
+                                                            module_cmn_md_list_t  *md_node_pptr,
                                                             module_cmn_md_list_t **head_pptr);
 
 capi_err_t gen_topo_capi_metadata_create_with_tracking(void *                    context_ptr, // context cannot be NULL
@@ -244,7 +244,7 @@ void gen_topo_drop_md(uint32_t                          log_id,
 
 void gen_topo_check_free_md_ptr(void **ptr, bool_t pool_used);
 
-ar_result_t gen_topo_raise_tracking_event(gen_topo_t *          topo_ptr,
+ar_result_t gen_topo_raise_tracking_event(uint32_t              log_id,
                                           uint32_t              source_miid,
                                           module_cmn_md_list_t *md_list_ptr,
                                           bool_t                is_md_rendered,

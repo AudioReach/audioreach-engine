@@ -1,0 +1,38 @@
+#===============================================================================
+#
+# AVS AU
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+Import('env')
+import os
+
+core_public_apis = [
+ 'DEBUGTOOLS',
+ 'SERVICES',
+ 'KERNEL',
+]
+
+#---------------------------- h2xml generation --------------------------
+env.Append(H2XML_INC_PATH = "${INC_ROOT}/${AVS_AU_NAME}/fwk/api/modules")
+env.H2xmlFileGenerate(env.subst('../api'))
+#---------------------------- h2xml generation --------------------------
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['SHARED_LIBRARY_INC_PATHS', 'AVS'])
+env.RequireProtectedApi('AVS')
+
+#env.LoadSoftwareUnits()
+
+env.PublishProtectedApi('AVS',[
+   '../inc',
+   '../api',
+   ])
+   
+
+
+
+

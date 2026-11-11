@@ -29,6 +29,8 @@
 extern "C" {
 #endif //__cplusplus
 
+//#define OLC_VERBOSE_DEBUGGING
+
 #define OLC_SGM_ID spgm_ptr->sgm_id.log_id, spgm_ptr->sgm_id.sat_pd, spgm_ptr->sgm_id.cont_id
 #define OLC_SDM_ID spgm_ptr->sgm_id.log_id, spgm_ptr->sgm_id.sat_pd, spgm_ptr->sgm_id.cont_id, port_index
 

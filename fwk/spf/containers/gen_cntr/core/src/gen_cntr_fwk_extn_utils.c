@@ -255,3 +255,137 @@ ar_result_t gen_cntr_fwk_extn_async_signal_disable(gen_cntr_t *me_ptr, gen_topo_
 
    return result;
 }
+
+/*** Error check function - end */
+ar_result_t gen_cntr_handle_module_buffer_access_event(gen_topo_t        *topo_ptr,
+                                                       gen_topo_module_t *module_ptr,
+                                                       capi_event_info_t *event_info_ptr)
+{
+   capi_buf_t                       *payload       = &event_info_ptr->payload;
+   capi_event_data_to_dsp_service_t *dsp_event_ptr = (capi_event_data_to_dsp_service_t *)(payload->data_ptr);
+
+   if (!event_info_ptr->port_info.is_valid)
+   {
+      TOPO_MSG(topo_ptr->gu.log_id,
+               DBG_ERROR_PRIO,
+               "Module 0x%lX: Error in module buffer access event callback function. port info invalid:%lu "
+               "is_input:%lu",
+               module_ptr->gu.module_instance_id,
+               event_info_ptr->port_info.is_valid,
+               event_info_ptr->port_info.is_input_port);
+      return AR_EFAILED;
+   }
+
+   gen_topo_input_port_t  *input_port_ptr  = NULL;
+   gen_topo_output_port_t *output_port_ptr = NULL;
+   if (event_info_ptr->port_info.is_input_port)
+   {
+      // get output port id by the port index
+      input_port_ptr = (gen_topo_input_port_t *)gu_find_input_port_by_index((gu_module_t *)module_ptr,
+                                                                            event_info_ptr->port_info.port_index);
+      if (!input_port_ptr)
+      {
+         TOPO_MSG(topo_ptr->gu.log_id,
+                  DBG_ERROR_PRIO,
+                  "Module 0x%lX: Error in module buffer access event callback function. invalid input port index %lu ",
+                  module_ptr->gu.module_instance_id,
+                  event_info_ptr->port_info.port_index);
+         return AR_EFAILED;
+      }
+   }
+   else
+   {
+      // get output port id by the port index
+      output_port_ptr = (gen_topo_output_port_t *)gu_find_output_port_by_index((gu_module_t *)module_ptr,
+                                                                               event_info_ptr->port_info.port_index);
+      if (!output_port_ptr)
+      {
+         TOPO_MSG(topo_ptr->gu.log_id,
+                  DBG_ERROR_PRIO,
+                  "Module 0x%lX: Error in module buffer access event callback function. invalid output port index %lu ",
+                  module_ptr->gu.module_instance_id,
+                  event_info_ptr->port_info.port_index);
+         return AR_EFAILED;
+      }
+   }
+
+   bool_t is_enable = FALSE;
+   if (INTF_EXTN_EVENT_ID_MODULE_BUFFER_ACCESS_ENABLE_V2 == dsp_event_ptr->param_id)
+   {
+      intf_extn_event_id_module_buffer_access_enable_v2_t *cfg_ptr =
+         (intf_extn_event_id_module_buffer_access_enable_v2_t *)dsp_event_ptr->payload.data_ptr;
+      is_enable = (TRUE == cfg_ptr->enable);
+
+      if (!is_enable)
+      {
+         if (module_ptr->mod_buf_extn_ptr)
+         {
+            posal_memory_free(module_ptr->mod_buf_extn_ptr);
+            module_ptr->mod_buf_extn_ptr = NULL;
+         }
+      }
+      else
+      {
+         if (!module_ptr->mod_buf_extn_ptr)
+         {
+            intf_extn_event_id_module_buffer_access_enable_v2_t *temp_ptr = NULL;
+            temp_ptr = (intf_extn_event_id_module_buffer_access_enable_v2_t *)
+               posal_memory_malloc(sizeof(intf_extn_event_id_module_buffer_access_enable_v2_t), topo_ptr->heap_id);
+            if (NULL == temp_ptr)
+            {
+               return AR_EFAILED;
+            }
+            memset(temp_ptr, 0, sizeof(intf_extn_event_id_module_buffer_access_enable_v2_t));
+            module_ptr->mod_buf_extn_ptr = temp_ptr;
+         }
+
+         if (event_info_ptr->port_info.is_input_port)
+         {
+            input_port_ptr->common.flags.supports_buffer_reuse_extn =
+               is_enable ? GEN_TOPO_MODULE_INPUT_BUF_ACCESS : GEN_TOPO_MODULE_BUF_ACCESS_INVALID;
+
+            module_ptr->mod_buf_extn_ptr->buffer_mgr_cb_handle = cfg_ptr->buffer_mgr_cb_handle;
+
+            module_ptr->mod_buf_extn_ptr->get_port_buf_fn = cfg_ptr->get_port_buf_fn;
+
+            // optional for PTC because PTC always returns through process
+            module_ptr->mod_buf_extn_ptr->return_port_buf_fn = cfg_ptr->return_port_buf_fn;
+         }
+         else
+         {
+            output_port_ptr->common.flags.supports_buffer_reuse_extn =
+               (TRUE == is_enable) ? GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS : GEN_TOPO_MODULE_BUF_ACCESS_INVALID;
+
+            module_ptr->mod_buf_extn_ptr->buffer_mgr_cb_handle = cfg_ptr->buffer_mgr_cb_handle;
+
+            module_ptr->mod_buf_extn_ptr->return_port_buf_fn = cfg_ptr->return_port_buf_fn;
+
+            // optional for PTC because PTC always gets buffer through process
+            module_ptr->mod_buf_extn_ptr->get_port_buf_fn = cfg_ptr->get_port_buf_fn;
+         }
+      }
+   }
+   else // unknown param id
+   {
+      TOPO_MSG(topo_ptr->gu.log_id,
+               DBG_ERROR_PRIO,
+               "Module 0x%lX: Error in module buffer access event callback function. unsupport param id 0x%lx",
+               module_ptr->gu.module_instance_id,
+               event_info_ptr->port_info.is_valid,
+               event_info_ptr->port_info.is_input_port,
+               dsp_event_ptr->param_id);
+      return AR_EFAILED;
+   }
+
+   TOPO_MSG(topo_ptr->gu.log_id,
+            DBG_LOW_PRIO,
+            "Module 0x%lX: Module support buffer access:%lu on the port index%lu is_input:%lu callbacks validity:(%lu, "
+            "%lu) ",
+            module_ptr->gu.module_instance_id,
+            (TRUE == is_enable),
+            event_info_ptr->port_info.port_index,
+            event_info_ptr->port_info.is_input_port,
+            (NULL != module_ptr->mod_buf_extn_ptr->get_port_buf_fn),
+            (NULL != module_ptr->mod_buf_extn_ptr->return_port_buf_fn));
+   return AR_EOK;
+}

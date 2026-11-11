@@ -25,12 +25,6 @@ static bool_t gen_topo_is_data_trigger_satisfied_for_trigger_policy_module(gen_t
                                                                            bool_t *is_ext_trigger_not_satisfied_ptr,
                                                                            gen_topo_process_context_t *proc_ctxt_ptr);
 
-static bool_t gen_topo_output_has_empty_buffer(gen_topo_output_port_t *out_port_ptr)
-{
-   return (NULL != out_port_ptr->common.bufs_ptr[0].data_ptr) &&
-          (0 == out_port_ptr->common.bufs_ptr[0].actual_data_len);
-}
-
 /**
  * Returns wheter the module's subgraph is started
  *
@@ -132,6 +126,20 @@ static bool_t gen_topo_input_has_sufficient_data(gen_topo_input_port_t *in_port_
    bool_t is_threshold_required   = (in_port_ptr->common.flags.port_has_threshold || module_ptr->flags.need_sync_extn);
    bool_t is_fixed_frame_required = gen_topo_does_module_requires_fixed_frame_len(module_ptr);
 
+#ifdef VERBOSE_DEBUGGING
+   TOPO_MSG(topo_ptr->gu.log_id,
+            DBG_LOW_PRIO,
+            "Module 0x%lX: Input port_id 0x%lx, is_threshold_required %lu is_fixed_frame_required %lu, lens %lu of %Lu "
+            "bytes_from_prev_buf %lu",
+            module_ptr->gu.module_instance_id,
+            in_port_ptr->gu.cmn.id,
+            is_threshold_required,
+            is_fixed_frame_required,
+            in_port_ptr->common.bufs_ptr[0].actual_data_len,
+            in_port_ptr->common.bufs_ptr[0].max_data_len,
+            in_port_ptr->bytes_from_prev_buf);
+#endif
+
    if (is_fixed_frame_required && is_threshold_required)
    {
       /** call process for ports that don't require data buffering but have threshold, only if thresh is met.
@@ -200,25 +208,31 @@ bool_t gen_topo_input_port_is_trigger_present(void *  ctx_topo_ptr,
 
 // here check only for buffer, buffer itself is conditionally assigned at other places.
 // Trigger is not present if a stale output is present
-bool_t gen_topo_output_port_is_trigger_present(void *  ctx_topo_ptr,
-                                               void *  ctx_out_port_ptr,
+bool_t gen_topo_output_port_is_trigger_present(void   *ctx_topo_ptr,
+                                               void   *ctx_out_port_ptr,
                                                bool_t *is_ext_trigger_not_satisfied_ptr)
 {
-   gen_topo_t *            topo_ptr           = (gen_topo_t *)ctx_topo_ptr;
+   gen_topo_t             *topo_ptr           = (gen_topo_t *)ctx_topo_ptr;
    gen_topo_output_port_t *out_port_ptr       = (gen_topo_output_port_t *)ctx_out_port_ptr;
    bool_t                  trigger_is_present = TRUE;
 
    if (!gen_topo_output_has_empty_buffer(out_port_ptr))
    {
-      trigger_is_present = FALSE;
-
       if (is_ext_trigger_not_satisfied_ptr)
       {
          *is_ext_trigger_not_satisfied_ptr =
             (out_port_ptr->gu.ext_out_port_ptr &&
              !topo_ptr->topo_to_cntr_vtable_ptr->ext_out_port_has_buffer(out_port_ptr->gu.ext_out_port_ptr));
       }
+
+      // GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS means CAPI internal buffer will be assign and share output buffer, in capi
+      // process() context.
+      if (GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS != out_port_ptr->common.flags.supports_buffer_reuse_extn)
+      {
+         trigger_is_present = FALSE;
+      }
    }
+
    return trigger_is_present;
 }
 
@@ -1571,4 +1585,3 @@ gen_topo_data_need_t gen_topo_in_port_needs_data(gen_topo_t *topo_ptr, gen_topo_
 
    return rc;
 }
-

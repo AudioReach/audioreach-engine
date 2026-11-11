@@ -147,6 +147,9 @@ typedef struct capi_data_logging_non_island_t
    uint32_t log_code_status : 1;
    /* Whether log code is connected or not. */
 
+   uint32_t log_code_status_prev : 1;
+   /* Whether previous log code is connected or not. */
+
    uint32_t is_data_scaling_enabled : 1;
    /* For 1586 logging, we want to convert the Q27 data to Q31 before the logging.
     * This is a temporary change until we have a solution in HW EP modules to log the data*/

@@ -46,6 +46,7 @@
 #ifdef CONTAINER_ASYNC_CMD_HANDLING
 #include "cu_async_cmd_handle.h"
 #endif
+#include "cu_ipc_fwk_ext.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -79,8 +80,8 @@ Macros
 #define FRAME_LEN_20000_US       (20000)
 #define FRAME_LEN_40000_US       (40000)
 
-
-#define LATENCY_VOTE_MIN         (10) //us
+// for subms frame size latency must be set to minimum possible i.e 2 as per ADSPPM, lower is not supported by adsspm
+#define LATENCY_VOTE_MIN         (2) //us
 #define LATENCY_VOTE_LOW         (40) //us
 #define LATENCY_VOTE_MAX         (0xFFFFFFFF)
 #define LATENCY_VOTE_RT_FACTOR   (3)  // 3% tolerance
@@ -223,9 +224,13 @@ typedef enum
    CU_PM_REL_KPPS_BW,
    CU_PM_REL_KPPS_ONLY,
 } cu_pm_vote_type_t;
+
 typedef struct cu_module_t
 {
    spf_list_node_t     *event_list_ptr;       /**< Module events list */
+
+   cu_fwk_extn_ipc_port_info_t * ipc_port_cb_info_ptr;
+
 } cu_module_t;
 /**
  * @brief The base structure of a container
@@ -608,6 +613,15 @@ typedef struct cu_cntr_vtable_t
 
    ar_result_t (*handle_cntr_set_offload_voice_session_info)(cu_base_t *me_ptr,   cntr_param_id_offload_voice_session_info_t* voice_session_info_ptr);
 
+   ar_result_t (*ipc_port_ext_in_data_trigger_handler)(cu_base_t *base_ptr, uint32_t channel_bit_index);
+
+   ar_result_t (*ipc_port_ext_out_data_trigger_handler)(cu_base_t *base_ptr, uint32_t channel_bit_index);
+
+   ar_result_t (*get_and_update_fwk_extn_ipc_port_msg_cb_info)(cu_base_t   *base_ptr,
+                                                               gu_module_t *gu_module_ptr,
+                                                               bool_t       is_ext_input,
+                                                               uint32_t     port_index);
+
 } cu_cntr_vtable_t;
 
 /* =======================================================================
@@ -626,7 +640,8 @@ ar_result_t cu_check_launch_thread(cu_base_t *            me_ptr,
                                    char *                 thread_name,
                                    bool_t *               thread_launched_ptr);
 
-ar_result_t cu_parse_container_cfg(cu_base_t *me_ptr, apm_container_cfg_t *container_cfg_ptr);
+ar_result_t cu_parse_container_cfg(cu_base_t *me_ptr,
+                                   apm_container_cfg_t *container_cfg_ptr);
 
 ar_result_t cu_handle_cmd_queue(cu_base_t *me_ptr, uint32_t channel_bit_index);
 ar_result_t cu_process_cmd_queue(cu_base_t *me_ptr);
@@ -734,7 +749,10 @@ ar_result_t cu_handle_prepare(cu_base_t *base_ptr, spf_msg_cmd_graph_mgmt_t *cmd
 ar_result_t cu_ctrl_path_media_fmt_cmd(cu_base_t *base_ptr);
 ar_result_t cu_unsupported_resp(cu_base_t *me_ptr);
 ar_result_t cu_unsupported_cmd(cu_base_t *me_ptr);
-ar_result_t cu_cmd_icb_info_from_downstream(cu_base_t *base_ptr);
+//ar_result_t cu_ext_out_handle_icb_info_from_downstream(cu_base_t *base_ptr);
+ar_result_t cu_ext_out_handle_icb_info_from_downstream(cu_base_t *base_ptr,
+                                            spf_msg_cmd_inform_icb_info_t *ds_icb_info_ptr,
+                                            gu_ext_out_port_t *gu_ext_out_port_ptr);
 ar_result_t cu_gpr_cmd(cu_base_t *me_ptr);
 bool_t cu_is_frame_done_event_registered(cu_base_t *me_ptr);
 ar_result_t cu_handle_peer_port_property_update_cmd(cu_base_t *base_ptr);
@@ -801,8 +819,12 @@ ar_result_t cu_handle_sg_mgmt_cmd_async(cu_base_t *me_ptr, uint32_t sg_ops, topo
 bool_t cu_is_disconnect_ext_in_port_needed(cu_base_t *base_ptr, gu_ext_in_port_t *ext_in_port_ptr);
 bool_t cu_is_disconnect_ext_out_port_needed(cu_base_t *base_ptr, gu_ext_out_port_t *ext_out_port_ptr);
 bool_t cu_is_disconnect_ext_ctrl_port_needed(cu_base_t *base_ptr, gu_ext_ctrl_port_t *ext_ctrl_port_ptr);
-ar_result_t cu_init_external_ports(cu_base_t *base_ptr, uint32_t ctrl_port_queue_offet);
+ar_result_t cu_init_external_ports(cu_base_t *base_ptr,
+                                   uint32_t   ext_in_queue_offset,
+                                   uint32_t   ext_out_queue_offset,
+                                   uint32_t   ctrl_ptr_queue_offset);
 void cu_deinit_external_ports(cu_base_t *base_ptr, bool_t b_ignore_ports_from_sg_close, bool_t force_deinit_all_ports);
+ar_result_t cu_deinit_ext_port_queue(cu_base_t *base_ptr, spf_handle_t *hdl_ptr, uint32_t bit_mask);
 ar_result_t cu_deinit_internal_ctrl_port(cu_base_t *     me_ptr,
         gu_ctrl_port_t *gu_ctrl_port_ptr,
         bool_t          b_skip_q_flush);

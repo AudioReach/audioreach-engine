@@ -53,6 +53,8 @@ uint32_t cu_gpr_callback(gpr_packet_t *packet, void *callback_data)
    {
       case AR_GUID_TYPE_CONTROL_CMD:
       {
+         AR_MSG(DBG_LOW_PRIO, "CNTR TID: 0x%lx received AR_GUID_TYPE_CONTROL_CMD, GUID 0x%lX. q_ptr:0x%lx ", thread_id, packet->opcode, handle_ptr->cmd_handle_ptr->cmd_q_ptr);
+
          /** control commands */
          TRY(result,
              (ar_result_t)posal_queue_push_back(handle_ptr->cmd_handle_ptr->cmd_q_ptr, (posal_queue_element_t *)&msg));
@@ -60,6 +62,8 @@ uint32_t cu_gpr_callback(gpr_packet_t *packet, void *callback_data)
       }
       case AR_GUID_TYPE_DATA_CMD:
       {
+         AR_MSG(DBG_LOW_PRIO, "CNTR TID: 0x%lx received AR_GUID_TYPE_DATA_CMD, GUID 0x%lX. q_ptr:0x%lx ", thread_id, packet->opcode, handle_ptr->q_ptr);
+
          VERIFY(result, (NULL != handle_ptr->q_ptr));
          /** Data commands */
          TRY(result, (ar_result_t)posal_queue_push_back(handle_ptr->q_ptr, (posal_queue_element_t *)&msg));
@@ -67,12 +71,13 @@ uint32_t cu_gpr_callback(gpr_packet_t *packet, void *callback_data)
       }
       case AR_GUID_TYPE_CONTROL_EVENT:
       {
+         AR_MSG(DBG_LOW_PRIO, "CNTR TID: 0x%lx received AR_GUID_TYPE_CONTROL_EVENT, GUID 0x%lX. q_ptr:0x%lx ", thread_id, packet->opcode, handle_ptr->cmd_handle_ptr->cmd_q_ptr);
+
          switch (packet->opcode)
          {
             case IMCL_INTER_PROC_TRIGGER_MSG_GPR:
             case IMCL_INTER_PROC_POLLING_MSG_GPR:
             case IMCL_INTER_PROC_PEER_STATE_UPDATE:
-            case EVENT_ID_MODULE_CMN_METADATA_CUSTOM_TRACKING_EVENT:
                // for polling message, first push to cmd Q. from there, we'll open the message and push to the ctrl port
                // Q
                // which will be polled at process boundary

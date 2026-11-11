@@ -330,16 +330,24 @@ ar_result_t gen_topo_operate_on_modules(void                      *topo_ptr,
    {
       gen_topo_module_t *module_ptr = (gen_topo_module_t *)module_list_ptr->module_ptr;
 
-      for (gu_output_port_list_t *out_port_list_ptr = module_ptr->gu.output_port_list_ptr; (NULL != out_port_list_ptr);
-           LIST_ADVANCE(out_port_list_ptr))
+      /** Iterate through module's input ports and apply port states. */
+      gu_output_port_list_t *out_port_lists[] = { module_ptr->gu.output_port_list_ptr,
+                                                  module_ptr->gu.ipc_output_port_list_ptr };
+
+      for (uint32_t i = 0; i < SIZE_OF_ARRAY(out_port_lists); i++)
       {
-         SPF_CRITICAL_SECTION_START(&me_ptr->gu);
-         result |= gen_topo_operate_on_int_out_port(me_ptr,
-                                                    out_port_list_ptr->op_port_ptr,
-                                                    spf_sg_list_ptr,
-                                                    sg_ops,
-                                                    is_set_port_op);
-         SPF_CRITICAL_SECTION_END(&me_ptr->gu);
+
+         for (gu_output_port_list_t *out_port_list_ptr = out_port_lists[i]; (NULL != out_port_list_ptr);
+              LIST_ADVANCE(out_port_list_ptr))
+         {
+            SPF_CRITICAL_SECTION_START(&me_ptr->gu);
+            result |= gen_topo_operate_on_int_out_port(me_ptr,
+                                                       out_port_list_ptr->op_port_ptr,
+                                                       spf_sg_list_ptr,
+                                                       sg_ops,
+                                                       is_set_port_op);
+            SPF_CRITICAL_SECTION_END(&me_ptr->gu);
+         }
       }
 
       // if internal metadata list has nodes, then destroy them before destroying any nodes in ports.
@@ -349,16 +357,23 @@ ar_result_t gen_topo_operate_on_modules(void                      *topo_ptr,
          gen_topo_reset_module(me_ptr, module_ptr);
       }
 
-      for (gu_input_port_list_t *in_port_list_ptr = module_ptr->gu.input_port_list_ptr; (NULL != in_port_list_ptr);
-           LIST_ADVANCE(in_port_list_ptr))
+      /** Iterate through module's input ports and apply port states. */
+      gu_input_port_list_t *in_port_lists[] = { module_ptr->gu.input_port_list_ptr,
+                                                module_ptr->gu.ipc_input_port_list_ptr };
+
+      for (uint32_t i = 0; i < SIZE_OF_ARRAY(in_port_lists); i++)
       {
-         SPF_CRITICAL_SECTION_START(&me_ptr->gu);
-         result |= gen_topo_operate_on_int_in_port(me_ptr,
-                                                   in_port_list_ptr->ip_port_ptr,
-                                                   spf_sg_list_ptr,
-                                                   sg_ops,
-                                                   is_set_port_op);
-         SPF_CRITICAL_SECTION_END(&me_ptr->gu);
+         for (gu_input_port_list_t *in_port_list_ptr = in_port_lists[i]; (NULL != in_port_list_ptr);
+              LIST_ADVANCE(in_port_list_ptr))
+         {
+            SPF_CRITICAL_SECTION_START(&me_ptr->gu);
+            result |= gen_topo_operate_on_int_in_port(me_ptr,
+                                                      in_port_list_ptr->ip_port_ptr,
+                                                      spf_sg_list_ptr,
+                                                      sg_ops,
+                                                      is_set_port_op);
+            SPF_CRITICAL_SECTION_END(&me_ptr->gu);
+         }
       }
 
       for (gu_ctrl_port_list_t *ctrl_port_list_ptr = module_ptr->gu.ctrl_port_list_ptr; (NULL != ctrl_port_list_ptr);
@@ -659,9 +674,9 @@ ar_result_t gen_topo_set_input_port_media_format(gen_topo_t            *topo_ptr
    return AR_EOK;
 }
 
-static ar_result_t gen_topo_input_port_algo_reset_(gen_topo_module_t     *module_ptr,
-                                                   gen_topo_input_port_t *ip_port_ptr,
-                                                   uint32_t               log_id)
+ar_result_t gen_topo_input_port_algo_reset(gen_topo_module_t     *module_ptr,
+                                           gen_topo_input_port_t *ip_port_ptr,
+                                           uint32_t               log_id)
 {
    if (module_ptr->capi_ptr && ip_port_ptr->common.flags.port_is_not_reset)
    {
@@ -678,9 +693,9 @@ static ar_result_t gen_topo_input_port_algo_reset_(gen_topo_module_t     *module
    return AR_EOK;
 }
 
-static ar_result_t gen_topo_output_port_algo_reset_(gen_topo_module_t      *module_ptr,
-                                                    gen_topo_output_port_t *out_port_ptr,
-                                                    uint32_t                log_id)
+ar_result_t gen_topo_output_port_algo_reset(gen_topo_module_t      *module_ptr,
+                                            gen_topo_output_port_t *out_port_ptr,
+                                            uint32_t                log_id)
 {
    if (module_ptr->capi_ptr && out_port_ptr->common.flags.port_is_not_reset)
    {
@@ -713,7 +728,7 @@ ar_result_t topo_shared_reset_input_port(void *topo_ptr, void *topo_in_port_ptr,
       topo_basic_reset_input_port(me_ptr, in_port_ptr, use_bufmgr);
    }
 
-   gen_topo_input_port_algo_reset_(module_ptr, in_port_ptr, me_ptr->gu.log_id);
+   gen_topo_input_port_algo_reset(module_ptr, in_port_ptr, me_ptr->gu.log_id);
 
    return AR_EOK;
 }
@@ -731,7 +746,7 @@ ar_result_t topo_shared_reset_output_port(void *topo_ptr, void *topo_out_port_pt
 
    topo_basic_reset_output_port(me_ptr, out_port_ptr, use_bufmgr);
 
-   gen_topo_output_port_algo_reset_(module_ptr, out_port_ptr, me_ptr->gu.log_id);
+   gen_topo_output_port_algo_reset(module_ptr, out_port_ptr, me_ptr->gu.log_id);
 
    return AR_EOK;
 }
