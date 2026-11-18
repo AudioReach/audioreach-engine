@@ -1,0 +1,90 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#-------------------------------------------------------------------------------
+#
+#  $Header: //components/dev/audioreach_spm_cmn.cmn/0.0/vasharma.audioreach_spm_cmn.cmn.0.0.qli_kaanapali_sim_2/mfc_osrc/lib/build/pcm_cnv_lib.scons#1 $
+#  $DateTime: 2026/05/19 03:52:53 $
+#  $Author: vasharma $
+#  $Change: 73696726 $
+#                      EDIT HISTORY FOR FILE
+#
+#  This section contains comments describing changes made to the module.
+#  Notice that changes are listed in reverse chronological order.
+#
+# when       who     what, where, why
+# --------   ---     ---------------------------------------------------------
+# 7/15/26   vasharma    Added file for opensource resampler based MFC
+#===============================================================================
+Import('env')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS = '-ffunction-sections')
+
+if 'USES_AUDIO_IN_ISLAND' in env:
+    env.Append(CFLAGS = '-DAR_MSG_IN_ISLAND')
+    env.Append(CPPFLAGS = '-DAR_MSG_IN_ISLAND')
+
+core_public_apis = [
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS', 'CAPI_CMN_LIB'])
+env.RequireProtectedApi('AVS')
+env.RequirePrivateApi('AVS')
+
+env.PublishPrivateApi('AVS',[
+   '../inc'
+   ])
+
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'mfc_osrc_lib'
+LIBNAME_STUB = LIBNAME+'_stub'
+#import pdb; pdb.set_trace()
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+float_sources = []
+
+if 'FLOATING_POINT_DEFINED' in env:
+    float_sources.append("src/pc_float/pc_float.c")
+else:
+    float_sources.append("stub_src/pc_float/mfc_osrc_float_stub.cpp")
+
+# All mfc_osrc lib sources.  After the pc_* -> mfc_* rename these
+# files define all pipeline symbols used by the CAPI module; pcm_mf_cnv_lib
+# is no longer the provider of these symbols.
+avs_sources = env.GlobSourceFiles([
+    'src/mfc_osrc_init.c',
+    'src/mfc_osrc_init_island.c',
+    'src/mfc_osrc_process.c',
+    'src/mfc_osrc_process_island.c',
+    'src/mfc_osrc_converter.c',
+    'src/mfc_osrc_converter_island.c',
+] + float_sources, SRCPATH, posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.cpp', 'stub_src/*.c'], SRCPATH, posix=True)
+
+
+
+if False:
+    non_island_sources,island_sources = env.IslandFilter(avs_sources)
+    env.AddLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME, non_island_sources)
+    get_island_lib = env.AddLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME+'_island', [island_sources])
+    if 'USES_MEMSEG' in env:
+      env.TagLibraryForMemorySegment(['AVS_ADSP','AVS_ADSP_USER'], 'va', get_island_lib)
+    elif 'USES_ISLAND' in env:
+      env.AddIslandLibrary(['AVS_ADSP','AVS_ADSP_USER'], get_island_lib)
+
+else:
+    env.AddLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME, avs_sources)
+    env.AddLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)

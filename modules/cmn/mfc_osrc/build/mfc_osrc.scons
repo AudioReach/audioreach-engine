@@ -1,0 +1,93 @@
+#===============================================================================
+#
+# AVS AU
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#-------------------------------------------------------------------------------
+#
+#  $Header: mfc_osrc/build/mfc_osrc.scons $
+#  $DateTime: 2026/05/19 03:52:53 $
+#  $Author: vasharma $
+#  $Change: 73696726 $
+#                      EDIT HISTORY FOR FILE
+#
+#  This section contains comments describing changes made to the module.
+#  Notice that changes are listed in reverse chronological order.
+#
+# when       who     what, where, why
+# --------   ---     ---------------------------------------------------------
+# 7/15/26   vasharma    Added file for opensource resampler based MFC
+#
+#===============================================================================
+Import('env')
+
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+LIBNAME = 'mfc_osrc_module'
+
+items = env.GetSoftwareUnits()
+
+x = items.get('LIBS')
+a = x
+
+avs_reg_sources = []
+avs_stub_sources = []
+avs_prop_sources = list(a)
+island_sources = []
+island_stub_sources = []
+island_prop_sources = []
+for i in a: 
+    if "_stub" in i.name:
+        avs_stub_sources.append(i)
+        avs_prop_sources.remove(i)
+    elif "_island" in i.name and "capi" in i.name:
+        island_sources.append(i)
+        avs_prop_sources.remove(i)
+    elif "_island" in i.name and "lib" in i.name:
+        island_prop_sources.append(i)
+        avs_prop_sources.remove(i)
+    elif "capi" in i.name:
+        avs_reg_sources.append(i)
+        avs_prop_sources.remove(i)
+
+core_public_apis = [
+ 'DEBUGTOOLS',
+ 'SERVICES',
+ 'KERNEL',
+]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['SHARED_LIBRARY_INC_PATHS'])
+env.RequireProtectedApi('AVS')
+env.RequirePrivateApi('AVS')
+
+platform_public_apis = [
+  'STDDEF', # AEEDef
+  'HAPSDK', # HAP_debug, farf etc
+    ]
+
+
+# This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+env.RequirePublicApi(platform_public_apis, area='platform')
+
+#import pdb; pdb.set_trace()
+
+if 'USES_AVS_SHARED_LIBS' in env:
+    SRCPATH='..'
+    env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+    avs_reg_sources.append(island_sources)
+    avs_prop_sources.append(island_prop_sources)
+    env.AddAvsSharedLibrary(['AVS_SHARED'], '${BUILDPATH}/'+LIBNAME,
+                            [avs_reg_sources, avs_stub_sources, avs_prop_sources], build_type='MOD')
+elif 'USES_AVS_LIBRARY_BUILDER' in env:
+    avs_reg_sources.append(island_sources)
+    avs_prop_sources.append(island_prop_sources)
+    env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+                        [avs_reg_sources, avs_stub_sources, avs_prop_sources], 'MOD')
+            
+            

@@ -1,0 +1,76 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#-------------------------------------------------------------------------------
+#
+#  $Header: mfc_osrc/capi/build/mfc_osrc_capi.scons $
+#  $DateTime: 2026/07/15 00:00:00 $
+#  $Author: vasharma $
+#                      EDIT HISTORY FOR FILE
+#
+#  This section contains comments describing changes made to the module.
+#  Notice that changes are listed in reverse chronological order.
+#
+# when       who     what, where, why
+# --------   ---     ---------------------------------------------------------
+# 7/15/26   vasharma    Added file for opensource resampler based MFC
+#
+#===============================================================================
+Import('env')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+    env.Append(CFLAGS = '-ffunction-sections')
+
+if 'USES_AUDIO_IN_ISLAND' in env:
+    env.Append(CFLAGS = '-DAR_MSG_IN_ISLAND')
+    env.Append(CPPFLAGS = '-DAR_MSG_IN_ISLAND')
+
+env.PublishPrivateApi('AVS', [
+    '${INC_ROOT}/${AVS_AU_NAME}/spm/pp_reg/resampler/opensource_resampler/lib/inc',
+   '${INC_ROOT}/${AVS_AU_NAME}/spm/cmn/mfc_osrc/capi/inc',
+   '${INC_ROOT}/${AVS_AU_NAME}/spm/cmn/mfc_osrc/capi/src',
+   '${INC_ROOT}/${AVS_AU_NAME}/spm/cmn/mfc_osrc/api',
+   '${INC_ROOT}/${AVS_AU_NAME}/spm/cmn/mfc_osrc/lib/inc'
+   
+])
+
+core_public_apis = [
+    'DEBUGTOOLS',
+    'SERVICES',
+    'KERNEL',
+]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS', 'CAPI_CMN_LIB'])
+env.RequireProtectedApi('AVS')
+env.RequirePrivateApi('AVS')
+
+env.Append(H2XML_INC_PATH = "${INC_ROOT}/${AVS_AU_NAME}/spm/pp/common/api")
+env.H2xmlFileGenerate(env.subst('../../api'))
+
+SRCPATH = '..'
+LIBNAME = 'capi_mfc_osrc'
+LIBNAME_STUB = LIBNAME + '_stub'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+avs_sources = env.GlobSourceFiles(['src/*.cpp', 'src/*.c'], SRCPATH, posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.cpp', 'stub_src/*.c'], SRCPATH, posix=True)
+
+bucket = ['AVS_ADSP', 'AVS_ADSP_USER', 'AVS_ADSP_STUBS']
+
+if 'USES_AUDIO_IN_ISLAND' in env:
+    non_island_sources, island_sources = env.IslandFilter(avs_sources)
+    env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME, non_island_sources)
+    get_island_lib = env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME+'_island', [island_sources])
+    env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)
+    if 'USES_MEMSEG' in env:
+        env.TagLibraryForMemorySegment(bucket, 'va', get_island_lib)
+    elif 'USES_ISLAND' in env:
+        env.AddIslandLibrary(bucket, get_island_lib)
+else:
+    env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME, avs_sources)
+    env.AddLibrary(bucket, '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)
