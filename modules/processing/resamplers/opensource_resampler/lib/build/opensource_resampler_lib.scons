@@ -1,0 +1,60 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#-------------------------------------------------------------------------------
+#
+#  $DateTime: 2026/05/19 03:55:26 $
+#  $Author: vasharma $
+#  $Change: 73696801 $
+#                      EDIT HISTORY FOR FILE
+#
+#  This section contains comments describing changes made to the module.
+#  Notice that changes are listed in reverse chronological order.
+#
+# when       who     what, where, why
+# --------   ---     ---------------------------------------------------------
+# 7/15/26   vasharma    Added file for opensource resampler based MFC
+#===============================================================================
+Import('env')
+
+#env.Replace(HEXAGONCC_OPT = "-O0")
+core_public_apis = [
+    'DEBUGTOOLS',
+    'SERVICES',
+    'KERNEL',
+    ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS'])
+env.RequireProtectedApi('AVS')
+env.RequirePrivateApi('AVS')
+
+env.PublishPrivateApi('AVS',[
+   '../inc',
+   '../src',
+   ])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = '..'
+LIBNAME = 'opensource_resampler_lib'
+LIBNAME_STUB = LIBNAME+'_stub'
+
+#import pdb; pdb.set_trace()
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+# Only compile the core OSResampler and its SPF wrapper.
+# The osrc_pc_*.c files implement a legacy "embedding" design that is not
+# used by the current pcm_mf_cnv_osrc module; they transitively include
+# hwsw_rs_lib.h / iir_rs_lib.h which define file-scope tables and cause
+# multiple-definition linker errors when linked together.
+avs_sources = env.GlobSourceFiles(['src/resampler.c',
+                                   'src/osrc_rs_lib_wrapper.c'], SRCPATH, posix=True)
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.cpp'], SRCPATH,posix=True)
+
+env.AddLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME, avs_sources)
+env.AddLibrary(['AVS_ADSP','AVS_ADSP_USER','AVS_ADSP_STUBS'], '${BUILDPATH}/'+LIBNAME_STUB, avs_stub_sources)

@@ -1,0 +1,73 @@
+#===============================================================================
+#
+# AVS AU
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#-------------------------------------------------------------------------------
+#
+#  $Header: opensource_resampler/build/opensource_resampler.scons $
+#  $DateTime: 2026/05/19 03:55:26 $
+#  $Author: vasharma $
+#  $Change: 73696801 $
+#                      EDIT HISTORY FOR FILE
+#
+#  This section contains comments describing changes made to the module.
+#  Notice that changes are listed in reverse chronological order.
+#
+# when       who     what, where, why
+# --------   ---     ---------------------------------------------------------
+# 7/15/26   vasharma    Added file for opensource resampler based MFC
+#===============================================================================
+Import('env')
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+LIBNAME = 'OpensourceResamplerModule'
+
+#---------------------------- h2xml generation --------------------------
+env.H2xmlFileGenerate(env.subst('../api'))
+#---------------------------- h2xml generation --------------------------
+
+# Explicitly load the lib scons since it's outside GetSoftwareUnits() discovery scope
+env.SConscript('../lib/build/opensource_resampler_lib.scons', exports='env')
+
+items = env.GetSoftwareUnits()
+
+x = items.get('LIBS')
+
+avs_reg_sources = []
+avs_stub_sources = []
+avs_prop_sources = list(x)
+island_sources = []
+island_stub_sources = []
+island_prop_sources = []
+
+for i in x:
+    if "_stub" in i.name:
+        avs_stub_sources.append(i)
+        avs_prop_sources.remove(i)
+    elif "_island" in i.name and "Capi" in i.name:
+        island_sources.append(i)
+        avs_prop_sources.remove(i)
+    elif "_island" in i.name and "_lib" in i.name:
+        island_prop_sources.append(i)
+        avs_prop_sources.remove(i)
+    elif "_island" in i.name and "Lib" in i.name:
+        island_prop_sources.append(i)
+        avs_prop_sources.remove(i)
+    elif "Capi" in i.name:
+        avs_reg_sources.append(i)
+        avs_prop_sources.remove(i)
+
+#import pdb; pdb.set_trace()
+
+if 'USES_AVS_LIBRARY_BUILDER' in env:
+        x = env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+        [avs_reg_sources, avs_stub_sources, avs_prop_sources],'MOD')
+
+#import pdb; pdb.set_trace()
+
