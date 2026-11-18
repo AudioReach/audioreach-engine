@@ -21,47 +21,6 @@
 
 #include "spl_cntr_i.h"
 
-/**
- * Used to remove a bit from the gpd mask. Handles modifying send_to_topo as well.
- */
-static inline void spl_cntr_ext_in_port_clear_gpd_mask(spl_cntr_t *me_ptr, spl_cntr_ext_in_port_t *ext_in_port_ptr)
-{
-   gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
-   spl_cntr_remove_ext_in_port_from_gpd_mask(me_ptr, ext_in_port_ptr);
-   cu_clear_bits_in_x(&me_ptr->gpd_optional_mask, ext_in_port_ptr->cu.bit_mask);
-
-   // Only send started ports to topo.
-   if ((TOPO_PORT_STATE_STARTED == in_port_ptr->common.state) &&
-       (spl_cntr_ext_in_port_local_buf_exists(ext_in_port_ptr)))
-   {
-      ext_in_port_ptr->topo_buf.send_to_topo = TRUE;
-   }
-   else
-   {
-      ext_in_port_ptr->topo_buf.send_to_topo = FALSE;
-   }
-}
-
-/**
- * Used to remove a bit from the gpd mask. Handles modifying send_to_topo as well.
- */
-static inline void spl_cntr_ext_out_port_clear_gpd_mask(spl_cntr_t *me_ptr, spl_cntr_ext_out_port_t *ext_out_port_ptr)
-{
-   spl_topo_output_port_t *out_port_ptr = (spl_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
-   spl_cntr_remove_ext_out_port_from_gpd_mask(me_ptr, ext_out_port_ptr);
-   cu_clear_bits_in_x(&me_ptr->gpd_optional_mask, ext_out_port_ptr->cu.bit_mask);
-
-   // Only send only started ports to topo.
-   if (TOPO_PORT_STATE_STARTED == out_port_ptr->t_base.common.state)
-   {
-      ext_out_port_ptr->topo_buf.send_to_topo = TRUE;
-   }
-   else
-   {
-      ext_out_port_ptr->topo_buf.send_to_topo = FALSE;
-   }
-}
-
 static uint32_t spl_cntr_get_all_inputs_gpd_mask(spl_cntr_t *me_ptr)
 {
    gu_ext_in_port_list_t *ext_in_port_list_ptr = NULL;
@@ -81,19 +40,18 @@ static uint32_t spl_cntr_get_all_inputs_gpd_mask(spl_cntr_t *me_ptr)
 // is disabled.
 static void spl_cntr_gpd_clear_input_mask_for_threshold_disabled(spl_cntr_t *me_ptr)
 {
-   gu_ext_in_port_list_t *ext_in_port_list_ptr = NULL;
-
-   for (ext_in_port_list_ptr = me_ptr->topo.t_base.gu.ext_in_port_list_ptr; ext_in_port_list_ptr;
+   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = me_ptr->topo.t_base.gu.ext_in_port_list_ptr; ext_in_port_list_ptr;
         LIST_ADVANCE(ext_in_port_list_ptr))
    {
       spl_cntr_ext_in_port_t *ext_in_port_ptr = (spl_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
-      gen_topo_input_port_t * in_port_ptr     = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
+      gen_topo_input_port_t  *in_port_ptr     = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
 
       if (!in_port_ptr->flags.is_threshold_disabled_prop)
       {
          // skip this external input port if threshold is not disabled here.
          continue;
       }
+
       ext_in_port_ptr->next_process_samples_valid = FALSE;
 
       spl_cntr_remove_ext_in_port_from_gpd_mask(me_ptr, ext_in_port_ptr);
@@ -107,6 +65,23 @@ static void spl_cntr_gpd_clear_input_mask_for_threshold_disabled(spl_cntr_t *me_
       {
          ext_in_port_ptr->topo_buf.send_to_topo = TRUE;
       }
+   }
+
+   // If there is IPC port facing the threshold disable module, remove it from the GPD mask.
+   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = me_ptr->topo.t_base.gu.ipc_ext_in_port_list_ptr;
+        ext_in_port_list_ptr;
+        LIST_ADVANCE(ext_in_port_list_ptr))
+   {
+      spl_cntr_ext_in_port_t *ext_in_port_ptr = (spl_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
+      gen_topo_input_port_t  *in_port_ptr     = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
+
+      if (!in_port_ptr->flags.is_threshold_disabled_prop)
+      {
+         // skip this external input port if threshold is not disabled here.
+         continue;
+      }
+
+      spl_cntr_remove_ext_in_port_from_gpd_mask(me_ptr, ext_in_port_ptr);
    }
 }
 
@@ -367,8 +342,6 @@ static inline void spl_cntr_check_and_get_input_buffer(spl_cntr_t *            m
 static bool_t spl_cntr_graph_processing_decision(spl_cntr_t *me_ptr, uint32_t check_mask, bool_t first_iter)
 {
    bool_t                  decision                    = FALSE;
-   gu_ext_in_port_list_t * ext_in_port_list_ptr        = NULL;
-   gu_ext_out_port_list_t *ext_out_port_list_ptr       = NULL;
    bool_t                  is_none_of_the_port_started = TRUE;
    bool_t                  any_condition_satisfied     = FALSE;
 
@@ -377,11 +350,11 @@ static bool_t spl_cntr_graph_processing_decision(spl_cntr_t *me_ptr, uint32_t ch
    SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id, DBG_MED_PRIO, "GPD begin, check mask 0x%lX", check_mask);
 #endif
 
-   for (ext_in_port_list_ptr = me_ptr->topo.t_base.gu.ext_in_port_list_ptr; ext_in_port_list_ptr;
+   for (gu_ext_in_port_list_t *ext_in_port_list_ptr = me_ptr->topo.t_base.gu.ext_in_port_list_ptr; ext_in_port_list_ptr;
         LIST_ADVANCE(ext_in_port_list_ptr))
    {
       spl_cntr_ext_in_port_t *ext_in_port_ptr = (spl_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
-      gen_topo_input_port_t * in_port_ptr =
+      gen_topo_input_port_t  *in_port_ptr =
          (gen_topo_input_port_t *)ext_in_port_list_ptr->ext_in_port_ptr->int_in_port_ptr;
 
       if (!(check_mask & ext_in_port_ptr->cu.bit_mask))
@@ -522,10 +495,96 @@ static bool_t spl_cntr_graph_processing_decision(spl_cntr_t *me_ptr, uint32_t ch
                /* If trigger is not present then set the gpd bit so that this port doesn't trigger the topo_process.
                 */
                ext_in_port_ptr->topo_buf.send_to_topo = FALSE;
-               spl_cntr_add_ext_in_port_from_gpd_mask(me_ptr, ext_in_port_ptr);
+               spl_cntr_add_ext_in_port_to_gpd_mask(me_ptr, ext_in_port_ptr);
             }
          }
       }
+   }
+
+   for (gu_ext_in_port_list_t *ipc_ext_in_port_list_ptr = me_ptr->topo.t_base.gu.ipc_ext_in_port_list_ptr;
+        ipc_ext_in_port_list_ptr;
+        LIST_ADVANCE(ipc_ext_in_port_list_ptr))
+   {
+      spl_cntr_ext_in_port_t *ipc_ext_in_port_ptr = (spl_cntr_ext_in_port_t *)ipc_ext_in_port_list_ptr->ext_in_port_ptr;
+      gen_topo_input_port_t  *ipc_in_port_ptr =
+         (gen_topo_input_port_t *)ipc_ext_in_port_list_ptr->ext_in_port_ptr->int_in_port_ptr;
+
+      if (!(check_mask & ipc_ext_in_port_ptr->cu.bit_mask))
+      {
+#if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_3
+         SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                      DBG_MED_PRIO,
+                      "gpd: not checking IPC ext input idx = %ld, miid = 0x%lx bit_mask 0x%lx!",
+                      ipc_ext_in_port_ptr->gu.int_in_port_ptr->cmn.index,
+                      ipc_ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->module_instance_id,
+                      ipc_ext_in_port_ptr->cu.bit_mask);
+#endif
+
+         continue;
+      }
+
+      // Don't check stopped ports -> make sure the gpd bit mask is cleared.
+      if (TOPO_PORT_STATE_STARTED != ipc_in_port_ptr->common.state)
+      {
+#if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_3
+         SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                      DBG_MED_PRIO,
+                      "gpd: clearing bit mask on not started port ext input idx = %ld, miid = 0x%lx bit_mask "
+                      "0x%lx, "
+                      "state 0x%lx!",
+                      ipc_ext_in_port_ptr->gu.int_in_port_ptr->cmn.index,
+                      ipc_ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->module_instance_id,
+                      ipc_ext_in_port_ptr->cu.bit_mask,
+                      ipc_in_port_ptr->common.state);
+#endif
+         spl_cntr_ext_in_port_clear_gpd_mask(me_ptr, ipc_ext_in_port_ptr);
+         continue;
+      }
+
+      // at least one port is started.
+      is_none_of_the_port_started = FALSE;
+
+      fwk_extn_ipc_port_trigger_t input_trigger = FWK_EXTN_IPC_PORT_BUFFER_NEEDED;
+
+      ar_result_t result = cu_poll_and_setup_ipc_input_port_buffer(&me_ptr->cu,
+                                                                       (gu_ext_in_port_t *)ipc_ext_in_port_ptr,
+                                                                       &input_trigger,
+                                                                       DENY_UNDERRUN);
+      if (AR_FAILED(result))
+      {
+         SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                      DBG_MED_PRIO,
+                      "gpd: Failed to setup ext input idx = %ld, miid = 0x%lx bit_mask 0x%lx, state 0x%lx!",
+                      ipc_ext_in_port_ptr->gu.int_in_port_ptr->cmn.index,
+                      ipc_ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->module_instance_id,
+                      ipc_ext_in_port_ptr->cu.bit_mask,
+                      ipc_in_port_ptr->common.state);
+      }
+
+      if (FWK_EXTN_IPC_PORT_BUFFER_NOT_NEEDED == input_trigger)
+      {
+         any_condition_satisfied = TRUE;
+         spl_cntr_ext_in_port_clear_gpd_mask(me_ptr, ipc_ext_in_port_ptr);
+      }
+      else if (FWK_EXTN_IPC_PORT_BUFFER_NEEDED == input_trigger)
+      {
+         spl_cntr_add_ext_in_port_to_gpd_mask(me_ptr, ipc_ext_in_port_ptr);
+      }
+      else // FWK_EXTN_IPC_PORT_BUFFER_NEEDED_OPTIONALLY & FWK_EXTN_IPC_PORT_BUFFER_NOT_NEEDED_OPTIONALLY & ipc_in_trigger
+      {
+         cu_set_bits_in_x(&me_ptr->gpd_optional_mask, ipc_ext_in_port_ptr->cu.bit_mask);
+         spl_cntr_remove_ext_in_port_from_gpd_mask(me_ptr, ipc_ext_in_port_ptr);
+      }
+
+#if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_3
+      SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                   DBG_MED_PRIO,
+                   "gpd: input port idx = %ld miid = 0x%lx bit_mask 0x%lx input_trigger: %lu",
+                   ipc_ext_in_port_ptr->gu.int_in_port_ptr->cmn.index,
+                   ipc_ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->module_instance_id,
+                   ipc_ext_in_port_ptr->cu.bit_mask,
+                   input_trigger);
+#endif
    }
 
    // This check is to avoid processing if we are waiting for voice proc tick,
@@ -534,11 +593,12 @@ static bool_t spl_cntr_graph_processing_decision(spl_cntr_t *me_ptr, uint32_t ch
       return FALSE;
    }
 
-   for (ext_out_port_list_ptr = me_ptr->topo.t_base.gu.ext_out_port_list_ptr; ext_out_port_list_ptr;
+   for (gu_ext_out_port_list_t *ext_out_port_list_ptr = me_ptr->topo.t_base.gu.ext_out_port_list_ptr;
+        ext_out_port_list_ptr;
         LIST_ADVANCE(ext_out_port_list_ptr))
    {
       spl_cntr_ext_out_port_t *ext_out_port_ptr = (spl_cntr_ext_out_port_t *)ext_out_port_list_ptr->ext_out_port_ptr;
-      spl_topo_output_port_t * out_port_ptr     = (spl_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
+      spl_topo_output_port_t  *out_port_ptr     = (spl_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
       topo_port_state_t        state            = out_port_ptr->t_base.common.state;
 
       if (!(check_mask & ext_out_port_ptr->cu.bit_mask))
@@ -600,8 +660,95 @@ static bool_t spl_cntr_graph_processing_decision(spl_cntr_t *me_ptr, uint32_t ch
          /* If trigger is not present then set the gpd bit so that this port doesn't trigger the topo_process.
           */
          ext_out_port_ptr->topo_buf.send_to_topo = FALSE;
-         spl_cntr_add_ext_out_port_from_gpd_mask(me_ptr, ext_out_port_ptr);
+         spl_cntr_add_ext_out_port_to_gpd_mask(me_ptr, ext_out_port_ptr);
       }
+   }
+
+   for (gu_ext_out_port_list_t *ipc_ext_out_port_list_ptr = me_ptr->topo.t_base.gu.ipc_ext_out_port_list_ptr;
+        ipc_ext_out_port_list_ptr;
+        LIST_ADVANCE(ipc_ext_out_port_list_ptr))
+   {
+      spl_cntr_ext_out_port_t *ipc_ext_out_port_ptr =
+         (spl_cntr_ext_out_port_t *)ipc_ext_out_port_list_ptr->ext_out_port_ptr;
+      spl_topo_output_port_t *ipc_out_port_ptr = (spl_topo_output_port_t *)ipc_ext_out_port_ptr->gu.int_out_port_ptr;
+      topo_port_state_t       state             = ipc_out_port_ptr->t_base.common.state;
+
+      if (!(check_mask & ipc_ext_out_port_ptr->cu.bit_mask))
+      {
+// check the output port that triggered us and the optional ports.
+#if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_3
+         SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                      DBG_MED_PRIO,
+                      "gpd: output port idx = %ld miid = 0x%lx bit_mask 0x%lx not checked, check mask not set.",
+                      ipc_ext_out_port_ptr->gu.int_out_port_ptr->cmn.index,
+                      ipc_ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->module_instance_id,
+                      ipc_ext_out_port_ptr->cu.bit_mask);
+#endif
+         continue;
+      }
+
+      // Don't check stopped ports -> make sure the gpd bit mask is cleared.
+      if (TOPO_PORT_STATE_STARTED != state)
+      {
+#if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_3
+         SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                      DBG_MED_PRIO,
+                      "gpd: clearing bit mask on not started port ext output port idx = %ld miid = 0x%lx bit_mask "
+                      "0x%lx, "
+                      "state 0x%lx!",
+                      ipc_ext_out_port_ptr->gu.int_out_port_ptr->cmn.index,
+                      ipc_ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->module_instance_id,
+                      ipc_ext_out_port_ptr->cu.bit_mask,
+                      state);
+#endif
+         spl_cntr_ext_out_port_clear_gpd_mask(me_ptr, ipc_ext_out_port_ptr);
+         continue;
+      }
+
+      // at least one port is started.
+      is_none_of_the_port_started = FALSE;
+
+      fwk_extn_ipc_port_trigger_t output_trigger = FWK_EXTN_IPC_PORT_BUFFER_NEEDED;
+
+      ar_result_t result = cu_poll_and_setup_ipc_output_port_buffer(&me_ptr->cu,
+                                                                        (gu_ext_out_port_t *)ipc_ext_out_port_ptr,
+                                                                        &output_trigger,
+                                                                        DENY_OVERRUN);
+      if (AR_FAILED(result))
+      {
+         SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                      DBG_MED_PRIO,
+                      "gpd: Failed to setup ext out idx = %ld, miid = 0x%lx bit_mask 0x%lx, state 0x%lx!",
+                      ipc_ext_out_port_ptr->gu.int_out_port_ptr->cmn.index,
+                      ipc_ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->module_instance_id,
+                      ipc_ext_out_port_ptr->cu.bit_mask,
+                      ipc_out_port_ptr->t_base.common.state);
+      }
+
+      if (FWK_EXTN_IPC_PORT_BUFFER_NOT_NEEDED == output_trigger)
+      {
+         any_condition_satisfied = TRUE;
+         spl_cntr_ext_out_port_clear_gpd_mask(me_ptr, ipc_ext_out_port_ptr);
+      }
+      else if (FWK_EXTN_IPC_PORT_BUFFER_NEEDED == output_trigger)
+      {
+         spl_cntr_add_ext_out_port_to_gpd_mask(me_ptr, ipc_ext_out_port_ptr);
+      }
+      else
+      {
+         spl_cntr_remove_ext_out_port_from_gpd_mask(me_ptr, ipc_ext_out_port_ptr);
+         cu_set_bits_in_x(&me_ptr->gpd_optional_mask, ipc_ext_out_port_ptr->cu.bit_mask);
+      }
+
+#if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_3
+      SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                   DBG_MED_PRIO,
+                   "gpd: output port idx = %ld miid = 0x%lx bit_mask 0x%lx output_trigger: %lu",
+                   ipc_ext_out_port_ptr->gu.int_out_port_ptr->cmn.index,
+                   ipc_ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->module_instance_id,
+                   ipc_ext_out_port_ptr->cu.bit_mask,
+                   output_trigger);
+#endif
    }
 
    if (is_none_of_the_port_started)
@@ -753,7 +900,7 @@ void spl_cntr_ext_in_port_update_gpd_bit(spl_cntr_t *me_ptr, spl_cntr_ext_in_por
    else if (GEN_TOPO_DATA_NEEDED == data_need)
    {
       cu_clear_bits_in_x(&me_ptr->gpd_optional_mask, ext_in_port_ptr->cu.bit_mask);
-      spl_cntr_add_ext_in_port_from_gpd_mask(me_ptr, ext_in_port_ptr);
+      spl_cntr_add_ext_in_port_to_gpd_mask(me_ptr, ext_in_port_ptr);
    }
    else
    {
@@ -790,7 +937,7 @@ static void spl_cntr_ext_out_port_update_gpd_bit(spl_cntr_t *me_ptr, spl_cntr_ex
    else if (GEN_TOPO_PORT_TRIGGER_NEEDED == trigger_need)
    {
       cu_clear_bits_in_x(&me_ptr->gpd_optional_mask, ext_out_port_ptr->cu.bit_mask);
-      spl_cntr_add_ext_out_port_from_gpd_mask(me_ptr, ext_out_port_ptr);
+      spl_cntr_add_ext_out_port_to_gpd_mask(me_ptr, ext_out_port_ptr);
    }
    else
    {
@@ -810,28 +957,39 @@ ar_result_t spl_cntr_update_cu_bit_mask(spl_cntr_t *me_ptr)
    uint32_t                output_listen_mask    = 0;
    uint32_t                stop_mask             = 0;
    uint32_t                optional_mask         = 0;
-   gu_ext_out_port_list_t *ext_out_port_list_ptr = NULL;
-   gu_ext_in_port_list_t * ext_in_port_list_ptr  = NULL;
 
-   // during voice proc trigger, stop waiting on any external ports.
+   gu_ext_in_port_list_t *ext_in_port_lists[] = { me_ptr->topo.t_base.gu.ext_in_port_list_ptr,
+                                                  me_ptr->topo.t_base.gu.ipc_ext_in_port_list_ptr };
+
+   gu_ext_out_port_list_t *ext_out_port_lists[] = { me_ptr->topo.t_base.gu.ext_out_port_list_ptr,
+                                                    me_ptr->topo.t_base.gu.ipc_ext_out_port_list_ptr };
+
+   gu_ext_in_port_list_t  *ext_in_port_list_ptr  = NULL;
+   gu_ext_out_port_list_t *ext_out_port_list_ptr = NULL;
+   // during voice proc trigger, stop waiting on all the external ports.
    if (VOICE_PROC_TRIGGER_MODE == me_ptr->trigger_policy)
    {
-      gu_ext_in_port_list_t * ext_in_port_list_ptr  = NULL;
-      gu_ext_out_port_list_t *ext_out_port_list_ptr = NULL;
 
-      for (ext_in_port_list_ptr = me_ptr->topo.t_base.gu.ext_in_port_list_ptr; ext_in_port_list_ptr;
-           LIST_ADVANCE(ext_in_port_list_ptr))
+      /** stop listening to both real & IPC ext in/output ports */
+      for (uint32_t i = 0; i < SIZE_OF_ARRAY(ext_in_port_lists); i++)
       {
-         spl_cntr_ext_in_port_t *ext_in_port_ptr = (spl_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
-         stop_mask |= ext_in_port_ptr->cu.bit_mask;
+         for (ext_in_port_list_ptr = ext_in_port_lists[i]; ext_in_port_list_ptr; LIST_ADVANCE(ext_in_port_list_ptr))
+         {
+            spl_cntr_ext_in_port_t *ext_in_port_ptr = (spl_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
+            stop_mask |= ext_in_port_ptr->cu.bit_mask;
+         }
       }
 
-      for (ext_out_port_list_ptr = me_ptr->topo.t_base.gu.ext_out_port_list_ptr; ext_out_port_list_ptr;
-           LIST_ADVANCE(ext_out_port_list_ptr))
+      for (uint32_t i = 0; i < SIZE_OF_ARRAY(ext_out_port_lists); i++)
       {
-         spl_cntr_ext_out_port_t *ext_out_port_ptr = (spl_cntr_ext_out_port_t *)ext_out_port_list_ptr->ext_out_port_ptr;
-         stop_mask |= ext_out_port_ptr->cu.bit_mask;
+         for (ext_out_port_list_ptr = ext_out_port_lists[i]; ext_out_port_list_ptr; LIST_ADVANCE(ext_out_port_list_ptr))
+         {
+            spl_cntr_ext_out_port_t *ext_out_port_ptr =
+               (spl_cntr_ext_out_port_t *)ext_out_port_list_ptr->ext_out_port_ptr;
+            stop_mask |= ext_out_port_ptr->cu.bit_mask;
+         }
       }
+
 #if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_2
       SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
                    DBG_HIGH_PRIO,
@@ -856,99 +1014,105 @@ ar_result_t spl_cntr_update_cu_bit_mask(spl_cntr_t *me_ptr)
          uint32_t input_listen_mask_for_this_path  = 0;
          uint32_t output_listen_mask_for_this_path = 0;
 
-         for (ext_in_port_list_ptr = me_ptr->cu.gu_ptr->ext_in_port_list_ptr; ext_in_port_list_ptr;
-              LIST_ADVANCE(ext_in_port_list_ptr))
+         for (uint32_t i = 0; i < SIZE_OF_ARRAY(ext_in_port_lists); i++)
          {
-            spl_cntr_ext_in_port_t *ext_in_port_ptr = (spl_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
-
-            if (path_index != ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->path_index)
+            for (ext_in_port_list_ptr = ext_in_port_lists[i]; ext_in_port_list_ptr; LIST_ADVANCE(ext_in_port_list_ptr))
             {
-               continue;
-            }
+               spl_cntr_ext_in_port_t *ext_in_port_ptr =
+                  (spl_cntr_ext_in_port_t *)ext_in_port_list_ptr->ext_in_port_ptr;
 
-            bool_t add_to_stop_mask = TRUE;
+               if (path_index != ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->path_index)
+               {
+                  continue;
+               }
 
-            if ((me_ptr->gpd_mask & ext_in_port_ptr->cu.bit_mask))
-            {
-               input_listen_mask_for_this_path |= ext_in_port_ptr->cu.bit_mask;
-               add_to_stop_mask = FALSE;
-            }
-            else if ((me_ptr->gpd_optional_mask & ext_in_port_ptr->cu.bit_mask))
-            {
-               optional_mask |= ext_in_port_ptr->cu.bit_mask;
-               add_to_stop_mask = FALSE;
-            }
+               bool_t add_to_stop_mask = TRUE;
 
-            if (add_to_stop_mask)
-            {
-               stop_mask |= ext_in_port_ptr->cu.bit_mask;
+               if ((me_ptr->gpd_mask & ext_in_port_ptr->cu.bit_mask))
+               {
+                  input_listen_mask_for_this_path |= ext_in_port_ptr->cu.bit_mask;
+                  add_to_stop_mask = FALSE;
+               }
+               else if ((me_ptr->gpd_optional_mask & ext_in_port_ptr->cu.bit_mask))
+               {
+                  optional_mask |= ext_in_port_ptr->cu.bit_mask;
+                  add_to_stop_mask = FALSE;
+               }
+
+               if (add_to_stop_mask)
+               {
+                  stop_mask |= ext_in_port_ptr->cu.bit_mask;
 
 #if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_3
-               SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
-                            DBG_MED_PRIO,
-                            "Not listening to external input port idx = %ld, miid = 0x%lx",
-                            ext_in_port_ptr->gu.int_in_port_ptr->cmn.index,
-                            ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->module_instance_id);
+                  SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                               DBG_MED_PRIO,
+                               "Not listening to external input port idx = %ld, miid = 0x%lx",
+                               ext_in_port_ptr->gu.int_in_port_ptr->cmn.index,
+                               ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->module_instance_id);
 #endif
-            }
+               }
 #if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_3
-            else
-            {
-               SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
-                            DBG_MED_PRIO,
-                            "Start listening to external input port idx = %ld, miid = 0x%lx",
-                            ext_in_port_ptr->gu.int_in_port_ptr->cmn.index,
-                            ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->module_instance_id);
-            }
+               else
+               {
+                  SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                               DBG_MED_PRIO,
+                               "Start listening to external input port idx = %ld, miid = 0x%lx",
+                               ext_in_port_ptr->gu.int_in_port_ptr->cmn.index,
+                               ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr->module_instance_id);
+               }
 #endif
+            }
          }
 
-         for (ext_out_port_list_ptr = me_ptr->cu.gu_ptr->ext_out_port_list_ptr; ext_out_port_list_ptr;
-              LIST_ADVANCE(ext_out_port_list_ptr))
+         for (uint32_t i = 0; i < SIZE_OF_ARRAY(ext_out_port_lists); i++)
          {
-            spl_cntr_ext_out_port_t *ext_out_port_ptr =
-               (spl_cntr_ext_out_port_t *)ext_out_port_list_ptr->ext_out_port_ptr;
-
-            if (path_index != ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->path_index)
+            for (ext_out_port_list_ptr = ext_out_port_lists[i]; ext_out_port_list_ptr;
+                 LIST_ADVANCE(ext_out_port_list_ptr))
             {
-               continue;
-            }
+               spl_cntr_ext_out_port_t *ext_out_port_ptr =
+                  (spl_cntr_ext_out_port_t *)ext_out_port_list_ptr->ext_out_port_ptr;
 
-            bool_t add_to_stop_mask = TRUE;
+               if (path_index != ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->path_index)
+               {
+                  continue;
+               }
 
-            if ((me_ptr->gpd_mask & ext_out_port_ptr->cu.bit_mask))
-            {
-               output_listen_mask_for_this_path |= ext_out_port_ptr->cu.bit_mask;
-               add_to_stop_mask = FALSE;
-            }
-            else if ((me_ptr->gpd_optional_mask & ext_out_port_ptr->cu.bit_mask))
-            {
-               optional_mask |= ext_out_port_ptr->cu.bit_mask;
-               add_to_stop_mask = FALSE;
-            }
+               bool_t add_to_stop_mask = TRUE;
 
-            if (add_to_stop_mask)
-            {
-               stop_mask |= ext_out_port_ptr->cu.bit_mask;
+               if ((me_ptr->gpd_mask & ext_out_port_ptr->cu.bit_mask))
+               {
+                  output_listen_mask_for_this_path |= ext_out_port_ptr->cu.bit_mask;
+                  add_to_stop_mask = FALSE;
+               }
+               else if ((me_ptr->gpd_optional_mask & ext_out_port_ptr->cu.bit_mask))
+               {
+                  optional_mask |= ext_out_port_ptr->cu.bit_mask;
+                  add_to_stop_mask = FALSE;
+               }
+
+               if (add_to_stop_mask)
+               {
+                  stop_mask |= ext_out_port_ptr->cu.bit_mask;
 
 #if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_3
-               SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
-                            DBG_MED_PRIO,
-                            "Not listening to external output port idx = %ld, miid = 0x%lx",
-                            ext_out_port_ptr->gu.int_out_port_ptr->cmn.index,
-                            ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->module_instance_id);
+                  SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                               DBG_MED_PRIO,
+                               "Not listening to external output port idx = %ld, miid = 0x%lx",
+                               ext_out_port_ptr->gu.int_out_port_ptr->cmn.index,
+                               ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->module_instance_id);
 #endif
-            }
+               }
 #if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_3
-            else
-            {
-               SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
-                            DBG_MED_PRIO,
-                            "Start listening to external output port idx = %ld, miid = 0x%lx",
-                            ext_out_port_ptr->gu.int_out_port_ptr->cmn.index,
-                            ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->module_instance_id);
-            }
+               else
+               {
+                  SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                               DBG_MED_PRIO,
+                               "Start listening to external output port idx = %ld, miid = 0x%lx",
+                               ext_out_port_ptr->gu.int_out_port_ptr->cmn.index,
+                               ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr->module_instance_id);
+               }
 #endif
+            }
          }
 
          /*For voice containers, wait for input trigger first and then start to listen on input*/
@@ -994,6 +1158,14 @@ ar_result_t spl_cntr_update_cu_bit_mask(spl_cntr_t *me_ptr)
       }
    }
 
+#if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_5
+   SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                  DBG_LOW_PRIO,
+                  "start_listen_mask: 0x%lx, stop_listen_mask: 0x%lx",
+                  (input_listen_mask | output_listen_mask | optional_mask),
+                  stop_mask);
+#endif
+
    cu_start_listen_to_mask(&me_ptr->cu, (input_listen_mask | output_listen_mask | optional_mask));
    cu_stop_listen_to_mask(&me_ptr->cu, stop_mask);
 
@@ -1030,6 +1202,10 @@ ar_result_t spl_cntr_update_gpd_and_cu_bit_mask(spl_cntr_t *me_ptr)
 
       spl_cntr_ext_out_port_update_gpd_bit(me_ptr, ext_out_port_ptr);
    }
+
+   /** update GPD mask for the IPC ext input/output ports */
+   spl_cntr_update_ipc_ext_in_ports_gpd_mask(me_ptr);
+   spl_cntr_update_ipc_ext_out_ports_gpd_mask(me_ptr);
 
 #if SPL_CNTR_DEBUG_LEVEL >= SPL_CNTR_DEBUG_LEVEL_2
    SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
@@ -1386,6 +1562,7 @@ static ar_result_t spl_cntr_setup_ext_in_port_bufs(spl_cntr_t *me_ptr)
          in_port_ptr->topo.ext_in_buf_ptr   = &ext_in_port_ptr->topo_buf;
       }
    }
+
    return result;
 }
 
@@ -1912,7 +2089,8 @@ ar_result_t spl_cntr_check_and_process_audio(spl_cntr_t *me_ptr, uint32_t gpd_ch
 
    // Don't process if there are no external inputs and outputs. This could happen if the container hosts floating
    // modules.
-   if ((0 == spl_cntr_num_ext_in_ports(me_ptr)) && (0 == spl_cntr_num_ext_out_ports(me_ptr)))
+   if ((0 == spl_cntr_num_ext_in_ports(me_ptr)) && (0 == spl_cntr_num_ext_out_ports(me_ptr)) &&
+       (0 == me_ptr->topo.t_base.gu.num_ipc_ext_in_ports) && (0 == me_ptr->topo.t_base.gu.num_ipc_ext_out_ports))
    {
       return FALSE;
    }
@@ -1931,7 +2109,6 @@ ar_result_t spl_cntr_check_and_process_audio(spl_cntr_t *me_ptr, uint32_t gpd_ch
     * 	  Therefore we should give a chance for optional ports to pull the buffer from Q if it is available
     */
    gpd_check_mask |= me_ptr->gpd_optional_mask;
-
 
    /* If trigger policy is enabled then topo-process will be called if any trigger is satisfied.
     * So before calling topo-process, we should give chance to other ports to buffer sufficient data as well if it is
@@ -2048,6 +2225,11 @@ ar_result_t spl_cntr_check_and_process_audio(spl_cntr_t *me_ptr, uint32_t gpd_ch
          break;
       }
    }
+
+   // Process incoming control messages
+   cu_poll_and_process_ctrl_msgs(&me_ptr->cu);
+
+   TRY(result, spl_cntr_handle_process_events_and_flags(me_ptr));
 
    CATCH(result, SPL_CNTR_MSG_PREFIX, me_ptr->cu.gu_ptr->log_id)
    {

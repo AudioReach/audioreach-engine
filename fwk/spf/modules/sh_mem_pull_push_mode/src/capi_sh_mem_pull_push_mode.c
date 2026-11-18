@@ -16,6 +16,7 @@
 #include "capi.h"
 #include "ar_msg.h"
 #include "capi_sh_mem_pull_push_mode.h"
+#include "sh_pull_push_mode_i.h"
 
 #define CAPI_PM_STACK_SIZE 4096 // TODO: To be measured
 
@@ -1053,7 +1054,7 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
                (capi_register_event_to_dsp_client_v2_t *)(payload_ptr->data_ptr);
 
             // check if the event is valid
-            if ((EVENT_ID_SH_MEM_PULL_PUSH_MODE_WATERMARK != reg_event_ptr->event_id) &&
+            if ((EVENT_ID_SH_MEM_PULL_PUSH_MODE_WATERMARK != reg_event_ptr->event_id) && (EVENT_ID_SH_MEM_PULL_PUSH_MODE_BUFFER_LEVEL != reg_event_ptr->event_id) &&
                 (EVENT_ID_SH_MEM_PUSH_MODE_EOS_MARKER != reg_event_ptr->event_id))
             {
                PULL_PUSH_MSG(pm_info_ptr->miid, DBG_HIGH_PRIO, "Unsupported event ID[%d]", reg_event_ptr->event_id);
@@ -1132,6 +1133,13 @@ static capi_err_t capi_pm_set_properties(capi_t *_pif, capi_proplist_t *props_pt
                                                                      (event_cfg_sh_mem_pull_push_mode_watermark_level_t
                                                                          *)(event_config_payload + 1),
                                                                      me_ptr->heap_mem.heap_id);
+               }
+               else if (EVENT_ID_SH_MEM_PULL_PUSH_MODE_BUFFER_LEVEL == reg_event_ptr->event_id)
+               {
+                  event_cfg_sh_mem_pull_push_mode_buffer_level_t *event_config_payload =
+                     (event_cfg_sh_mem_pull_push_mode_buffer_level_t *)(reg_event_ptr->event_cfg.data_ptr);
+                  capi_result = pull_push_mode_buffer_level_init(&(me_ptr->pull_push_mode_info),
+                                                                  event_config_payload->buffer_level_bytes);
                }
                else
                {

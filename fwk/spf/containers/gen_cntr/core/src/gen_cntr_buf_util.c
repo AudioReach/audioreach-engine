@@ -214,25 +214,6 @@ ar_result_t gen_cntr_create_ext_out_bufs(gen_cntr_t *             me_ptr,
    return result;
 }
 
-static ar_result_t gen_cntr_deinit_ext_port_queue(gen_cntr_t *me_ptr, spf_handle_t *hdl_ptr, uint32_t bit_mask)
-{
-   if (hdl_ptr->q_ptr)
-   {
-      /*Release mask only in Buffer driven mode*/
-      cu_release_bit_in_bit_mask(&me_ptr->cu, bit_mask);
-
-      // We can clear without checking input or output or control because only one bit is set in bit_mask.
-      cu_clear_bits_in_x(&me_ptr->cu.all_ext_in_mask, bit_mask);
-      cu_clear_bits_in_x(&me_ptr->cu.all_ext_out_mask, bit_mask);
-
-      /*deinit the queue */
-      posal_queue_deinit(hdl_ptr->q_ptr);
-      hdl_ptr->q_ptr = NULL;
-   }
-
-   return AR_EOK;
-}
-
 /**
  * destroys (ext_port_ptr->cu.num_buf_allocated - num_bufs_to_keep) num of buffers,
  * where num_bufs_to_keep can be different from num_buf_allocated
@@ -2386,6 +2367,18 @@ static ar_result_t gen_cntr_recreate_all_buffers(gen_cntr_t *me_ptr)
                                                in_port_ptr->gu.cmn.module_ptr->module_instance_id,
                                                in_port_ptr->gu.cmn.id));
          }
+
+         // handle ICB info from downstream, computes ICB buffers required and sets to the IPC Tx modules
+         // to recreate IPC buffers the given output ports.
+         for (gu_output_port_list_t *ipc_output_port_list_ptr = module_ptr->gu.ipc_output_port_list_ptr;
+              (NULL != ipc_output_port_list_ptr);
+              LIST_ADVANCE(ipc_output_port_list_ptr))
+         {
+            gu_output_port_t  *ipc_out_port_ptr     = (gu_output_port_t *)ipc_output_port_list_ptr->op_port_ptr;
+            gu_ext_out_port_t *ipc_ext_out_port_ptr = (gu_ext_out_port_t *)ipc_out_port_ptr->ext_out_port_ptr;
+
+            TRY(result, cu_ext_out_handle_icb_info_from_downstream(&me_ptr->cu, NULL, ipc_ext_out_port_ptr));
+         }
       }
    }
 
@@ -2789,7 +2782,8 @@ ar_result_t gen_cntr_deinit_ext_in_port(void *base_ptr, gu_ext_in_port_t *gu_ext
 
    gen_cntr_ext_in_port_reset(me_ptr, ext_in_port_ptr);
 
-   result |= gen_cntr_deinit_ext_port_queue(me_ptr, &ext_in_port_ptr->gu.this_handle, ext_in_port_ptr->cu.bit_mask);
+   result |=
+      cu_deinit_ext_port_queue((cu_base_t *)base_ptr, &ext_in_port_ptr->gu.this_handle, ext_in_port_ptr->cu.bit_mask);
 
    MFREE_NULLIFY(ext_in_port_ptr->bufs_ptr);
    ext_in_port_ptr->bufs_num = 0;
@@ -2843,7 +2837,8 @@ ar_result_t gen_cntr_deinit_ext_out_port(void *base_ptr, gu_ext_out_port_t *gu_e
 
    gen_cntr_ext_out_port_reset(me_ptr, ext_out_port_ptr);
 
-   result |= gen_cntr_deinit_ext_port_queue(me_ptr, &ext_out_port_ptr->gu.this_handle, ext_out_port_ptr->cu.bit_mask);
+   result |=
+      cu_deinit_ext_port_queue((cu_base_t *)base_ptr, &ext_out_port_ptr->gu.this_handle, ext_out_port_ptr->cu.bit_mask);
 
    // Destroy the internal port.
    if (int_out_port_ptr->gu.attached_module_ptr)

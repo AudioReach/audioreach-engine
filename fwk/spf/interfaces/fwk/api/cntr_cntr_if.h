@@ -85,8 +85,9 @@ struct spf_msg_peer_port_property_info_t
 };
 
 typedef struct spf_msg_peer_port_property_info_t spf_msg_peer_port_property_info_t;
+
 /**
- * Payload structure for SPF_MSG_CMD_PEER_PORT_PROPERTY_UPDATE
+ * Payload structure for SPF_MSG_CMD_PEER_PORT_PROPERTY_UPDATE & SPF_IPC_FWK_EXTN_GPR_CMD_PEER_PORT_PROPERTY_UPDATE
  *
  * this payload is preceded by spf_msg_header_t
  */

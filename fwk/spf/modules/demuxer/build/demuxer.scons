@@ -1,0 +1,16 @@
+'''
+/*==============================================================================
+@file simple_splitter.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+#env.Replace(HEXAGONCC_OPT = "-O0")
+
+env.H2xmlFileGenerate(env.subst('${AVS_ROOT}/spf/modules/demuxer/api'))
+
+env.LoadSoftwareUnits()
+

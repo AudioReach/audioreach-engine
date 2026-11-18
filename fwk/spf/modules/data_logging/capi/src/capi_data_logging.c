@@ -920,9 +920,10 @@ capi_err_t capi_data_logging_init(capi_t *capi_ptr, capi_proplist_t *init_set_pr
          me_ptr->nlpi_me_ptr->extn_params.endianness = PCM_LITTLE_ENDIAN;
 
          /* Get a unique id for this instance and reset sequence number */
-         me_ptr->nlpi_me_ptr->seq_number      = 0;
-         me_ptr->nlpi_me_ptr->log_code_status = FALSE;
-         me_ptr->nlpi_me_ptr->counter         = 0;
+         me_ptr->nlpi_me_ptr->seq_number           = 0;
+         me_ptr->nlpi_me_ptr->log_code_status      = FALSE;
+         me_ptr->nlpi_me_ptr->log_code_status_prev = FALSE;
+         me_ptr->nlpi_me_ptr->counter              = 0;
 
          // module is enabled by default
          me_ptr->nlpi_me_ptr->is_enabled = TRUE;
@@ -1301,6 +1302,13 @@ capi_err_t capi_data_logging_set_properties(capi_t *capi_ptr, capi_proplist_t *p
                              (uint32_t)prop_ptr[i].id);
             capi_result |= CAPI_EUNSUPPORTED;
          }
+      }
+
+      // change vote if logging status changed
+      if (me_ptr->nlpi_me_ptr->log_code_status != me_ptr->nlpi_me_ptr->log_code_status_prev)
+      {
+         capi_data_logging_raise_kpps_bw_event(me_ptr);
+         me_ptr->nlpi_me_ptr->log_code_status_prev = me_ptr->nlpi_me_ptr->log_code_status;
       }
    }
 

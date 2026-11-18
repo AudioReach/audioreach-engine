@@ -427,7 +427,7 @@ PT_CNTR_STATIC ar_result_t pt_cntr_assign_buffer_to_module(pt_cntr_t *me_ptr, pt
                       in_port_ptr->gc.common.flags.buf_origin);
       }
       else if (prev_out_port_ptr &&
-               (GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS == prev_out_port_ptr->gc.common.flags.supports_buffer_resuse_extn))
+               (GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS == prev_out_port_ptr->gc.common.flags.supports_buffer_reuse_extn))
       {
          // gets buffer from prev module during process
          in_port_ptr->gc.common.flags.buf_origin = GEN_TOPO_BUF_ORIGIN_CAPI_MODULE_BORROWED;
@@ -446,7 +446,7 @@ PT_CNTR_STATIC ar_result_t pt_cntr_assign_buffer_to_module(pt_cntr_t *me_ptr, pt
                       in_port_ptr->gc.common.max_buf_len,
                       in_port_ptr->gc.common.flags.buf_origin);
       }
-      else if (GEN_TOPO_MODULE_INPUT_BUF_ACCESS == in_port_ptr->gc.common.flags.supports_buffer_resuse_extn)
+      else if (GEN_TOPO_MODULE_INPUT_BUF_ACCESS == in_port_ptr->gc.common.flags.supports_buffer_reuse_extn)
       {
          // gets buffer from the current module during process
          in_port_ptr->gc.common.flags.buf_origin = GEN_TOPO_BUF_ORIGIN_CAPI_MODULE;
@@ -643,7 +643,7 @@ PT_CNTR_STATIC ar_result_t pt_cntr_assign_buffer_to_module(pt_cntr_t *me_ptr, pt
                       out_port_ptr->gc.common.max_buf_len,
                       out_port_ptr->gc.common.flags.buf_origin);
       }
-      else if (GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS == out_port_ptr->gc.common.flags.supports_buffer_resuse_extn)
+      else if (GEN_TOPO_MODULE_OUTPUT_BUF_ACCESS == out_port_ptr->gc.common.flags.supports_buffer_reuse_extn)
       {
          // gets buffer from the current module during process
          out_port_ptr->gc.common.flags.buf_origin = GEN_TOPO_BUF_ORIGIN_CAPI_MODULE;
@@ -662,7 +662,7 @@ PT_CNTR_STATIC ar_result_t pt_cntr_assign_buffer_to_module(pt_cntr_t *me_ptr, pt
                       out_port_ptr->gc.common.max_buf_len,
                       out_port_ptr->gc.common.flags.buf_origin);
       }
-      else if (GEN_TOPO_MODULE_INPUT_BUF_ACCESS == next_in_port_ptr->gc.common.flags.supports_buffer_resuse_extn &&
+      else if (GEN_TOPO_MODULE_INPUT_BUF_ACCESS == next_in_port_ptr->gc.common.flags.supports_buffer_reuse_extn &&
                (TOPO_PORT_STATE_STARTED == next_in_port_ptr->gc.common.state))
       {
          // gets buffer from next module's input during process

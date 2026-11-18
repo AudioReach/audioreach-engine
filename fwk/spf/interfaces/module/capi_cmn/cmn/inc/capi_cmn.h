@@ -15,7 +15,6 @@
 #include "posal_types.h"
 #include "module_cmn_api.h"
 #include "common_enc_dec_api.h"
-#include "capi_intf_extn_module_buffer_access.h"
 
 /*=====================================================================
   Macros
@@ -574,6 +573,16 @@ static inline uint32_t capi_cmn_count_set_bits_in_lower_n_bits(uint32_t var, uin
    uint32_t pos_of_Nth_bit = capi_cmn_count_set_bits(set_bits_before_N);
    return pos_of_Nth_bit;
 }
+
+static inline void capi_cmn_crash(void)
+{
+#if defined(SIM)
+   *((volatile uint32_t *)0) = 0;
+#else
+   return;
+#endif
+}
+
 void capi_cmn_check_print_underrun(capi_cmn_underrun_info_t *underrun_info_ptr, uint32_t iid);
 
 void capi_cmn_check_print_underrun_multiple_threshold(capi_cmn_underrun_info_t *underrun_info_ptr,
@@ -618,6 +627,12 @@ capi_err_t capi_cmn_intf_extn_event_module_output_buffer_reuse(uint32_t         
                                                               bool_t                      is_enable,
                                                               uint32_t                    buffer_mgr_cb_handle,
                                                               intf_extn_return_module_output_buf_func_t return_output_buf_fn);
+
+capi_err_t capi_cmn_intf_extn_event_module_port_buffer_reuse_v2(uint32_t                    log_id,
+                                                              capi_event_callback_info_t *cb_info_ptr,
+                                                              uint32_t                    port_index,
+                                                              bool_t                      is_input,
+                                                              intf_extn_event_id_module_buffer_access_enable_v2_t *cfg_ptr);
 
 #ifdef AVS_BUILD_SOS
 #include "spf_dyn_loading_func_mapping.h"

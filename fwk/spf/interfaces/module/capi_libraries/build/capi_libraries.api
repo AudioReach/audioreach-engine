@@ -1,0 +1,17 @@
+'''
+/*==============================================================================
+@file capi_libraries.api
+@brief
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.PublishRestrictedApi('CAPI_LIBRARIES',[
+   '${AVS_ROOT}/spf/interfaces/module/capi_libraries/capi_library_thread_pool/inc',
+   '${AVS_ROOT}/spf/interfaces/module/capi_libraries/capi_library_internal_buffer/inc',
+   ])
+
+env.LoadAPIUnits()

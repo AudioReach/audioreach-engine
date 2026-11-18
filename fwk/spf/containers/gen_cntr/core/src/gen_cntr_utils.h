@@ -269,7 +269,7 @@ ar_result_t gen_cntr_destroy_module(gen_topo_t *       topo_ptr,
 ar_result_t gen_cntr_capi_set_fwk_extn_proc_dur(gen_cntr_t *me_ptr, uint32_t cont_proc_dur_us);
 
 ar_result_t gen_cntr_fwk_extn_handle_at_stop(gen_cntr_t *me_ptr, gu_module_list_t *module_list_ptr);
-ar_result_t gen_cntr_fwk_extn_handle_at_start(gen_cntr_t *me_ptr, gu_module_list_t *module_list_ptr);
+ar_result_t gen_cntr_fwk_extn_handle_at_start(gen_cntr_t *me_ptr, gu_module_list_t *module_list_ptr, uint32_t defer_stm_enable_until_endof_cmd);
 
 /** ------------------------------------------- data flow state -----------------------------------------------------*/
 ar_result_t gen_cntr_handle_ext_in_data_flow_begin(gen_cntr_t *me_ptr, gen_cntr_ext_in_port_t *ext_in_port_ptr);
@@ -296,6 +296,8 @@ ar_result_t gen_cntr_notify_timestamp_discontinuity_event_cb(gen_topo_t *topo_pt
                                                              bool_t      ts_valid,
                                                              int64_t     timestamp_disc_us,
                                                              uint32_t    path_index);
+
+ar_result_t gen_cntr_handle_events_after_cmds(gen_cntr_t *me_ptr, bool_t is_ack_cmd, ar_result_t rsp_result);
 #ifdef __cplusplus
 }
 #endif //__cplusplus

@@ -58,7 +58,7 @@ static ar_result_t gen_cntr_call_process_frames(cu_base_t *cu_ptr, void *temp)
  *  This function needs to first ensure that the event flags are reconciled.
  *  This function must also be executed synchronous to the data-path processing.
  */
-static ar_result_t gen_cntr_handle_events_after_cmds(gen_cntr_t *me_ptr, bool_t is_ack_cmd, ar_result_t rsp_result)
+ar_result_t gen_cntr_handle_events_after_cmds(gen_cntr_t *me_ptr, bool_t is_ack_cmd, ar_result_t rsp_result)
 {
    ar_result_t                 result              = AR_EOK;
    cu_base_t                  *base_ptr            = &me_ptr->cu;
@@ -337,7 +337,22 @@ static ar_result_t gen_cntr_handle_rest_of_graph_open(cu_base_t *base_ptr, void 
    /* Allocate memory for voice info structure, for voice call use cases*/
    TRY(result, cu_create_voice_info(&me_ptr->cu, open_cmd_ptr));
 
-   TRY(result, cu_init_external_ports(&me_ptr->cu, GEN_CNTR_EXT_CTRL_PORT_Q_OFFSET));
+   if (check_if_pass_thru_container(me_ptr))
+   {
+      TRY(result,
+          cu_init_external_ports(&me_ptr->cu,
+                                 PT_CNTR_EXT_IN_PORT_Q_OFFSET,
+                                 PT_CNTR_EXT_OUT_PORT_Q_OFFSET,
+                                 GEN_CNTR_EXT_CTRL_PORT_Q_OFFSET));
+   }
+   else
+   {
+      TRY(result,
+          cu_init_external_ports(&me_ptr->cu,
+                                 GEN_CNTR_EXT_IN_PORT_Q_OFFSET,
+                                 GEN_CNTR_EXT_OUT_PORT_Q_OFFSET,
+                                 GEN_CNTR_EXT_CTRL_PORT_Q_OFFSET));
+   }
 
    // NOTES: [PT_CNTR]
    // 1. pass thru container ext ports sdata_ptr is assigned for the newly opened ports in init_ext_in/out_port() Since
@@ -1020,6 +1035,35 @@ ar_result_t gen_cntr_graph_start(cu_base_t *base_ptr)
 
    SPF_CRITICAL_SECTION_END(me_ptr->cu.gu_ptr);
 
+   // for PTC, STM enabled is differed until the end of the start to reduce the delay between first and last enabled
+   // DMAs. for GC, it will help avoid signal misses during start
+   if (me_ptr->st_module.pending_start_stm_list_ptr)
+   {
+      // handle events before handling STM enable to avoid signal miss and delayed DMA irq handling.
+      // Ideally not expected but incase if any events are raised during STM enable they will handled in
+      // in another call gen_cntr_handle_events_after_cmds() in end of graph start. Note that response
+      // is also returned in the second call to ensure STM enable result is also accounted when sending response.
+      gen_cntr_handle_events_after_cmds(me_ptr, FALSE, result);
+
+      if (check_if_pass_thru_container(me_ptr))
+      {
+         pt_cntr_t *pt_ptr = (pt_cntr_t *)me_ptr;
+         if (AR_EOK !=
+             (result = pt_cntr_stm_fwk_extn_handle_enable(pt_ptr, me_ptr->st_module.pending_start_stm_list_ptr)))
+         {
+            GEN_CNTR_MSG(me_ptr->topo.gu.log_id, DBG_ERROR_PRIO, "Failed enabling PTC cntr");
+         }
+      }
+      else
+      {
+         result |= gen_cntr_stm_fwk_extn_handle_enable(me_ptr,
+                                                       (gen_topo_module_t *)
+                                                          me_ptr->st_module.pending_start_stm_list_ptr->module_ptr);
+      }
+
+      spf_list_delete_list((spf_list_node_t **)&me_ptr->st_module.pending_start_stm_list_ptr, TRUE);
+   }
+
    /** NOTES: [PT_CNTR]
     *  Module active flag and proc list not updated it seems unsafe to free the lock here check with Harsh once.
     * Possible corner case if the ext output gets started and data thread is processing with old sorted order list.
@@ -1423,6 +1467,11 @@ ar_result_t gen_cntr_cmd_icb_info_from_downstream(cu_base_t *base_ptr)
    ar_result_t result = AR_EOK;
    gen_cntr_t *me_ptr = (gen_cntr_t *)base_ptr;
 
+   gu_ext_out_port_t *gu_ext_out_port_ptr =
+      (gu_ext_out_port_t *)(((spf_msg_header_t *)base_ptr->cmd_msg.payload_ptr)->dst_handle_ptr);
+   spf_msg_header_t              *header_ptr      = (spf_msg_header_t *)base_ptr->cmd_msg.payload_ptr;
+   spf_msg_cmd_inform_icb_info_t *ds_icb_info_ptr = (spf_msg_cmd_inform_icb_info_t *)&header_ptr->payload_start;
+
    INIT_EXCEPTION_HANDLING
    SPF_MANAGE_CRITICAL_SECTION
 
@@ -1432,7 +1481,8 @@ ar_result_t gen_cntr_cmd_icb_info_from_downstream(cu_base_t *base_ptr)
                 me_ptr->cu.curr_chan_mask);
 
    SPF_CRITICAL_SECTION_START(base_ptr->gu_ptr);
-   TRY(result, cu_cmd_icb_info_from_downstream(base_ptr));
+
+   TRY(result, cu_ext_out_handle_icb_info_from_downstream(base_ptr, ds_icb_info_ptr, gu_ext_out_port_ptr));
 
    CATCH(result, GEN_CNTR_MSG_PREFIX, me_ptr->topo.gu.log_id)
    {
@@ -1759,6 +1809,13 @@ ar_result_t gen_cntr_operate_on_ext_out_port(void *              base_ptr,
                                           TRUE /*is_dropped*/);
          }
       }
+
+      // if IPC output port just do an algo reset
+      if(gu_is_ipc_ext_output_port(&ext_out_port_ptr->gu))
+      {
+         cu_destroy_ipc_ext_out_port_buffers((cu_base_t *)base_ptr, &ext_out_port_ptr->gu);
+      }
+
       ext_out_port_ptr->gu.gu_status = GU_STATUS_CLOSING;
       return AR_EOK;
    }
@@ -1767,15 +1824,30 @@ ar_result_t gen_cntr_operate_on_ext_out_port(void *              base_ptr,
     * Case of Read shared memory end point in remote DSP.
     * 	APM is not going to send the DISCONNECT/CLOSE to the external output port connected to the ADSP.
     * 	It is possible that some read buffers are in Queue and those must be flushed at SG DISCONNECT
-    * */
+    */
    bool_t is_disconnect_needed =
       ((TOPO_SG_OP_DISCONNECT & sg_ops) &&
        (is_self_sg || cu_is_disconnect_ext_out_port_needed((cu_base_t *)base_ptr, &ext_out_port_ptr->gu)));
 
    if (((TOPO_SG_OP_STOP | TOPO_SG_OP_FLUSH) & sg_ops) || (is_disconnect_needed))
    {
-      gen_cntr_flush_output_data_queue(me_ptr, ext_out_port_ptr, TRUE);
-      (void)gen_cntr_ext_out_port_reset(me_ptr, ext_out_port_ptr);
+      // if IPC output port just do an algo reset
+      if(gu_is_ipc_ext_output_port(&ext_out_port_ptr->gu))
+      {
+         gen_topo_output_port_t *ipc_out_port_ptr = (gen_topo_output_port_t *)ext_out_port_ptr->gu.int_out_port_ptr;
+         gen_topo_module_t      *module_ptr       = (gen_topo_module_t *)(ipc_out_port_ptr->gu.cmn.module_ptr);
+         gen_topo_output_port_algo_reset(module_ptr, ipc_out_port_ptr, me_ptr->topo.gu.log_id);
+
+         // Flush handling:
+         // no need to flush output queue since buffers are owned by the ipc output port.
+         // todo: if operating in the Rd shm mode, it still needs to flush the buffers to HLOS client
+         // since buffers are owned by HLOS.
+      }
+      else
+      {
+         gen_cntr_flush_output_data_queue(me_ptr, ext_out_port_ptr, TRUE);
+         (void)gen_cntr_ext_out_port_reset(me_ptr, ext_out_port_ptr);
+      }
    }
 
    if (is_disconnect_needed)
@@ -1862,24 +1934,40 @@ ar_result_t gen_cntr_operate_on_ext_in_port(void *             base_ptr,
    // Note that if US is stopped and self is started we are flushing. We can ideally process the input buffers at
    // since self is started. But if we don't flush immediately, US CLOSE can be potentially delayed because it will
    // wait for the buffers.
-   if (((TOPO_SG_OP_FLUSH | TOPO_SG_OP_STOP) & sg_ops) || (is_disconnect_needed))
+   if(gu_is_ipc_input_port(&in_port_ptr->gu))
    {
-      // For stop and flush operation, we need to preserve the MF (which is like stream associated MD)
-      gen_cntr_flush_input_data_queue(me_ptr,
-                                      ext_in_port_ptr,
-                                      ((TOPO_SG_OP_FLUSH | TOPO_SG_OP_STOP) & sg_ops) /* keep data msg */);
-   }
+      if (((TOPO_SG_OP_FLUSH | TOPO_SG_OP_STOP) & sg_ops) || (is_disconnect_needed))
+      {
+         gen_topo_module_t *module_ptr = ((gen_topo_module_t *)ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr);
 
-   // we cannot reset port except in self flush cases, as resetting puts the port in data flow state = at-gap.
-   // we can reset only after EOS is propagated ( upstream to downstream)
-   if ((is_self_sg && (TOPO_SG_OP_FLUSH & sg_ops)) || (is_disconnect_needed))
-   {
-      gen_cntr_ext_in_port_reset(me_ptr, ext_in_port_ptr);
-   }
+         // do reset to the module to ensure any held input IPC buffer is returned
+         gen_topo_input_port_algo_reset(module_ptr, in_port_ptr, me_ptr->topo.gu.log_id);
 
-   if (is_disconnect_needed)
+         // flush out the data buffers
+         cu_ipc_ext_input_flush_data_queue(&me_ptr->cu, &ext_in_port_ptr->gu);
+      }
+   }
+   else
    {
-      ext_in_port_ptr->gu.upstream_handle.spf_handle_ptr = NULL;
+      if (((TOPO_SG_OP_FLUSH | TOPO_SG_OP_STOP) & sg_ops) || (is_disconnect_needed))
+      {
+         // For stop and flush operation, we need to preserve the MF (which is like stream associated MD)
+         gen_cntr_flush_input_data_queue(me_ptr,
+                                       ext_in_port_ptr,
+                                       ((TOPO_SG_OP_FLUSH | TOPO_SG_OP_STOP) & sg_ops) /* keep data msg */);
+      }
+
+      // we cannot reset port except in self flush cases, as resetting puts the port in data flow state = at-gap.
+      // we can reset only after EOS is propagated ( upstream to downstream)
+      if ((is_self_sg && (TOPO_SG_OP_FLUSH & sg_ops)) || (is_disconnect_needed))
+      {
+         gen_cntr_ext_in_port_reset(me_ptr, ext_in_port_ptr);
+      }
+
+      if (is_disconnect_needed)
+      {
+         ext_in_port_ptr->gu.upstream_handle.spf_handle_ptr = NULL;
+      }
    }
 
    return result;
@@ -1926,6 +2014,29 @@ ar_result_t gen_cntr_operate_on_subgraph_async(void                      *base_p
          }
       }
 
+      /* Flush ipc external input ports*/
+      for (gu_ext_in_port_list_t *ipc_ext_in_port_list_ptr =me_ptr->topo.gu.ipc_ext_in_port_list_ptr;
+            (NULL != ipc_ext_in_port_list_ptr);
+            LIST_ADVANCE(ipc_ext_in_port_list_ptr))
+      {
+         gen_cntr_ext_in_port_t *ipc_ext_in_port_ptr = (gen_cntr_ext_in_port_t *)ipc_ext_in_port_list_ptr->ext_in_port_ptr;
+         gen_topo_input_port_t* in_port_ptr = (gen_topo_input_port_t *)ipc_ext_in_port_ptr->gu.int_in_port_ptr;
+
+         if (ipc_ext_in_port_ptr->gu.sg_ptr == gu_sg_ptr)
+         {
+            SPF_CRITICAL_SECTION_START(&me_ptr->topo.gu);
+            gen_topo_module_t *module_ptr = ((gen_topo_module_t *)ipc_ext_in_port_ptr->gu.int_in_port_ptr->cmn.module_ptr);
+
+            // do reset to the module to ensure any held input IPC buffer is returned
+            gen_topo_input_port_algo_reset(module_ptr, in_port_ptr, me_ptr->topo.gu.log_id);
+
+            // flush out the data buffers
+            cu_ipc_ext_input_flush_data_queue(&me_ptr->cu, ipc_ext_in_port_list_ptr->ext_in_port_ptr);
+
+            SPF_CRITICAL_SECTION_END(&me_ptr->topo.gu);
+         }
+      }
+
       for (gu_ext_out_port_list_t *ext_out_port_list_ptr = me_ptr->topo.gu.ext_out_port_list_ptr;
            (NULL != ext_out_port_list_ptr);
            LIST_ADVANCE(ext_out_port_list_ptr))
@@ -1938,6 +2049,29 @@ ar_result_t gen_cntr_operate_on_subgraph_async(void                      *base_p
             gen_cntr_flush_output_data_queue(me_ptr, ext_out_port_ptr, TRUE /*is_client_cmd*/);
             (void)gen_cntr_ext_out_port_reset(me_ptr, ext_out_port_ptr);
             ext_out_port_ptr->flags.is_not_reset = FALSE;
+
+            SPF_CRITICAL_SECTION_END(&me_ptr->topo.gu);
+         }
+      }
+
+      for (gu_ext_out_port_list_t *ipc_ext_out_port_list_ptr = me_ptr->topo.gu.ipc_ext_out_port_list_ptr;
+      (NULL != ipc_ext_out_port_list_ptr);
+      LIST_ADVANCE(ipc_ext_out_port_list_ptr))
+      {
+         gen_cntr_ext_out_port_t *ipc_ext_out_port_ptr = (gen_cntr_ext_out_port_t *)ipc_ext_out_port_list_ptr->ext_out_port_ptr;
+         if (ipc_ext_out_port_ptr->gu.sg_ptr == gu_sg_ptr)
+         {
+            SPF_CRITICAL_SECTION_START(&me_ptr->topo.gu);
+
+            gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)ipc_ext_out_port_ptr->gu.int_out_port_ptr;
+            gen_topo_module_t      *module_ptr   = (gen_topo_module_t *)(out_port_ptr->gu.cmn.module_ptr);
+
+            gen_topo_output_port_algo_reset(module_ptr, out_port_ptr, me_ptr->topo.gu.log_id);
+
+            // Flush handling:
+            // no need to flush output queue since buffers are owned by the ipc output port.
+            // todo: if operating in the Rd shm mode, it still needs to flush the buffers to HLOS client
+            // since buffers are owned by HLOS.
 
             SPF_CRITICAL_SECTION_END(&me_ptr->topo.gu);
          }
@@ -2021,34 +2155,41 @@ ar_result_t gen_cntr_operate_on_subgraph(void                      *base_ptr,
          continue;
       }
 
-      for (gu_output_port_list_t *out_port_list_ptr = module_ptr->gu.output_port_list_ptr; (NULL != out_port_list_ptr);
-           LIST_ADVANCE(out_port_list_ptr))
+      /** Iterate through module's output ports and apply port states to modules */
+      gu_output_port_list_t *out_port_lists[] = { module_ptr->gu.output_port_list_ptr,
+                                                  module_ptr->gu.ipc_output_port_list_ptr };
+
+      for (uint32_t i = 0; i < SIZE_OF_ARRAY(out_port_lists); i++)
       {
-         gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
-
-         if (out_port_ptr->gu.ext_out_port_ptr)
+         for (gu_output_port_list_t *out_port_list_ptr = out_port_lists[i]; (NULL != out_port_list_ptr);
+            LIST_ADVANCE(out_port_list_ptr))
          {
-            // Handles the case where both ends of this connection belong to the same SG.
-            TRY(result,
-                gen_cntr_operate_on_ext_out_port(&me_ptr->cu,
-                                                 sg_ops,
-                                                 &out_port_ptr->gu.ext_out_port_ptr,
-                                                 TRUE /* is_self_sg */));
+            gen_topo_output_port_t *out_port_ptr = (gen_topo_output_port_t *)out_port_list_ptr->op_port_ptr;
 
-            // if (ext_out_port_ptr->gu.downstream_handle_ptr) : any ext connection is issued appropriate cmd by APM.
-            // no container to container messaging necessary.
-         }
-         else if (operate_on_all_internal_ports || // all internal ports for FLUSH
-                  (operate_on_sg_boundary_ports &&
-                   gen_topo_is_output_port_at_sg_boundary(out_port_ptr))) // all boundary ports for STOP/SUSPEND/CLOSE
-         {
-            bool_t SET_PORT_OP_FALSE = FALSE;
-            TRY(result,
-                gen_topo_operate_on_int_out_port(&me_ptr->topo,
-                                                 &out_port_ptr->gu,
-                                                 spf_sg_list_ptr,
-                                                 sg_ops,
-                                                 SET_PORT_OP_FALSE));
+            if (out_port_ptr->gu.ext_out_port_ptr)
+            {
+               // Handles the case where both ends of this connection belong to the same SG.
+               TRY(result,
+                  gen_cntr_operate_on_ext_out_port(&me_ptr->cu,
+                                                   sg_ops,
+                                                   &out_port_ptr->gu.ext_out_port_ptr,
+                                                   TRUE /* is_self_sg */));
+
+               // if (ext_out_port_ptr->gu.downstream_handle_ptr) : any ext connection is issued appropriate cmd by APM.
+               // no container to container messaging necessary.
+            }
+            else if (operate_on_all_internal_ports || // all internal ports for FLUSH
+                     (operate_on_sg_boundary_ports &&
+                     gen_topo_is_output_port_at_sg_boundary(out_port_ptr))) // all boundary ports for STOP/SUSPEND/CLOSE
+            {
+               bool_t SET_PORT_OP_FALSE = FALSE;
+               TRY(result,
+                  gen_topo_operate_on_int_out_port(&me_ptr->topo,
+                                                   &out_port_ptr->gu,
+                                                   spf_sg_list_ptr,
+                                                   sg_ops,
+                                                   SET_PORT_OP_FALSE));
+            }
          }
       }
 
@@ -2059,34 +2200,40 @@ ar_result_t gen_cntr_operate_on_subgraph(void                      *base_ptr,
          gen_topo_reset_module(&me_ptr->topo, module_ptr);
       }
 
-      for (gu_input_port_list_t *in_port_list_ptr = module_ptr->gu.input_port_list_ptr; (NULL != in_port_list_ptr);
-           LIST_ADVANCE(in_port_list_ptr))
+      gu_input_port_list_t *in_port_lists[] = { module_ptr->gu.input_port_list_ptr,
+                                                module_ptr->gu.ipc_input_port_list_ptr };
+
+      for (uint32_t i = 0; i < SIZE_OF_ARRAY(in_port_lists); i++)
       {
-         gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
-
-         if (in_port_ptr->gu.ext_in_port_ptr)
+         for (gu_input_port_list_t *in_port_list_ptr = in_port_lists[i]; (NULL != in_port_list_ptr);
+            LIST_ADVANCE(in_port_list_ptr))
          {
-            // Handles the case where both ends of the connection from this ext in port belong to the same SG.
-            TRY(result,
-                gen_cntr_operate_on_ext_in_port(&me_ptr->cu,
-                                                sg_ops,
-                                                &in_port_ptr->gu.ext_in_port_ptr,
-                                                TRUE /* is_self_sg */));
+            gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)in_port_list_ptr->ip_port_ptr;
 
-            // if (ext_in_port_ptr->gu.upstream_handle_ptr) : any ext connection is issued appropriate cmd by APM.
-            // no container to container messaging necessary.
-         }
-         else if (operate_on_all_internal_ports || // all internal ports for FLUSH
-                  (operate_on_sg_boundary_ports &&
-                   gen_topo_is_input_port_at_sg_boundary(in_port_ptr))) // all boundary ports for STOP/SUSPEND/CLOSE
-         {
-            bool_t SET_PORT_OP_FALSE = FALSE;
-            TRY(result,
-                gen_topo_operate_on_int_in_port(&me_ptr->topo,
-                                                &in_port_ptr->gu,
-                                                spf_sg_list_ptr,
-                                                sg_ops,
-                                                SET_PORT_OP_FALSE));
+            if (in_port_ptr->gu.ext_in_port_ptr)
+            {
+               // Handles the case where both ends of the connection from this ext in port belong to the same SG.
+               TRY(result,
+                  gen_cntr_operate_on_ext_in_port(&me_ptr->cu,
+                                                   sg_ops,
+                                                   &in_port_ptr->gu.ext_in_port_ptr,
+                                                   TRUE /* is_self_sg */));
+
+               // if (ext_in_port_ptr->gu.upstream_handle_ptr) : any ext connection is issued appropriate cmd by APM.
+               // no container to container messaging necessary.
+            }
+            else if (operate_on_all_internal_ports || // all internal ports for FLUSH
+                     (operate_on_sg_boundary_ports &&
+                     gen_topo_is_input_port_at_sg_boundary(in_port_ptr))) // all boundary ports for STOP/SUSPEND/CLOSE
+            {
+               bool_t SET_PORT_OP_FALSE = FALSE;
+               TRY(result,
+                  gen_topo_operate_on_int_in_port(&me_ptr->topo,
+                                                   &in_port_ptr->gu,
+                                                   spf_sg_list_ptr,
+                                                   sg_ops,
+                                                   SET_PORT_OP_FALSE));
+            }
          }
       }
    }
@@ -2121,6 +2268,19 @@ ar_result_t gen_cntr_post_operate_on_ext_in_port(void *                     base
    gen_cntr_ext_in_port_t *ext_in_port_ptr = (gen_cntr_ext_in_port_t *)*ext_in_port_pptr;
    gen_topo_input_port_t  *in_port_ptr     = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
 
+   // IPC module will insert EOS internally if requried container doesnt need to do insert EOS/DFG for
+   // ipc external input ports.
+   if(gu_is_ipc_ext_input_port(*ext_in_port_pptr))
+   {
+      GEN_CNTR_MSG(me_ptr->topo.gu.log_id,
+                  DBG_LOW_PRIO,
+                  "MD_DBG: Skip inserting EOS/DFG for ipc ext in port (0x%0lX, 0x%lx) with result 0x%lx",
+                  in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                  in_port_ptr->gu.cmn.id,
+                  result);
+      return result;
+   }
+
    /* If ext input port receives both a self and peer stop/flush from upstream (any order)
     * eos need not be set since next DS container will anyway get the eos because of this self stop
     *
@@ -2138,14 +2298,14 @@ ar_result_t gen_cntr_post_operate_on_ext_in_port(void *                     base
                                  &is_upstream_realtime);
 
       /* If upstream is real-time we can avoid sending eos downstream for FLUSH command since this implies upstream
-      is in STARTED state and will be pumping data in real time. If we flush while upstream is in STARTED state,
-      it might lead to an infinite loop since data is dropped while new data is coming in.
-      In current cases, when we seek, upstream sg is flushed and spr will be pumping 0's downstream which flushes out
-      the device leg while ensuring there are no endpoint underruns. Upstream rt check will not work in cases where
-      timestamp is valid since it would lead to ts discontinuities due to dropping of data at ext inp of device leg.
+         is in STARTED state and will be pumping data in real time. If we flush while upstream is in STARTED state,
+         it might lead to an infinite loop since data is dropped while new data is coming in.
+         In current cases, when we seek, upstream sg is flushed and spr will be pumping 0's downstream which flushes out
+         the device leg while ensuring there are no endpoint underruns. Upstream rt check will not work in cases where
+         timestamp is valid since it would lead to ts discontinuities due to dropping of data at ext inp of device leg.
 
-      We still need eos to be sent when upstream is STOPPED, to flush out any data stuck in the device pipeline.
-    */
+         We still need eos to be sent when upstream is STOPPED, to flush out any data stuck in the device pipeline.
+      */
       if ((TOPO_SG_OP_STOP & sg_ops) || ((TOPO_SG_OP_FLUSH & sg_ops) && (is_upstream_realtime == FALSE)))
       {
          module_cmn_md_eos_flags_t eos_md_flag = { .word = 0 };
@@ -2203,6 +2363,7 @@ ar_result_t gen_cntr_post_operate_on_ext_in_port(void *                     base
    return result;
 }
 
+// note that call to this function to IPC ports is not expected
 static ar_result_t gen_cntr_post_operate_on_connected_input(gen_cntr_t *               me_ptr,
                                                             gen_topo_output_port_t *   out_port_ptr,
                                                             spf_cntr_sub_graph_list_t *spf_sg_list_ptr,
@@ -2326,6 +2487,9 @@ ar_result_t gen_cntr_post_operate_on_subgraph(void *                     base_pt
    ar_result_t    result = AR_EOK;
    gen_cntr_t    *me_ptr = (gen_cntr_t *)base_ptr;
    gen_topo_sg_t *sg_ptr = (gen_topo_sg_t *)gu_sg_ptr;
+
+   // nothing to do for ipc ports since the flush is already handled in operate_on_subgraph
+   // and eos/dfg inesrtion happens within in the module.
 
    if ((TOPO_SG_OP_FLUSH | TOPO_SG_OP_STOP | TOPO_SG_OP_SUSPEND) & sg_ops)
    {

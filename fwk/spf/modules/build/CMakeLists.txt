@@ -16,6 +16,7 @@ include_directories(
 
 #Add the sub directories
 add_subdirectory(../data_logging/build data_logging)
+add_subdirectory(../history_buffer/build history_buffer)
 add_subdirectory(../irm/build irm)
 add_subdirectory(../mux_demux/build mux_demux)
 add_subdirectory(../rat/build rat)

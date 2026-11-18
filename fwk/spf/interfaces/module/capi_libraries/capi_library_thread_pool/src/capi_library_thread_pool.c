@@ -98,7 +98,11 @@ th_pool_t *th_pool_create(uint32_t   th_prio,
       }
 
       obj_ptr->num_threads++;
-      thread_name[strlen(thread_name) - 1]++;
+      int32_t name_len = (int32_t)strlen(thread_name);
+      if (name_len > 0)
+      {
+         thread_name[name_len - 1]++;
+      }
    }
 
    // return object

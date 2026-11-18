@@ -437,6 +437,11 @@ ar_result_t gen_topo_capi_get_required_fmwk_extensions(void *           topo_ctx
                module_ptr->flags.need_async_st_extn = TRUE;
                break;
             }
+            case FWK_EXTN_IPC_PORT_HANDLER:
+            {
+               module_ptr->flags.need_ipc_port_extn = TRUE;
+               break;
+            }
             default:
             {
                extn_supported = FALSE;

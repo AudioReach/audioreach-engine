@@ -42,7 +42,7 @@ ar_result_t gen_cntr_send_media_fmt_to_gpr_client(gen_cntr_t *             me_pt
                                                   uint32_t                 reg_mf_event_id,
                                                   bool_t                   raise_only_event);
 ar_result_t gen_cntr_rd_ep_num_loops_err_check(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr);
-ar_result_t gen_cntr_output_buf_set_up_gpr_client(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
+ar_result_t gen_cntr_output_buf_set_up_gpr_client(cu_base_t *me_ptr, gu_ext_out_port_t *ext_out_port_ptr);
 ar_result_t gen_cntr_write_data_for_gpr_client(gen_cntr_t *me_ptr, gen_cntr_ext_out_port_t *ext_out_port_ptr);
 ar_result_t gen_cntr_fill_frame_metadata(gen_cntr_t *             me_ptr,
                                          gen_cntr_ext_out_port_t *ext_out_port_ptr,

@@ -71,7 +71,6 @@ static void capi_alsa_device_dma_wait_thread(void *arg)
       {
          if (!me_ptr->exit_thread)
          {
-            AR_MSG(DBG_ERROR_PRIO, "CAPI_ALSA_DEVICE: pcm_wait failed in DMA thread, result=%d", result);
             /* Set recovery flag for non-timeout errors (XRUN etc.).
              * Timeout means no data yet — just retry pcm_wait. */
             if (AR_ETIMEOUT != result)

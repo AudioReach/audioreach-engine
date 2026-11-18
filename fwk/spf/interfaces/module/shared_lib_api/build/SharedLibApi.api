@@ -1,0 +1,58 @@
+'''
+/*==============================================================================
+@file SharedLibApi.api
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.PublishRestrictedApi('interfaces_API',[
+   '${AVS_ROOT}/spf/interfaces/shared_lib_api/inc/capi'
+   ])
+
+
+env.PublishRestrictedApi('SHARED_LIBRARY_API',[
+   '${AVS_ROOT}/spf/interfaces/module/shared_lib_api/inc'
+   ])
+
+AR_MSG_INC_PATH = '${AVS_INC_ROOT}/api/ar_utils/${TGT_SPECIFIC_FOLDER}/tgt/static'
+
+if 'USES_AVS_SHARED_LIBS' in env or 'AVS_SINGLE_SO' in env:
+	AR_MSG_INC_PATH = '${AVS_INC_ROOT}/api/ar_utils/${TGT_SPECIFIC_FOLDER}/tgt/shared'
+
+if 'USES_AVS_TEST' in env: #
+	AR_MSG_INC_PATH = '${AVS_INC_ROOT}/api/ar_utils/${TGT_SPECIFIC_FOLDER}/sim'
+
+
+### All posal APIs will need to be backward compatible. Hence adding the entire posal instead of filtering.
+shared_lib_api_inc_paths = [
+   '${AVS_ROOT}/api/modules',
+   '${AVS_ROOT}/spf/interfaces/module/shared_lib_api/inc',
+   '${AVS_ROOT}/spf/interfaces/module/shared_lib_api/inc/${TGT_SPECIFIC_FOLDER}',
+   '${AVS_ROOT}/spf/interfaces/module/capi',
+   '${AVS_ROOT}/spf/interfaces/module/capi/adv',
+   '${AVS_ROOT}/spf/interfaces/module/audio_cmn_lib',
+   '${AVS_ROOT}/spf/interfaces/module/capi_cmn/cmn/inc',
+   '${AVS_ROOT}/spf/interfaces/module/capi_cmn/ctrl_port/inc',
+   '${AVS_ROOT}/spf/interfaces/module/capi_libraries',   
+   '${AVS_ROOT}/spf/interfaces/module/imcl/api',
+   '${AVS_ROOT}/spf/interfaces/module/metadata/api',
+   '${AVS_ROOT}/api/ar_utils',
+   AR_MSG_INC_PATH,
+   '${AVS_ROOT}/api/apm',
+   '${AVS_ROOT}/spf/apm/core/inc/',
+   '${AVS_ROOT}/platform/posal/inc',
+   '${AVS_ROOT}/platform/posal/inc/${TGT_SPECIFIC_FOLDER}',
+   '${AVS_ROOT}/platform/posal/inc/generic',
+   '${AVS_ROOT}/spf/utils/list/inc',
+   '${AVS_ROOT}/spf/utils/interleaver/inc/',
+   '${AVS_ROOT}/../spm/cmn/common/utils/inc/${TGT_SPECIFIC_FOLDER}',
+   '${AVS_ROOT}/../spm/cmn/common/utils/inc/',
+   ];
+
+env.PublishRestrictedApi('SHARED_LIBRARY_INC_PATHS', shared_lib_api_inc_paths);
+
+env.LoadAPIUnits()

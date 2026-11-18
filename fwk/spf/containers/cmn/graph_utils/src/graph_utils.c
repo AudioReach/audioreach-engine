@@ -23,6 +23,7 @@
 #include "gpr_api_inline.h"
 #include "offload_apm_api.h"
 #include "spf_svc_utils.h"
+#include "ipc_tx_rx_api.h"
 
 /** max ports just for bounds check. also internal variables for num ports are 8 bits*/
 #define MAX_PORTS 100
@@ -52,20 +53,6 @@ static void gu_update_is_siso_module(gu_module_t *module_ptr)
       return;
    }
    module_ptr->flags.is_siso = FALSE;
-}
-
-/*
- * Helper function to update state of graph components.
- * All states are not always valid, e.g. if state is NEW, it should not be changed to updated
- */
-static void gu_set_status(gu_status_t *status_to_update, gu_status_t status_value)
-{
-   // Reject the status update if moving from NEW to UPDATED.
-   if ((GU_STATUS_NEW == *status_to_update) && (GU_STATUS_UPDATED == status_value))
-   {
-      return;
-   }
-   *status_to_update = status_value;
 }
 
 static gu_cmn_port_t *gu_find_port_by_id(spf_list_node_t *list_ptr, uint32_t id)
@@ -114,7 +101,13 @@ gu_output_port_t *gu_find_output_port(gu_module_t *module_ptr, uint32_t id)
       return NULL;
    }
 
-   return (gu_output_port_t *)gu_find_port_by_id((spf_list_node_t *)module_ptr->output_port_list_ptr, id);
+   gu_output_port_t *result_ptr =
+      (gu_output_port_t *)gu_find_port_by_id((spf_list_node_t *)module_ptr->output_port_list_ptr, id);
+   if (!result_ptr)
+   {
+      return (gu_output_port_t *)gu_find_port_by_id((spf_list_node_t *)module_ptr->ipc_output_port_list_ptr, id);
+   }
+   return result_ptr;
 }
 
 gu_input_port_t *gu_find_input_port(gu_module_t *module_ptr, uint32_t id)
@@ -124,7 +117,13 @@ gu_input_port_t *gu_find_input_port(gu_module_t *module_ptr, uint32_t id)
       return NULL;
    }
 
-   return (gu_input_port_t *)gu_find_port_by_id((spf_list_node_t *)module_ptr->input_port_list_ptr, id);
+   gu_input_port_t *result_ptr =
+      (gu_input_port_t *)gu_find_port_by_id((spf_list_node_t *)module_ptr->input_port_list_ptr, id);
+   if (!result_ptr)
+   {
+      return (gu_input_port_t *)gu_find_port_by_id((spf_list_node_t *)module_ptr->ipc_input_port_list_ptr, id);
+   }
+   return result_ptr;
 }
 
 gu_ext_in_port_t *gu_get_ext_in_port_from_cmn_port(gu_cmn_port_t *cmn_port_ptr)
@@ -360,11 +359,11 @@ static ar_result_t gu_create_data_port(gu_t *          gu_ptr,
    return result;
 }
 
-static ar_result_t gu_insert_data_port(gu_t *            gu_ptr,
-                                       gu_module_t *     module_ptr,
-                                       spf_list_node_t **list_pptr,
-                                       gu_cmn_port_t *   port_ptr,
-                                       POSAL_HEAP_ID     heap_id)
+ar_result_t gu_insert_data_port(gu_t *            gu_ptr,
+                                 gu_module_t *     module_ptr,
+                                 spf_list_node_t **list_pptr,
+                                 gu_cmn_port_t *   port_ptr,
+                                 POSAL_HEAP_ID     heap_id)
 {
    INIT_EXCEPTION_HANDLING
    ar_result_t result = AR_EOK;
@@ -373,6 +372,8 @@ static ar_result_t gu_insert_data_port(gu_t *            gu_ptr,
    TRY(result, spf_list_insert_tail(list_pptr, port_ptr, heap_id, TRUE /* use_pool*/))
 
    // Move it to right position based on index (sorted order)
+   // Important Note (TODO): if a module has mix of IPC & real ports this may not work
+   // current there is no such scenario hence fine.
    TRY(result, gu_move_port_to_smallest_available_index(module_ptr, list_pptr, port_ptr));
 
    CATCH(result, GU_MSG_PREFIX, gu_ptr->log_id)
@@ -412,13 +413,16 @@ static ar_result_t gu_create_ctrl_port(gu_t *           gu_ptr,
    return result;
 }
 
-static ar_result_t gu_insert_output_port(gu_t *            gu_ptr,
-                                         gu_module_t *     module_ptr,
+static ar_result_t gu_insert_output_port(gu_t             *gu_ptr,
+                                         gu_module_t      *module_ptr,
                                          gu_output_port_t *output_port_ptr,
                                          POSAL_HEAP_ID     heap_id)
 {
    INIT_EXCEPTION_HANDLING
    ar_result_t result = AR_EOK;
+
+   // module can have only IPC or regular ports, not both, check module structure for more details.
+   VERIFY(result, (NULL == module_ptr->ipc_output_port_list_ptr));
 
    TRY(result,
        gu_insert_data_port(gu_ptr,
@@ -446,6 +450,9 @@ static ar_result_t gu_insert_input_port(gu_t *           gu_ptr,
 {
    INIT_EXCEPTION_HANDLING
    ar_result_t result = AR_EOK;
+
+   // module can have only IPC or real ports, not both, check module structure for more details.
+   VERIFY(result, (NULL == module_ptr->ipc_input_port_list_ptr));
 
    TRY(result,
        gu_insert_data_port(gu_ptr,
@@ -762,12 +769,13 @@ static ar_result_t gu_parse_module_props(gu_t *gu_ptr, spf_msg_cmd_graph_open_t 
 
                apm_module_prop_id_port_info_t *port_info_ptr = (apm_module_prop_id_port_info_t *)(module_prop_ptr + 1);
 
-               if (MODULE_ID_WR_SHARED_MEM_EP == module_ptr->module_id)
+               if ((MODULE_ID_WR_SHARED_MEM_EP == module_ptr->module_id) || (MODULE_ID_IPC_RX == module_ptr->module_id))
                {
                   VERIFY(result, 1 >= port_info_ptr->max_ip_port);
                   VERIFY(result, 1 == port_info_ptr->max_op_port);
                }
-               else if (MODULE_ID_RD_SHARED_MEM_EP == module_ptr->module_id)
+               else if ((MODULE_ID_RD_SHARED_MEM_EP == module_ptr->module_id) ||
+                        (MODULE_ID_IPC_RX == module_ptr->module_id))
                {
                   VERIFY(result, 1 == port_info_ptr->max_ip_port);
                   VERIFY(result, 1 >= port_info_ptr->max_op_port);
@@ -1298,6 +1306,7 @@ static POSAL_HEAP_ID gu_check_ext_data_conn_and_get_peer_heap_id(uint32_t       
    return self_heap_id;
 }
 
+
 static ar_result_t gu_handle_connection(gu_t *        gu_ptr_,
                                         uint32_t      src_mod_inst_id,
                                         uint32_t      src_mod_op_port_id,
@@ -1354,11 +1363,33 @@ static ar_result_t gu_handle_connection(gu_t *        gu_ptr_,
    VERIFY(result,
           (AR_PORT_DIR_TYPE_INPUT == spf_get_bits(dst_mod_ip_port_id, AR_PORT_DIR_TYPE_MASK, AR_PORT_DIR_TYPE_SHIFT)));
 
+   bool_t  is_ipc_output_connection = FALSE;
+   if(src_module_ptr && gu_does_module_needs_ipc_port(src_module_ptr, IS_IPC_OUTPUT))
+   {
+      VERIFY(result, (dst_module_ptr == NULL));
+      is_ipc_output_connection = TRUE;
+   }
+
+   bool_t  is_ipc_input_connection = FALSE;
+   if(dst_module_ptr && gu_does_module_needs_ipc_port(dst_module_ptr, IS_IPC_INPUT))
+   {
+      VERIFY(result, (src_module_ptr == NULL));
+      is_ipc_input_connection = TRUE;
+   }
+
    if ((src_module_ptr && (gu_find_pending_port(open_gu_ptr, src_module_ptr, src_mod_op_port_id) ||
                            gu_find_output_port(src_module_ptr, src_mod_op_port_id))) ||
        (dst_module_ptr && (gu_find_pending_port(open_gu_ptr, dst_module_ptr, dst_mod_ip_port_id) ||
                            gu_find_input_port(dst_module_ptr, dst_mod_ip_port_id))))
    {
+
+      // if the modules requrie IPC ports, they would have been created at the time of module creation itself during
+      //  gu_handle_graph_boundary_modules(), hence we can ignore if we received connection information for the ipc
+      //  ports.
+      if (is_ipc_output_connection || is_ipc_input_connection)
+      {
+         THROW(result, AR_EOK);
+      }
       THROW(result, AR_EDUPLICATE);
    }
 
@@ -1366,7 +1397,9 @@ static ar_result_t gu_handle_connection(gu_t *        gu_ptr_,
     *  then it's internal connection, otherwise, it's an external connection. */
    if (src_module_ptr)
    {
-      VERIFY(result, src_module_ptr->max_output_ports > src_module_ptr->num_output_ports);
+      VERIFY(result,
+             src_module_ptr->max_output_ports >
+                (src_module_ptr->num_output_ports + src_module_ptr->num_ipc_output_ports));
 
       // If it is an internal connection then assign the memory from sg mem resource.
       if (is_sg_internal_connection)
@@ -1391,7 +1424,14 @@ static ar_result_t gu_handle_connection(gu_t *        gu_ptr_,
       // if async handling is not enabled then isert the port now.
       if (GU_STATUS_NEW == src_module_ptr->gu_status || !open_gu_ptr->async_gu_ptr)
       {
-         TRY(result, gu_insert_output_port(open_gu_ptr, src_module_ptr, src_output_port_ptr, heap_id));
+         if (is_ipc_output_connection)
+         {
+            TRY(result, gu_insert_ipc_output_port(open_gu_ptr, src_module_ptr, src_output_port_ptr, heap_id));
+         }
+         else
+         {
+            TRY(result, gu_insert_output_port(open_gu_ptr, src_module_ptr, src_output_port_ptr, heap_id));
+         }
 
          if (!is_sg_internal_connection)
          {
@@ -1416,7 +1456,8 @@ static ar_result_t gu_handle_connection(gu_t *        gu_ptr_,
 
    if (dst_module_ptr)
    {
-      VERIFY(result, dst_module_ptr->max_input_ports > dst_module_ptr->num_input_ports);
+      VERIFY(result,
+             dst_module_ptr->max_input_ports > (dst_module_ptr->num_input_ports + dst_module_ptr->num_ipc_input_ports));
 
       // If it is an internal connection then assign the memory from sg mem resource.
       if (is_sg_internal_connection)
@@ -1440,7 +1481,14 @@ static ar_result_t gu_handle_connection(gu_t *        gu_ptr_,
       // if async handling is not enabled then insert the port now.
       if (GU_STATUS_NEW == dst_module_ptr->gu_status || !open_gu_ptr->async_gu_ptr)
       {
-         TRY(result, gu_insert_input_port(open_gu_ptr, dst_module_ptr, dst_input_port_ptr, heap_id));
+         if (is_ipc_input_connection)
+         {
+            TRY(result, gu_insert_ipc_input_port(open_gu_ptr, dst_module_ptr, dst_input_port_ptr, heap_id));
+         }
+         else
+         {
+            TRY(result, gu_insert_input_port(open_gu_ptr, dst_module_ptr, dst_input_port_ptr, heap_id));
+         }
 
          if (!is_sg_internal_connection)
          {
@@ -1495,14 +1543,38 @@ static ar_result_t gu_handle_connection(gu_t *        gu_ptr_,
       ext_out_port_ptr->downstream_handle.port_id            = dst_mod_ip_port_id;
       ext_out_port_ptr->downstream_handle.heap_id            = peer_heap_id;
 
-      VERIFY(result, (open_gu_ptr->num_ext_out_ports < UINT8_MAX));
-      TRY(result,
-          spf_list_insert_tail(((spf_list_node_t **)&(open_gu_ptr->ext_out_port_list_ptr)),
-                               ext_out_port_ptr,
-                               heap_id,
-                               TRUE /* use_pool*/));
+      if (is_ipc_output_connection)
+      {
+         // the connection must be at the container boundary
+         VERIFY(result, (dst_module_ptr == NULL));
+         VERIFY(result, (open_gu_ptr->num_ipc_ext_out_ports < UINT8_MAX));
 
-      open_gu_ptr->num_ext_out_ports++;
+         TRY(result,
+             spf_list_insert_tail(((spf_list_node_t **)&(open_gu_ptr->ipc_ext_out_port_list_ptr)),
+                                  ext_out_port_ptr,
+                                  heap_id,
+                                  TRUE /* use_pool*/));
+
+         open_gu_ptr->num_ipc_ext_out_ports++;
+
+         GU_MSG(gu_ptr_->log_id,
+                DBG_HIGH_PRIO,
+                "Created IPC external output port %lu for module 0x%X",
+                src_output_port_ptr->cmn.id,
+                src_module_ptr->module_instance_id);
+      }
+      else
+      {
+         VERIFY(result, (open_gu_ptr->num_ext_out_ports < UINT8_MAX));
+
+         TRY(result,
+             spf_list_insert_tail(((spf_list_node_t **)&(open_gu_ptr->ext_out_port_list_ptr)),
+                                  ext_out_port_ptr,
+                                  heap_id,
+                                  TRUE /* use_pool*/));
+
+         open_gu_ptr->num_ext_out_ports++;
+      }
 
       gu_init_ext_out_port(ext_out_port_ptr, src_output_port_ptr);
    }
@@ -1526,15 +1598,38 @@ static ar_result_t gu_handle_connection(gu_t *        gu_ptr_,
       ext_in_port_ptr->upstream_handle.port_id            = src_mod_op_port_id;
       ext_in_port_ptr->upstream_handle.heap_id            = peer_heap_id;
 
-      VERIFY(result, (open_gu_ptr->num_ext_in_ports < UINT8_MAX));
+      if (is_ipc_input_connection)
+      {
+         // connection must be at the container boundary
+         VERIFY(result, (src_module_ptr == NULL));
+         VERIFY(result, (open_gu_ptr->num_ipc_ext_in_ports < UINT8_MAX));
+         TRY(result,
+             spf_list_insert_tail(((spf_list_node_t **)&(open_gu_ptr->ipc_ext_in_port_list_ptr)),
+                                  ext_in_port_ptr,
+                                  heap_id,
+                                  TRUE /* use_pool*/));
 
-      TRY(result,
-          spf_list_insert_tail(((spf_list_node_t **)&(open_gu_ptr->ext_in_port_list_ptr)),
-                               ext_in_port_ptr,
-                               heap_id,
-                               TRUE /* use_pool*/));
+         open_gu_ptr->num_ipc_ext_in_ports++;
 
-      open_gu_ptr->num_ext_in_ports++;
+         GU_MSG(gu_ptr_->log_id,
+                DBG_HIGH_PRIO,
+                "Created IPC external input port %lu for module 0x%X",
+                dst_input_port_ptr->cmn.id,
+                dst_module_ptr->module_instance_id);
+      }
+      else
+      {
+         VERIFY(result, (open_gu_ptr->num_ext_in_ports < UINT8_MAX));
+
+         TRY(result,
+             spf_list_insert_tail(((spf_list_node_t **)&(open_gu_ptr->ext_in_port_list_ptr)),
+                                  ext_in_port_ptr,
+                                  heap_id,
+                                  TRUE /* use_pool*/));
+
+         open_gu_ptr->num_ext_in_ports++;
+      }
+
       gu_init_ext_in_port(ext_in_port_ptr, dst_input_port_ptr);
    }
    else
@@ -1569,7 +1664,7 @@ static ar_result_t gu_handle_graph_boundary_modules(gu_t *        gu_ptr,
    ar_result_t result = AR_EOK;
    INIT_EXCEPTION_HANDLING
 
-   if (MODULE_ID_WR_SHARED_MEM_EP == module_ptr->module_id)
+   if ((MODULE_ID_WR_SHARED_MEM_EP == module_ptr->module_id) || (MODULE_ID_IPC_RX == module_ptr->module_id))
    {
       /** Assign the max input ports. at this time module prop are not parsed. */
       module_ptr->max_input_ports  = 1;
@@ -1588,7 +1683,7 @@ static ar_result_t gu_handle_graph_boundary_modules(gu_t *        gu_ptr,
                                heap_id,
                                heap_id /*peer_heap_id*/));
    }
-   else if (MODULE_ID_RD_SHARED_MEM_EP == module_ptr->module_id)
+   else if ((MODULE_ID_RD_SHARED_MEM_EP == module_ptr->module_id) || (MODULE_ID_IPC_TX == module_ptr->module_id))
    {
       /** Assign the max input ports. at this time module prop are not parsed. */
       module_ptr->max_input_ports  = 1;
@@ -1646,6 +1741,10 @@ ar_result_t gu_reset_graph_port_markers(gu_t *gu_ptr)
             op_port_list_ptr->op_port_ptr->cmn.flags.mark = FALSE;
             LIST_ADVANCE(op_port_list_ptr);
          }
+
+         // important note:
+         // IPC ports are not part of the sorted graph hence no need mark.
+         // IPC modules considered like sink/source modules in context of sorting.
 
 #ifdef GU_DEBUG
          if (!module_done)
@@ -2433,6 +2532,8 @@ ar_result_t gu_find_edge_modules(gu_t *gu_ptr, gu_module_list_t **edge_module_li
    return result;
 }
 
+/** IPC ports are not considered for sorting the modules list. Hence if a module has only IPC outputs, it will
+ * considered as sink module and added to the end of the list. and vice versa for the modules with IPC inputs. */
 ar_result_t gu_update_sorted_list(gu_t *gu_ptr, POSAL_HEAP_ID heap_id)
 {
    INIT_EXCEPTION_HANDLING
@@ -2470,6 +2571,8 @@ ar_result_t gu_update_sorted_list(gu_t *gu_ptr, POSAL_HEAP_ID heap_id)
 #endif
       // Now mark all vertices for its connected modules
       gu_output_port_list_t *op_port_list_ptr = edge_module_list_ptr->module_ptr->output_port_list_ptr;
+
+      // Important note: no need to iterate over IPC ports for sorting they are considered non-existant.
 
       while (op_port_list_ptr)
       {
@@ -2795,7 +2898,7 @@ ar_result_t gu_parse_ctrl_link(gu_t *                      gu_ptr,
    return AR_EOK;
 }
 
-gu_cmn_port_t *gu_find_port_by_index(spf_list_node_t *list_ptr, uint32_t index)
+static gu_cmn_port_t *gu_find_port_by_index(spf_list_node_t *list_ptr, uint32_t index)
 {
    while (list_ptr)
    {
@@ -2819,7 +2922,14 @@ gu_output_port_t *gu_find_output_port_by_index(gu_module_t *module_ptr, uint32_t
       return NULL;
    }
 
-   return (gu_output_port_t *)gu_find_port_by_index((spf_list_node_t *)module_ptr->output_port_list_ptr, index);
+   gu_output_port_t *ret_ptr =
+      (gu_output_port_t *)gu_find_port_by_index((spf_list_node_t *)module_ptr->output_port_list_ptr, index);
+
+   if (NULL == ret_ptr)
+   {
+      return (gu_output_port_t *)gu_find_port_by_index((spf_list_node_t *)module_ptr->ipc_output_port_list_ptr, index);
+   }
+   return ret_ptr;
 }
 
 gu_input_port_t *gu_find_input_port_by_index(gu_module_t *module_ptr, uint32_t index)
@@ -2829,7 +2939,14 @@ gu_input_port_t *gu_find_input_port_by_index(gu_module_t *module_ptr, uint32_t i
       return NULL;
    }
 
-   return (gu_input_port_t *)gu_find_port_by_index((spf_list_node_t *)module_ptr->input_port_list_ptr, index);
+   gu_input_port_t *ret_ptr =
+      (gu_input_port_t *)gu_find_port_by_index((spf_list_node_t *)module_ptr->input_port_list_ptr, index);
+
+   if (NULL == ret_ptr)
+   {
+      return (gu_input_port_t *)gu_find_port_by_index((spf_list_node_t *)module_ptr->ipc_input_port_list_ptr, index);
+   }
+   return ret_ptr;
 }
 
 gu_sg_t *gu_find_subgraph(gu_t *gu_ptr, uint32_t id)
@@ -2884,6 +3001,140 @@ bool_t gu_is_sg_id_found_in_spf_array(spf_cntr_sub_graph_list_t *spf_sg_array_pt
    return FALSE;
 }
 
+static void gu_cleanup_dangling_input_ports(gu_t                  *gu_ptr,
+                                            gu_sg_t               *sg_ptr,
+                                            gu_input_port_list_t **ip_port_list_pptr,
+                                            uint8_t              *num_input_ports_ptr,
+                                            bool_t                *is_module_us_at_sg_or_cntr_boundary,
+                                            bool_t                *data_port_updated)
+{
+   gu_input_port_list_t *ip_port_list_ptr = *ip_port_list_pptr;
+   while (ip_port_list_ptr)
+   {
+      // If a port has neither an internal or external connection, it should be freed here
+      gu_input_port_t *in_port_ptr = ip_port_list_ptr->ip_port_ptr;
+
+      if ((!in_port_ptr->ext_in_port_ptr) && (!in_port_ptr->conn_out_port_ptr))
+      {
+         GU_MSG(gu_ptr->log_id,
+                DBG_LOW_PRIO,
+                "Destroying connections of Module, port 0x%lx, 0x%lx, ext in ptr 0x%p, conn out ptr "
+                "0x%p",
+                in_port_ptr->cmn.module_ptr->module_instance_id,
+                in_port_ptr->cmn.id,
+                in_port_ptr->ext_in_port_ptr,
+                in_port_ptr->conn_out_port_ptr);
+
+         *data_port_updated = TRUE;
+         spf_list_delete_node_and_free_obj((spf_list_node_t **)&ip_port_list_ptr,
+                                           (spf_list_node_t **)ip_port_list_pptr,
+                                           TRUE /* pool_used */);
+         (*num_input_ports_ptr)--;
+      }
+      else
+      {
+         if (in_port_ptr->ext_in_port_ptr || sg_ptr != in_port_ptr->conn_out_port_ptr->cmn.module_ptr->sg_ptr)
+         {
+            *is_module_us_at_sg_or_cntr_boundary = TRUE;
+         }
+
+         LIST_ADVANCE(ip_port_list_ptr);
+      }
+   }
+}
+
+static void gu_cleanup_dangling_output_ports(gu_t                   *gu_ptr,
+                                             gu_sg_t                *sg_ptr,
+                                             gu_output_port_list_t **op_port_list_pptr,
+                                             uint8_t                *num_output_ports_ptr,
+                                             bool_t                 *is_module_ds_at_sg_or_cntr_boundary,
+                                             bool_t                 *data_port_updated)
+{
+   gu_output_port_list_t *op_port_list_ptr = *op_port_list_pptr;
+   while (op_port_list_ptr)
+   {
+      gu_output_port_t *out_port_ptr = op_port_list_ptr->op_port_ptr;
+
+      if ((!out_port_ptr->ext_out_port_ptr) && (!out_port_ptr->conn_in_port_ptr))
+      {
+         // If a host module has an unconnected output port, reattach the module.
+         if (out_port_ptr->attached_module_ptr)
+         {
+            gu_module_t     *attached_module_ptr    = out_port_ptr->attached_module_ptr;
+            gu_input_port_t *attached_module_ip_ptr = attached_module_ptr->input_port_list_ptr->ip_port_ptr;
+
+            GU_MSG(gu_ptr->log_id,
+                   DBG_LOW_PRIO,
+                   "Detatching module miid 0x%lx from module, port (0x%lx, 0x%lx) since "
+                   "downstream got disconnected",
+                   attached_module_ptr->module_instance_id,
+                   out_port_ptr->cmn.module_ptr->module_instance_id,
+                   out_port_ptr->cmn.id);
+
+            out_port_ptr->conn_in_port_ptr            = attached_module_ip_ptr;
+            attached_module_ip_ptr->conn_out_port_ptr = out_port_ptr;
+
+            out_port_ptr->attached_module_ptr         = NULL;
+            attached_module_ptr->host_output_port_ptr = NULL;
+
+            // We need to destroy the internal output port of the attached module to reflect normal graph
+            // shape - when downstream is disconnected the last module should not have an output port data
+            // structure.
+            gu_output_port_t *attached_module_op_ptr = attached_module_ptr->output_port_list_ptr
+                                                          ? attached_module_ptr->output_port_list_ptr->op_port_ptr
+                                                          : NULL;
+            if (attached_module_op_ptr)
+            {
+               // Elementary modules will have one output port, so destroying first node in the output port
+               // list.
+               GU_MSG(gu_ptr->log_id,
+                      DBG_LOW_PRIO,
+                      "Destroying output port of Module, port 0x%lx, 0x%lx (previously attached)",
+                      attached_module_op_ptr->cmn.module_ptr->module_instance_id,
+                      attached_module_op_ptr->cmn.id);
+
+               spf_list_delete_node_and_free_obj((spf_list_node_t **)&attached_module_ptr->output_port_list_ptr,
+                                                 (spf_list_node_t **)&attached_module_ptr->output_port_list_ptr,
+                                                 TRUE /* pool_used */);
+
+               // Attached module's output port is destroyed, it must be at sg or container boundary
+               attached_module_ptr->flags.is_ds_at_sg_or_cntr_boundary = TRUE;
+
+               attached_module_ptr->num_output_ports--;
+               gu_update_module_sink_src_info(gu_ptr, attached_module_ptr);
+            }
+
+            LIST_ADVANCE(op_port_list_ptr);
+         }
+         else
+         {
+            GU_MSG(gu_ptr->log_id,
+                   DBG_LOW_PRIO,
+                   "Destroying connections of Module, port 0x%lx, 0x%lx, ext out ptr 0x%p, conn in ptr "
+                   "0x%p",
+                   out_port_ptr->cmn.module_ptr->module_instance_id,
+                   out_port_ptr->cmn.id,
+                   out_port_ptr->ext_out_port_ptr,
+                   out_port_ptr->conn_in_port_ptr);
+
+            spf_list_delete_node_and_free_obj((spf_list_node_t **)&op_port_list_ptr,
+                                              (spf_list_node_t **)op_port_list_pptr,
+                                              TRUE /* pool_used */);
+            (*num_output_ports_ptr)--;
+            *data_port_updated = TRUE;
+         }
+      }
+      else
+      {
+         if (out_port_ptr->ext_out_port_ptr || sg_ptr != out_port_ptr->conn_in_port_ptr->cmn.module_ptr->sg_ptr)
+         {
+            *is_module_ds_at_sg_or_cntr_boundary = TRUE;
+         }
+         LIST_ADVANCE(op_port_list_ptr);
+      }
+   }
+}
+
 // function to cleanup the dangling data ports.
 // caller's responsibility to manage the lock before calling this function.
 void gu_cleanup_dangling_data_ports(gu_t *gu_ptr)
@@ -2902,127 +3153,37 @@ void gu_cleanup_dangling_data_ports(gu_t *gu_ptr)
 
          if (!module_ptr->host_output_port_ptr) // Clear Output and Input ports if module is not an attached module.
          {
-            gu_input_port_list_t *ip_port_list_ptr = module_ptr->input_port_list_ptr;
-            while (ip_port_list_ptr)
-            {
-               // If a port has neither an internal or external connection, it should be freed here
-               gu_input_port_t *in_port_ptr = ip_port_list_ptr->ip_port_ptr;
+            // destory dangling real input ports
+            gu_cleanup_dangling_input_ports(gu_ptr,
+                                            sg_ptr,
+                                            &(module_ptr->input_port_list_ptr),
+                                            &module_ptr->num_input_ports,
+                                            &is_module_us_at_sg_or_cntr_boundary,
+                                            &data_port_updated);
 
-               if ((!in_port_ptr->ext_in_port_ptr) && (!in_port_ptr->conn_out_port_ptr))
-               {
-                  GU_MSG(gu_ptr->log_id,
-                         DBG_LOW_PRIO,
-                         "Destroying connections of Module, port 0x%lx, 0x%lx, ext in ptr 0x%p, conn out ptr "
-                         "0x%p",
-                         in_port_ptr->cmn.module_ptr->module_instance_id,
-                         in_port_ptr->cmn.id,
-                         in_port_ptr->ext_in_port_ptr,
-                         in_port_ptr->conn_out_port_ptr);
+            // destory dangling IPC input ports
+            gu_cleanup_dangling_input_ports(gu_ptr,
+                                            sg_ptr,
+                                            &(module_ptr->ipc_input_port_list_ptr),
+                                            &module_ptr->num_ipc_input_ports,
+                                            &is_module_us_at_sg_or_cntr_boundary,
+                                            &data_port_updated);
 
-                  data_port_updated = TRUE;
-                  spf_list_delete_node_and_free_obj((spf_list_node_t **)&ip_port_list_ptr,
-                                                    (spf_list_node_t **)&module_ptr->input_port_list_ptr,
-                                                    TRUE /* pool_used */);
-                  module_ptr->num_input_ports--;
-               }
-               else
-               {
-                  if (in_port_ptr->ext_in_port_ptr || sg_ptr != in_port_ptr->conn_out_port_ptr->cmn.module_ptr->sg_ptr)
-                  {
-                     is_module_us_at_sg_or_cntr_boundary = TRUE;
-                  }
+            // destory dangling real output ports
+            gu_cleanup_dangling_output_ports(gu_ptr,
+                                             sg_ptr,
+                                             &(module_ptr->output_port_list_ptr),
+                                             &module_ptr->num_output_ports,
+                                             &is_module_ds_at_sg_or_cntr_boundary,
+                                             &data_port_updated);
 
-                  LIST_ADVANCE(ip_port_list_ptr);
-               }
-            }
-
-            gu_output_port_list_t *op_port_list_ptr = module_ptr->output_port_list_ptr;
-            while (op_port_list_ptr)
-            {
-               gu_output_port_t *out_port_ptr = op_port_list_ptr->op_port_ptr;
-
-               if ((!out_port_ptr->ext_out_port_ptr) && (!out_port_ptr->conn_in_port_ptr))
-               {
-                  // If a host module has an unconnected output port, reattach the module.
-                  if (out_port_ptr->attached_module_ptr)
-                  {
-                     gu_module_t *    attached_module_ptr    = out_port_ptr->attached_module_ptr;
-                     gu_input_port_t *attached_module_ip_ptr = attached_module_ptr->input_port_list_ptr->ip_port_ptr;
-
-                     GU_MSG(gu_ptr->log_id,
-                            DBG_LOW_PRIO,
-                            "Detatching module miid 0x%lx from module, port (0x%lx, 0x%lx) since "
-                            "downstream got disconnected",
-                            attached_module_ptr->module_instance_id,
-                            out_port_ptr->cmn.module_ptr->module_instance_id,
-                            out_port_ptr->cmn.id);
-
-                     out_port_ptr->conn_in_port_ptr            = attached_module_ip_ptr;
-                     attached_module_ip_ptr->conn_out_port_ptr = out_port_ptr;
-
-                     out_port_ptr->attached_module_ptr         = NULL;
-                     attached_module_ptr->host_output_port_ptr = NULL;
-
-                     // We need to destroy the internal output port of the attached module to reflect normal graph
-                     // shape - when downstream is disconnected the last module should not have an output port data
-                     // structure.
-                     gu_output_port_t *attached_module_op_ptr =
-                        attached_module_ptr->output_port_list_ptr
-                           ? attached_module_ptr->output_port_list_ptr->op_port_ptr
-                           : NULL;
-                     if (attached_module_op_ptr)
-                     {
-                        // Elementary modules will have one output port, so destroying first node in the output port
-                        // list.
-                        GU_MSG(gu_ptr->log_id,
-                               DBG_LOW_PRIO,
-                               "Destroying output port of Module, port 0x%lx, 0x%lx (previously attached)",
-                               attached_module_op_ptr->cmn.module_ptr->module_instance_id,
-                               attached_module_op_ptr->cmn.id);
-
-                        spf_list_delete_node_and_free_obj((spf_list_node_t **)&attached_module_ptr
-                                                             ->output_port_list_ptr,
-                                                          (spf_list_node_t **)&attached_module_ptr
-                                                             ->output_port_list_ptr,
-                                                          TRUE /* pool_used */);
-
-                        // Attached module's output port is destroyed, it must be at sg or container boundary
-                        attached_module_ptr->flags.is_ds_at_sg_or_cntr_boundary = TRUE;
-
-                        attached_module_ptr->num_output_ports--;
-                        gu_update_module_sink_src_info(gu_ptr, attached_module_ptr);
-                     }
-
-                     LIST_ADVANCE(op_port_list_ptr);
-                  }
-                  else
-                  {
-                     GU_MSG(gu_ptr->log_id,
-                            DBG_LOW_PRIO,
-                            "Destroying connections of Module, port 0x%lx, 0x%lx, ext out ptr 0x%p, conn in ptr "
-                            "0x%p",
-                            out_port_ptr->cmn.module_ptr->module_instance_id,
-                            out_port_ptr->cmn.id,
-                            out_port_ptr->ext_out_port_ptr,
-                            out_port_ptr->conn_in_port_ptr);
-
-                     spf_list_delete_node_and_free_obj((spf_list_node_t **)&op_port_list_ptr,
-                                                       (spf_list_node_t **)&module_ptr->output_port_list_ptr,
-                                                       TRUE /* pool_used */);
-                     module_ptr->num_output_ports--;
-                     data_port_updated = TRUE;
-                  }
-               }
-               else
-               {
-                  if (out_port_ptr->ext_out_port_ptr ||
-                      sg_ptr != out_port_ptr->conn_in_port_ptr->cmn.module_ptr->sg_ptr)
-                  {
-                     is_module_ds_at_sg_or_cntr_boundary = TRUE;
-                  }
-                  LIST_ADVANCE(op_port_list_ptr);
-               }
-            }
+            // destory dangling IPC output ports
+            gu_cleanup_dangling_output_ports(gu_ptr,
+                                             sg_ptr,
+                                             &(module_ptr->ipc_output_port_list_ptr),
+                                             &module_ptr->num_ipc_output_ports,
+                                             &is_module_ds_at_sg_or_cntr_boundary,
+                                             &data_port_updated);
          }
          else
          {
@@ -3087,6 +3248,77 @@ void gu_cleanup_danling_control_ports(gu_t *gu_ptr)
       } // module-loop
    }    // sg-loop
 }
+
+static void gu_destroy_ext_input_port(gu_t                   *gu_ptr,
+                                      bool_t                  b_destroy_everything,
+                                      gu_ext_in_port_list_t **list_pptr,
+                                      uint8_t                *num_ext_in_ports,
+                                      bool_t                  is_ipc_port)
+{
+   gu_ext_in_port_list_t *list_ptr = *list_pptr;
+   while (list_ptr)
+   {
+      gu_ext_in_port_t *ext_in_port_ptr = list_ptr->ext_in_port_ptr;
+
+      if (!(b_destroy_everything || (GU_STATUS_CLOSING == ext_in_port_ptr->gu_status) ||
+            (GU_STATUS_CLOSING == ext_in_port_ptr->sg_ptr->gu_status)))
+      {
+         // Advance the list to next entry
+         LIST_ADVANCE(list_ptr);
+         continue;
+      }
+
+      // note: currently there its not possible to check if ipc ports are still connected.
+      if (!is_ipc_port && NULL != ext_in_port_ptr->upstream_handle.spf_handle_ptr)
+      {
+         GU_MSG(gu_ptr->log_id, DBG_ERROR_PRIO, "Destroy issued when connection to upstream is still present");
+         // this is an error because peer port has ref to this memory
+      }
+
+      // Set connected external port to null
+      gu_deinit_ext_in_port(ext_in_port_ptr);
+      (*num_ext_in_ports)--;
+      spf_list_delete_node_and_free_obj((spf_list_node_t **)&list_ptr,
+                                        (spf_list_node_t **)list_pptr,
+                                        TRUE /* pool_used */);
+   }
+}
+
+// check and destroy external output ports list. used in the context of ipc and regular ports.
+static void gu_destory_ext_output_ports(gu_t                    *gu_ptr,
+                                        bool_t                   b_destroy_everything,
+                                        gu_ext_out_port_list_t **list_pptr,
+                                        uint8_t                 *num_ext_out_ports,
+                                        bool_t                   is_ipc_port)
+{
+   gu_ext_out_port_list_t *list_ptr = *list_pptr;
+   while (list_ptr)
+   {
+      gu_ext_out_port_t *ext_out_port_ptr = list_ptr->ext_out_port_ptr;
+
+      if (!(b_destroy_everything || (GU_STATUS_CLOSING == ext_out_port_ptr->gu_status) ||
+            (GU_STATUS_CLOSING == ext_out_port_ptr->sg_ptr->gu_status)))
+      {
+         // Advance the list to next entry
+         LIST_ADVANCE(list_ptr);
+         continue;
+      }
+
+      if (!is_ipc_port && (NULL != ext_out_port_ptr->downstream_handle.spf_handle_ptr))
+      {
+         GU_MSG(gu_ptr->log_id, DBG_ERROR_PRIO, "Destroy issued when connection to downstream is still present");
+         // this is an error because peer port has ref to this memory
+      }
+
+      // Set connected external port to null
+      gu_deinit_ext_out_port(ext_out_port_ptr);
+      (*num_ext_out_ports)--;
+      spf_list_delete_node_and_free_obj((spf_list_node_t **)&list_ptr,
+                                        (spf_list_node_t **)list_pptr,
+                                        TRUE /* pool_used */);
+   }
+}
+
 /**
  * sg_list_ptr == NULL means destroy all subgraphs
  *
@@ -3100,65 +3332,33 @@ ar_result_t gu_destroy_graph(gu_t *gu_ptr, bool_t b_destroy_everything)
       return AR_EOK;
    }
 
-   {
-      // check and destroy external input ports
-      gu_ext_in_port_list_t *list_ptr = gu_ptr->ext_in_port_list_ptr;
-      while (list_ptr)
-      {
-         gu_ext_in_port_t *ext_in_port_ptr = list_ptr->ext_in_port_ptr;
+   // destory list of external input ports
+   gu_destroy_ext_input_port(gu_ptr,
+                             b_destroy_everything,
+                             &(gu_ptr->ext_in_port_list_ptr),
+                             &(gu_ptr->num_ext_in_ports),
+                             FALSE);
 
-         if (!(b_destroy_everything || (GU_STATUS_CLOSING == ext_in_port_ptr->gu_status) ||
-               (GU_STATUS_CLOSING == ext_in_port_ptr->sg_ptr->gu_status)))
-         {
-            // Advance the list to next entry
-            LIST_ADVANCE(list_ptr);
-            continue;
-         }
+   // destory list of IPC external input ports
+   gu_destroy_ext_input_port(gu_ptr,
+                             b_destroy_everything,
+                             &(gu_ptr->ipc_ext_in_port_list_ptr),
+                             &(gu_ptr->num_ipc_ext_in_ports),
+                             TRUE);
 
-         if (NULL != ext_in_port_ptr->upstream_handle.spf_handle_ptr)
-         {
-            GU_MSG(gu_ptr->log_id, DBG_ERROR_PRIO, "Destroy issued when connection to upstream is still present");
-            // this is an error because peer port has ref to this memory
-         }
+   // destory list of external output ports
+   gu_destory_ext_output_ports(gu_ptr,
+                               b_destroy_everything,
+                               &(gu_ptr->ext_out_port_list_ptr),
+                               &(gu_ptr->num_ext_out_ports),
+                               FALSE);
 
-         // Set connected external port to null
-         gu_deinit_ext_in_port(ext_in_port_ptr);
-         gu_ptr->num_ext_in_ports--;
-         spf_list_delete_node_and_free_obj((spf_list_node_t **)&list_ptr,
-                                           (spf_list_node_t **)&gu_ptr->ext_in_port_list_ptr,
-                                           TRUE /* pool_used */);
-      }
-   }
-
-   {
-      // check and destroy external output ports
-      gu_ext_out_port_list_t *list_ptr = gu_ptr->ext_out_port_list_ptr;
-      while (list_ptr)
-      {
-         gu_ext_out_port_t *ext_out_port_ptr = list_ptr->ext_out_port_ptr;
-
-         if (!(b_destroy_everything || (GU_STATUS_CLOSING == ext_out_port_ptr->gu_status) ||
-               (GU_STATUS_CLOSING == ext_out_port_ptr->sg_ptr->gu_status)))
-         {
-            // Advance the list to next entry
-            LIST_ADVANCE(list_ptr);
-            continue;
-         }
-
-         if (NULL != ext_out_port_ptr->downstream_handle.spf_handle_ptr)
-         {
-            GU_MSG(gu_ptr->log_id, DBG_ERROR_PRIO, "Destroy issued when connection to downstream is still present");
-            // this is an error because peer port has ref to this memory
-         }
-
-         // Set connected external port to null
-         gu_deinit_ext_out_port(ext_out_port_ptr);
-         gu_ptr->num_ext_out_ports--;
-         spf_list_delete_node_and_free_obj((spf_list_node_t **)&list_ptr,
-                                           (spf_list_node_t **)&gu_ptr->ext_out_port_list_ptr,
-                                           TRUE /* pool_used */);
-      }
-   }
+   // destory list of IPC external output ports
+   gu_destory_ext_output_ports(gu_ptr,
+                               b_destroy_everything,
+                               &(gu_ptr->ipc_ext_out_port_list_ptr),
+                               &(gu_ptr->num_ipc_ext_out_ports),
+                               TRUE);
 
    {
       // check and destroy external control ports
@@ -3244,7 +3444,29 @@ ar_result_t gu_destroy_graph(gu_t *gu_ptr, bool_t b_destroy_everything)
             spf_list_delete_list(((spf_list_node_t **)&module_ptr->input_port_list_ptr), TRUE /* pool_used */);
             module_ptr->num_input_ports = 0;
 
-            // Free output ports
+            // Free IPC input ports
+            gu_input_port_list_t *ipc_in_port_list_ptr = module_ptr->ipc_input_port_list_ptr;
+            while (ipc_in_port_list_ptr)
+            {
+               // Set connected port for upstream ports to NULL, those ports will get cleaned up later
+               gu_input_port_t *ipc_in_port_ptr = ipc_in_port_list_ptr->ip_port_ptr;
+               if (ipc_in_port_ptr && ipc_in_port_ptr->conn_out_port_ptr)
+               {
+                  ipc_in_port_ptr->conn_out_port_ptr->conn_in_port_ptr = NULL;
+               }
+
+               // port ptr assigned from the sg resource will be freed at the end.
+               if (!gu_sg_is_resource_memory(sg_ptr, (int8_t *)ipc_in_port_ptr))
+               {
+                  posal_memory_free(ipc_in_port_ptr);
+               }
+
+               LIST_ADVANCE(ipc_in_port_list_ptr);
+            }
+            spf_list_delete_list(((spf_list_node_t **)&module_ptr->ipc_input_port_list_ptr), TRUE /* pool_used */);
+            module_ptr->num_ipc_input_ports = 0;
+
+            // Free regular output ports
             gu_output_port_list_t *op_port_list_ptr = module_ptr->output_port_list_ptr;
             while (op_port_list_ptr)
             {
@@ -3268,6 +3490,31 @@ ar_result_t gu_destroy_graph(gu_t *gu_ptr, bool_t b_destroy_everything)
             }
             spf_list_delete_list(((spf_list_node_t **)&module_ptr->output_port_list_ptr), TRUE /* pool_used */);
             module_ptr->num_output_ports = 0;
+
+            // Free IPC output ports
+            gu_output_port_list_t *ipc_out_port_list_ptr = module_ptr->ipc_output_port_list_ptr;
+            while (ipc_out_port_list_ptr)
+            {
+               gu_output_port_t *ipc_out_port_ptr = ipc_out_port_list_ptr->op_port_ptr;
+               if (ipc_out_port_ptr)
+               {
+                  if (ipc_out_port_ptr->conn_in_port_ptr)
+                  {
+                     ipc_out_port_ptr->conn_in_port_ptr->conn_out_port_ptr = NULL;
+                  }
+                  ipc_out_port_ptr->attached_module_ptr = NULL;
+               }
+
+               // port ptr assigned from the sg resource will be freed at the end.
+               if (!gu_sg_is_resource_memory(sg_ptr, (int8_t *)ipc_out_port_ptr))
+               {
+                  posal_memory_free(ipc_out_port_ptr);
+               }
+
+               LIST_ADVANCE(ipc_out_port_list_ptr);
+            }
+            spf_list_delete_list(((spf_list_node_t **)&module_ptr->ipc_output_port_list_ptr), TRUE /* pool_used */);
+            module_ptr->num_ipc_output_ports = 0;
 
             // Free control ports
             gu_ctrl_port_list_t *ctrl_port_list_ptr = module_ptr->ctrl_port_list_ptr;
@@ -3775,7 +4022,16 @@ static ar_result_t gu_insert_pending_ports(gu_t *gu_ptr, POSAL_HEAP_ID heap_id)
       if (is_input)
       {
          gu_input_port_t *in_port_ptr = (gu_input_port_t *)cmn_port_ptr;
-         TRY(result, gu_insert_input_port(gu_ptr, module_ptr, in_port_ptr, heap_id));
+
+         if (gu_does_module_needs_ipc_port(module_ptr, IS_IPC_INPUT))
+         {
+            TRY(result, gu_insert_ipc_input_port(gu_ptr, module_ptr, in_port_ptr, heap_id));
+         }
+         else
+         {
+            TRY(result, gu_insert_input_port(gu_ptr, module_ptr, in_port_ptr, heap_id));
+         }
+
          module_ptr->flags.is_us_at_sg_or_cntr_boundary = TRUE;
 
          dst_module_ptr = module_ptr;
@@ -3784,7 +4040,16 @@ static ar_result_t gu_insert_pending_ports(gu_t *gu_ptr, POSAL_HEAP_ID heap_id)
       else
       {
          gu_output_port_t *out_port_ptr = (gu_output_port_t *)cmn_port_ptr;
-         TRY(result, gu_insert_output_port(gu_ptr, module_ptr, out_port_ptr, heap_id));
+
+         if (gu_does_module_needs_ipc_port(module_ptr, IS_IPC_OUTPUT))
+         {
+            TRY(result, gu_insert_ipc_output_port(gu_ptr, module_ptr, out_port_ptr, heap_id));
+         }
+         else
+         {
+            TRY(result, gu_insert_output_port(gu_ptr, module_ptr, out_port_ptr, heap_id));
+         }
+
          module_ptr->flags.is_ds_at_sg_or_cntr_boundary = TRUE;
 
          src_module_ptr = module_ptr;
@@ -3951,7 +4216,7 @@ ar_result_t gu_respond_to_graph_open(gu_t *gu_ptr, spf_msg_t *cmd_msg_ptr, POSAL
    INIT_EXCEPTION_HANDLING
    ar_result_t                   result = AR_EOK;
    spf_msg_t                     rsp_msg;
-   spf_msg_header_t *            cmd_header_ptr = (spf_msg_header_t *)cmd_msg_ptr->payload_ptr;
+   spf_msg_header_t             *cmd_header_ptr = (spf_msg_header_t *)cmd_msg_ptr->payload_ptr;
    spf_msg_header_t *            rsp_header_ptr;
    spf_cntr_port_connect_info_t *open_rsp_ptr;
    spf_msg_cmd_graph_open_t *    open_cmd_ptr = (spf_msg_cmd_graph_open_t *)&cmd_header_ptr->payload_start;
@@ -3960,8 +4225,8 @@ ar_result_t gu_respond_to_graph_open(gu_t *gu_ptr, spf_msg_t *cmd_msg_ptr, POSAL
    __gpr_cmd_get_host_domain_id(&host_domain_id);
 
    // this allocates more than required in case SH MEM EP are involved.
-   uint32_t num_ip_port_conn   = gu_ptr->num_ext_in_ports;
-   uint32_t num_op_port_conn   = gu_ptr->num_ext_out_ports;
+   uint32_t num_ip_port_conn =   gu_ptr->num_ext_in_ports + gu_ptr->num_ipc_ext_in_ports;
+   uint32_t num_op_port_conn   = gu_ptr->num_ext_out_ports + gu_ptr->num_ipc_ext_out_ports;
    uint32_t num_ctrl_port_conn = gu_ptr->num_ext_ctrl_ports;
 
    uint32_t rsp_size = sizeof(spf_cntr_port_connect_info_t) +
@@ -3995,18 +4260,29 @@ ar_result_t gu_respond_to_graph_open(gu_t *gu_ptr, spf_msg_t *cmd_msg_ptr, POSAL
    {
       apm_module_conn_cfg_t *cmd_conn_ptr = open_cmd_ptr->mod_conn_list_pptr[i];
 
-      gu_module_t *     src_module_ptr      = gu_find_module(gu_ptr, cmd_conn_ptr->src_mod_inst_id);
-      gu_module_t *     dst_module_ptr      = gu_find_module(gu_ptr, cmd_conn_ptr->dst_mod_inst_id);
+      gu_module_t *src_module_ptr = gu_find_module(gu_ptr, cmd_conn_ptr->src_mod_inst_id);
+      gu_module_t *dst_module_ptr = gu_find_module(gu_ptr, cmd_conn_ptr->dst_mod_inst_id);
+
+      // gets both regular and IPC ports
       gu_output_port_t *src_output_port_ptr = gu_find_output_port(src_module_ptr, cmd_conn_ptr->src_mod_op_port_id);
-      gu_input_port_t * dst_input_port_ptr  = gu_find_input_port(dst_module_ptr, cmd_conn_ptr->dst_mod_ip_port_id);
+      gu_input_port_t  *dst_input_port_ptr  = gu_find_input_port(dst_module_ptr, cmd_conn_ptr->dst_mod_ip_port_id);
+
+      GU_MSG(gu_ptr->log_id,
+             DBG_LOW_PRIO,
+             "GRAPH_OPEN: response handler external connection info (0x%lx, 0x%lx) -- >  (0x%lx, 0x%lx) ",
+             cmd_conn_ptr->src_mod_inst_id,
+             cmd_conn_ptr->src_mod_op_port_id,
+             cmd_conn_ptr->dst_mod_inst_id,
+             cmd_conn_ptr->dst_mod_ip_port_id);
 
       if (src_module_ptr && src_output_port_ptr && src_output_port_ptr->ext_out_port_ptr)
       {
-         gu_ext_out_port_t *     ext_out_port_ptr = src_output_port_ptr->ext_out_port_ptr;
+         gu_ext_out_port_t      *ext_out_port_ptr = src_output_port_ptr->ext_out_port_ptr;
          spf_module_port_conn_t *op_port_conn_list_ptr =
             &open_rsp_ptr->op_data_port_conn_list_ptr[open_rsp_ptr->num_op_data_port_conn];
 
-         op_port_conn_list_ptr->self_mod_port_hdl.port_ctx_hdl   = &ext_out_port_ptr->this_handle;
+         op_port_conn_list_ptr->self_mod_port_hdl.port_ctx_hdl = &ext_out_port_ptr->this_handle;
+
          op_port_conn_list_ptr->self_mod_port_hdl.module_inst_id = cmd_conn_ptr->src_mod_inst_id;
          op_port_conn_list_ptr->self_mod_port_hdl.module_port_id = cmd_conn_ptr->src_mod_op_port_id;
          op_port_conn_list_ptr->self_mod_port_hdl.port_type      = PORT_TYPE_DATA_OP;
@@ -4023,11 +4299,12 @@ ar_result_t gu_respond_to_graph_open(gu_t *gu_ptr, spf_msg_t *cmd_msg_ptr, POSAL
 
       if (dst_module_ptr && dst_input_port_ptr && dst_input_port_ptr->ext_in_port_ptr)
       {
-         gu_ext_in_port_t *      ext_in_port_ptr = dst_input_port_ptr->ext_in_port_ptr;
+         gu_ext_in_port_t       *ext_in_port_ptr = dst_input_port_ptr->ext_in_port_ptr;
          spf_module_port_conn_t *ip_port_conn_list_ptr =
             &open_rsp_ptr->ip_data_port_conn_list_ptr[open_rsp_ptr->num_ip_data_port_conn];
 
-         ip_port_conn_list_ptr->self_mod_port_hdl.port_ctx_hdl   = &ext_in_port_ptr->this_handle;
+         ip_port_conn_list_ptr->self_mod_port_hdl.port_ctx_hdl = &ext_in_port_ptr->this_handle;
+
          ip_port_conn_list_ptr->self_mod_port_hdl.module_inst_id = cmd_conn_ptr->dst_mod_inst_id;
          ip_port_conn_list_ptr->self_mod_port_hdl.module_port_id = cmd_conn_ptr->dst_mod_ip_port_id;
          ip_port_conn_list_ptr->self_mod_port_hdl.port_type      = PORT_TYPE_DATA_IP;
@@ -4169,6 +4446,54 @@ ar_result_t gu_prepare_async_create(gu_t *gu_ptr, POSAL_HEAP_ID heap_id)
    return result;
 }
 
+void gu_prepare_async_ext_in_destroy(gu_ext_in_port_list_t **src_ext_in_port_list_pptr,
+                                     uint8_t                *src_num_ext_in_ports,
+                                     gu_ext_in_port_list_t **dst_ext_in_port_list_pptr,
+                                     uint8_t                *dst_num_ext_in_ports)
+{
+   gu_ext_in_port_list_t *src_ext_in_list_ptr = *src_ext_in_port_list_pptr;
+   while (src_ext_in_list_ptr)
+   {
+      gu_ext_in_port_list_t *next_src_ext_in_list_ptr = src_ext_in_list_ptr->next_ptr;
+
+      if (GU_STATUS_CLOSING == src_ext_in_list_ptr->ext_in_port_ptr->gu_status ||
+          GU_STATUS_CLOSING == src_ext_in_list_ptr->ext_in_port_ptr->sg_ptr->gu_status)
+      {
+         spf_list_move_node_to_another_list((spf_list_node_t **)dst_ext_in_port_list_pptr,
+                                            (spf_list_node_t *)src_ext_in_list_ptr,
+                                            (spf_list_node_t **)src_ext_in_port_list_pptr);
+         (*src_num_ext_in_ports)--;
+         (*dst_num_ext_in_ports)++;
+      }
+
+      src_ext_in_list_ptr = next_src_ext_in_list_ptr;
+   }
+}
+
+void gu_prepare_async_ext_out_destroy(gu_ext_out_port_list_t **src_ext_out_port_list_pptr,
+                                      uint8_t                 *src_num_ext_out_ports,
+                                      gu_ext_out_port_list_t **dst_ext_out_port_list_pptr,
+                                      uint8_t                 *dst_num_ext_out_ports)
+{
+   gu_ext_out_port_list_t *src_ext_out_list_ptr = *src_ext_out_port_list_pptr;
+   while (src_ext_out_list_ptr)
+   {
+      gu_ext_out_port_list_t *next_src_ext_out_list_ptr = src_ext_out_list_ptr->next_ptr;
+
+      if (GU_STATUS_CLOSING == src_ext_out_list_ptr->ext_out_port_ptr->gu_status ||
+          GU_STATUS_CLOSING == src_ext_out_list_ptr->ext_out_port_ptr->sg_ptr->gu_status)
+      {
+         spf_list_move_node_to_another_list((spf_list_node_t **)dst_ext_out_port_list_pptr,
+                                            (spf_list_node_t *)src_ext_out_list_ptr,
+                                            (spf_list_node_t **)src_ext_out_port_list_pptr);
+         (*src_num_ext_out_ports)--;
+         (*dst_num_ext_out_ports)++;
+      }
+
+      src_ext_out_list_ptr = next_src_ext_out_list_ptr;
+   }
+}
+
 // function to clone the gu_ptr and copy only the necessary information so that the cloned gu can be used to handle
 // close while main gu is being used in the data-path Once the close is handled on the cloned-gu, it must be
 // destroyed using gu_finish_async_destroy.
@@ -4226,46 +4551,31 @@ ar_result_t gu_prepare_async_destroy(gu_t *gu_ptr, POSAL_HEAP_ID heap_id)
       }
    }
 
-   {
-      gu_ext_in_port_list_t *ext_in_list_ptr = gu_ptr->ext_in_port_list_ptr;
-      while (ext_in_list_ptr)
-      {
-         gu_ext_in_port_list_t *next_ext_in_list_ptr = ext_in_list_ptr->next_ptr;
+   // prepare async destory of real ext input ports
+   gu_prepare_async_ext_in_destroy(&gu_ptr->ext_in_port_list_ptr,
+                                   &gu_ptr->num_ext_in_ports,
+                                   &dst_gu_ptr->ext_in_port_list_ptr,
+                                   &dst_gu_ptr->num_ext_in_ports);
 
-         if (GU_STATUS_CLOSING == ext_in_list_ptr->ext_in_port_ptr->gu_status ||
-             GU_STATUS_CLOSING == ext_in_list_ptr->ext_in_port_ptr->sg_ptr->gu_status)
-         {
-            spf_list_move_node_to_another_list((spf_list_node_t **)&dst_gu_ptr->ext_in_port_list_ptr,
-                                               (spf_list_node_t *)ext_in_list_ptr,
-                                               (spf_list_node_t **)&gu_ptr->ext_in_port_list_ptr);
-            gu_ptr->num_ext_in_ports--;
-            dst_gu_ptr->num_ext_in_ports++;
-         }
+   // prepare async destory of IPC ext input ports
+   gu_prepare_async_ext_in_destroy(&gu_ptr->ipc_ext_in_port_list_ptr,
+                                   &gu_ptr->num_ipc_ext_in_ports,
+                                   &dst_gu_ptr->ipc_ext_in_port_list_ptr,
+                                   &dst_gu_ptr->num_ipc_ext_in_ports);
 
-         ext_in_list_ptr = next_ext_in_list_ptr;
-      }
-   }
+   // prepare async destory of real ext output ports
+   gu_prepare_async_ext_out_destroy(&gu_ptr->ext_out_port_list_ptr,
+                                    &gu_ptr->num_ext_out_ports,
+                                    &dst_gu_ptr->ext_out_port_list_ptr,
+                                    &dst_gu_ptr->num_ext_out_ports);
 
-   {
-      gu_ext_out_port_list_t *ext_out_list_ptr = gu_ptr->ext_out_port_list_ptr;
-      while (ext_out_list_ptr)
-      {
-         gu_ext_out_port_list_t *next_ext_out_list_ptr = ext_out_list_ptr->next_ptr;
+   // prepare async destory of IPC ext output ports
+   gu_prepare_async_ext_out_destroy(&gu_ptr->ipc_ext_out_port_list_ptr,
+                                    &gu_ptr->num_ipc_ext_out_ports,
+                                    &dst_gu_ptr->ipc_ext_out_port_list_ptr,
+                                    &dst_gu_ptr->num_ipc_ext_out_ports);
 
-         if (GU_STATUS_CLOSING == ext_out_list_ptr->ext_out_port_ptr->gu_status ||
-             GU_STATUS_CLOSING == ext_out_list_ptr->ext_out_port_ptr->sg_ptr->gu_status)
-         {
-            spf_list_move_node_to_another_list((spf_list_node_t **)&dst_gu_ptr->ext_out_port_list_ptr,
-                                               (spf_list_node_t *)ext_out_list_ptr,
-                                               (spf_list_node_t **)&gu_ptr->ext_out_port_list_ptr);
-            gu_ptr->num_ext_out_ports--;
-            dst_gu_ptr->num_ext_out_ports++;
-         }
-
-         ext_out_list_ptr = next_ext_out_list_ptr;
-      }
-   }
-
+   // prepare destory of control port list
    {
       gu_ext_ctrl_port_list_t *ext_ctrl_list_ptr = gu_ptr->ext_ctrl_port_list_ptr;
       while (ext_ctrl_list_ptr)
@@ -4324,9 +4634,17 @@ ar_result_t gu_finish_async_create(gu_t *gu_ptr, POSAL_HEAP_ID heap_id)
    spf_list_merge_lists(((spf_list_node_t **)&(gu_ptr->ext_in_port_list_ptr)),
                         ((spf_list_node_t **)&(src_gu_ptr->ext_in_port_list_ptr)));
 
+   gu_ptr->num_ipc_ext_in_ports += src_gu_ptr->num_ipc_ext_in_ports;
+   spf_list_merge_lists(((spf_list_node_t **)&(gu_ptr->ipc_ext_in_port_list_ptr)),
+                        ((spf_list_node_t **)&(src_gu_ptr->ipc_ext_in_port_list_ptr)));
+
    gu_ptr->num_ext_out_ports += src_gu_ptr->num_ext_out_ports;
    spf_list_merge_lists(((spf_list_node_t **)&(gu_ptr->ext_out_port_list_ptr)),
                         ((spf_list_node_t **)&(src_gu_ptr->ext_out_port_list_ptr)));
+
+   gu_ptr->num_ipc_ext_out_ports += src_gu_ptr->num_ipc_ext_out_ports;
+   spf_list_merge_lists(((spf_list_node_t **)&(gu_ptr->ipc_ext_out_port_list_ptr)),
+                        ((spf_list_node_t **)&(src_gu_ptr->ipc_ext_out_port_list_ptr)));
 
    gu_ptr->num_ext_ctrl_ports += src_gu_ptr->num_ext_ctrl_ports;
    spf_list_merge_lists(((spf_list_node_t **)&(gu_ptr->ext_ctrl_port_list_ptr)),

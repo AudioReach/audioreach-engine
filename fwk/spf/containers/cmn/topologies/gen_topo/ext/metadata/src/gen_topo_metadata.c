@@ -344,6 +344,7 @@ ar_result_t gen_topo_raise_md_cloning_event(gen_topo_t *                      to
 
    bool_t is_registered = FALSE;
    (void)__gpr_cmd_is_registered(md_tracking_ptr->src_port, &is_registered);
+
    // if stream close is done prior to render EOS, then client must not receive render EOS
    if (is_registered)
    {
@@ -383,6 +384,20 @@ ar_result_t gen_topo_raise_eos_tracking_event(gen_topo_tracking_md_context_t *cb
                "MD_DBG: md_tracking_ptr = 0x%X  is NULL in event callback",
                cb_context_ptr->tracking_payload_ptr,
                cb_context_ptr->md_payload_ptr);
+      return result;
+   }
+
+   // In some contexts, MD tracking event may not be necessary at the time of destory even though its a tracking MD
+   // for example, when MD gets propagated across proc domain boundary, it may be destoryed in the sending proc domain
+   // ID (in IPC tx or Wr Shm client EP context) but its not really a DROP event. So we should not send tracking event
+   // since its not true drop. Hence in such contexts caller might just update the tracking mode to disable
+   // to indicate the same.
+   if (MODULE_CMN_MD_TRACKING_CONFIG_DISABLE == cb_context_ptr->flags.tracking_mode)
+   {
+      TOPO_MSG(cb_context_ptr->log_id,
+               DBG_HIGH_PRIO,
+               "MD_DBG: Warning! md_tracking_ptr = 0x%X not raising tracking event due to tracking_mode being disabled.",
+               cb_context_ptr->tracking_payload_ptr);
       return result;
    }
 
@@ -463,6 +478,20 @@ static ar_result_t gen_topo_raise_md_tracking_event(gen_topo_tracking_md_context
       return result;
    }
 
+   // In some contexts, MD tracking event may not be necessary at the time of destory even though its a tracking MD
+   // for example, when MD gets propagated across proc domain boundary, it may be destoryed in the sending proc domain
+   // ID (in IPC tx or Wr Shm client EP context) but its not really a DROP event. So we should not send tracking event
+   // since its not true drop. Hence in such contexts caller might just update the tracking mode to disable
+   // to indicate the same.
+   if (MODULE_CMN_MD_TRACKING_CONFIG_DISABLE == cb_context_ptr->flags.tracking_mode)
+   {
+      TOPO_MSG(cb_context_ptr->log_id,
+               DBG_HIGH_PRIO,
+               "MD_DBG: Warning! md_tracking_ptr = 0x%X not raising tracking event due to tracking_mode being disabled.",
+               cb_context_ptr->tracking_payload_ptr);
+      return result;
+   }
+
    if ((MODULE_CMN_MD_TRACKING_EVENT_POLICY_EACH == cb_context_ptr->flags.tracking_policy) ||
        ((MODULE_CMN_MD_TRACKING_EVENT_POLICY_LAST == cb_context_ptr->flags.tracking_policy) && (0 == ref_count)))
    {
@@ -499,8 +528,9 @@ static ar_result_t gen_topo_raise_md_tracking_event(gen_topo_tracking_md_context
 
          TOPO_MSG(cb_context_ptr->log_id,
                   DBG_HIGH_PRIO,
-                  "MD_DBG: Raising tracking event for MD_ID (0x%lx) (src port 0x%lX), render status = %lu, "
-                  "policy 0x%x ref_count = %lu cmd_opcode  0x%lX",
+                  "MD_DBG: Raising tracking event for MD_ID (0x%lx) (src port 0x%lX), render status = %lu "
+                  "(render=0,drop=1), "
+                  "policy 0x%x (last=0,each=1), ref_count = %lu cmd_opcode  0x%lX",
                   cb_context_ptr->metadata_id,
                   md_tracking_ptr->src_port,
                   cb_context_ptr->render_status,
@@ -513,7 +543,8 @@ static ar_result_t gen_topo_raise_md_tracking_event(gen_topo_tracking_md_context
          TOPO_MSG(cb_context_ptr->log_id,
                   DBG_HIGH_PRIO,
                   "MD_DBG: Not Raising tracking event for MD_ID (0x%lx) as client has closed the source module. "
-                  "(src port 0x%lX), render status = %lu, policy 0x%x  ref_count = %lu cmd_opcode  0x%lX",
+                  "(src port 0x%lX), render status = %lu (render=0,drop=1), policy 0x%x (last=0,each=1), ref_count = "
+				  "%lu cmd_opcode  0x%lX",
                   cb_context_ptr->metadata_id,
                   md_tracking_ptr->src_port,
                   cb_context_ptr->render_status,
@@ -718,11 +749,11 @@ static void gen_topo_render_md(uint32_t         log_id,
    }
 }
 
-ar_result_t gen_topo_raise_tracking_event(gen_topo_t *          topo_ptr,
+ar_result_t gen_topo_raise_tracking_event(uint32_t              log_id,
                                           uint32_t              sink_miid,
                                           module_cmn_md_list_t *md_list_ptr,
                                           bool_t                is_md_rendered,
-                                          void *                md_payload_ptr,
+                                          void                 *md_payload_ptr,
                                           bool_t                override_ctrl_to_disable_tracking_event)
 {
    ar_result_t result = AR_EOK;
@@ -731,6 +762,7 @@ ar_result_t gen_topo_raise_tracking_event(gen_topo_t *          topo_ptr,
    {
       return result;
    }
+
    module_cmn_md_t *metadata_ptr = NULL;
    metadata_ptr                  = md_list_ptr->obj_ptr;
 
@@ -738,7 +770,7 @@ ar_result_t gen_topo_raise_tracking_event(gen_topo_t *          topo_ptr,
    {
       if (override_ctrl_to_disable_tracking_event)
       {
-         TOPO_MSG(topo_ptr->gu.log_id,
+         TOPO_MSG(log_id,
                   DBG_HIGH_PRIO,
                   "MD_DBG: Not raising tracking event for MD_ID (0x%lx) as the caller set the override flag to disable "
                   "tracking event render status = %lu (0/1 : drop/render), policy 0x%x  ",
@@ -749,26 +781,26 @@ ar_result_t gen_topo_raise_tracking_event(gen_topo_t *          topo_ptr,
       }
       else
       {
-      if (is_md_rendered)
-      {
-         if (MODULE_CMN_MD_TRACKING_CONFIG_ENABLE_FOR_DROP_OR_CONSUME == metadata_ptr->metadata_flag.tracking_mode)
+         if (is_md_rendered)
          {
-               gen_topo_render_md(topo_ptr->gu.log_id, metadata_ptr, sink_miid, md_payload_ptr);
+            if (MODULE_CMN_MD_TRACKING_CONFIG_ENABLE_FOR_DROP_OR_CONSUME == metadata_ptr->metadata_flag.tracking_mode)
+            {
+               gen_topo_render_md(log_id, metadata_ptr, sink_miid, md_payload_ptr);
+            }
+            else // no need to raise render/consume events
+            {
+               spf_ref_counter_remove_ref((void *)metadata_ptr->tracking_ptr, NULL, NULL);
+            }
          }
-         else
+         else if (!is_md_rendered) // dropped
          {
-            spf_ref_counter_remove_ref((void *)metadata_ptr->tracking_ptr, NULL, NULL);
-         }
-      }
-      else if (!is_md_rendered) // dropped
-      {
-         gen_topo_drop_md(topo_ptr->gu.log_id,
-                          metadata_ptr->tracking_ptr,
-                          metadata_ptr->metadata_id,
-                          metadata_ptr->metadata_flag,
+            gen_topo_drop_md(log_id,
+                             metadata_ptr->tracking_ptr,
+                             metadata_ptr->metadata_id,
+                             metadata_ptr->metadata_flag,
                              sink_miid,
-                          TRUE,
-                          md_payload_ptr);
+                             TRUE,
+                             md_payload_ptr);
          }
       }
    }

@@ -1,0 +1,59 @@
+'''
+/*==============================================================================
+@file async_cmd_handle.scons
+@brief 
+
+==============================================================================*/
+'''
+
+Import('env')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS = '-ffunction-sections')
+
+core_public_apis = [
+   'DAL',
+   'DEBUGTOOLS',
+   'SERVICES',
+   'KERNEL',
+   ]
+
+env.RequirePublicApi(core_public_apis, area='core')
+platform_public_apis = [
+    'QAIC',
+    'STDDEF',
+    'HAPSDK'
+    ]
+
+env.RequirePublicApi(platform_public_apis, area='platform') # This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+env.RequireRestrictedApi(['AVS', 'SHARED_LIBRARY_INC_PATHS', 'CAPI_LIBRARY_FACTORY', 'MODULE_INTERFACES_UTILS'])
+env.RequireProtectedApi('AVS')
+env.RequirePublicApi(['AMDB',])
+env.RequireRestrictedApi('AVS_CONVERTER_PROFILE')
+env.RequireRestrictedApi(['AVS','SHARED_LIBRARY_INC_PATHS'])
+env.RequireProtectedApi('AVS')
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = ".."
+LIBNAME = 'cu_async_cmd_handle'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+# Generate regular source file list
+if 'USES_CONTAINER_ASYNC_CMD_HANDLING' in env:
+   avs_reg_sources = env.GlobSourceFiles(['src/*.c'], SRCPATH,posix=True)
+else:
+   avs_reg_sources = env.GlobSourceFiles(['stub_src/*.c'], SRCPATH,posix=True)
+  
+# Generate stub source file list
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.c', 'stub_src/*.S'], SRCPATH,posix=True)
+
+# Genate  source file list
+avs_fwk_sources = []
+
+env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME, [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+    
+   
+   

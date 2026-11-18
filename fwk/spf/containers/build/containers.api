@@ -1,0 +1,20 @@
+'''
+/*==============================================================================
+@file containers.api
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.PublishRestrictedApi('AVS',[
+   '${AVS_ROOT}/spf/containers/cmn/container_interface/inc',
+   '${AVS_ROOT}/spf/containers/gen_cntr/api',   
+   '${AVS_ROOT}/spf/containers/gen_cntr/core/inc',
+   '${AVS_ROOT}/spf/containers/spl_cntr/inc',
+   '${AVS_ROOT}/spf/containers/olc/inc',   
+   ])
+
+env.LoadAPIUnits()

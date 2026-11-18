@@ -1,0 +1,14 @@
+'''
+/*==============================================================================
+@file module_interfaces.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.Append(H2XML_INC_PATH = "${AVS_ROOT}/spf/interfaces/module/imcl/api")
+
+env.LoadSoftwareUnits()

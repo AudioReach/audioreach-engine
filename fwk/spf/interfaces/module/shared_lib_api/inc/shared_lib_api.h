@@ -59,6 +59,8 @@
 #include "capi_fwk_extns_island.h"
 #include "capi_fwk_extns_async_signal_trigger.h"
 #include "capi_fwk_extns_global_shmem_msg.h"
+#include "capi_fwk_extns_ipc_port_handler.h"
+#include "capi_intf_extn_module_buffer_access.h"
 
 #include "capi_mm_error_code_converter.h"
 

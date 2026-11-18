@@ -1,0 +1,88 @@
+'''
+/*==============================================================================
+@file circular_buffer_lib.scons
+@brief
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+#env.Append(CPPFLAGS = ' -O0')
+#env.Append(CFLAGS = ' -O0')
+
+if 'USES_SPF_CIRC_BUF_IN_ISLAND' in env:
+  env.Append(CFLAGS = '-DAR_MSG_IN_ISLAND')
+
+CBSP_API = [
+   'BOOT',
+   'DAL',
+   'DEBUGTOOLS',
+   'HAL',
+   'MPROC',
+   'POWER',
+   'SERVICES',
+   'SYSTEMDRIVERS',
+
+   # needs to be last also contains wrong comdef.h
+   'KERNEL',
+]
+
+env.RequirePublicApi(CBSP_API,area='core')
+env.RequireRestrictedApi(['AVS', 'MODULE_INTERFACES_API', 'SHARED_LIBRARY_INC_PATHS'])
+env.RequireProtectedApi('AVS')
+
+platform_public_apis = [
+    'QAIC',
+    'STDDEF',
+    'HAPSDK'
+    ]
+
+env.RequirePublicApi([
+  'AMDB',
+])
+env.RequirePublicApi(platform_public_apis, area='platform') # This has to be the last include command, so that the Elite_CAPI.h and Elite_APPI.h are not overridden
+
+
+env.PublishPrivateApi('AVS',[
+   '${AVS_ROOT}/spf/utils/circular_buffer/inc'
+   '${AVS_ROOT}/spf/utils/circular_buffer/src'
+   ])
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = ".."
+
+LIBNAME = 'spf_circ_buf_utils'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+# Generate regular source file list
+
+avs_reg_sources = env.GlobSourceFiles(['src/*.cpp', 'src/*.c'], SRCPATH, posix=True)
+
+# Generate stub source file list
+avs_stub_sources = []
+
+# Genate  source file list
+avs_fwk_sources = []
+
+non_island_reg_sources= []
+island_reg_sources = []
+bucket= ['AVS_ADSP','AVS_ADSP_USER']
+
+if 'USES_AUDIO_IN_ISLAND' in env and 'USES_SPF_CIRC_BUF_IN_ISLAND' in env:
+    get_island_lib = env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME+'_island', [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+elif 'USES_AUDIO_IN_ISLAND' in env:
+    non_island_reg_sources,island_reg_sources = env.IslandFilter(avs_reg_sources)
+    non_island_stub_sources,island_stub_sources = env.IslandFilter(avs_stub_sources)
+    if non_island_reg_sources or non_island_stub_sources :
+        if 'USES_AVS_LIBRARY_BUILDER' in env:
+            env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+            [non_island_reg_sources, non_island_stub_sources, avs_fwk_sources], PACK_SRC=True)
+    get_island_lib = env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME+'_island',
+                                       [island_reg_sources,island_stub_sources, avs_fwk_sources], PACK_SRC=True)
+
+else:
+    env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+      [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)

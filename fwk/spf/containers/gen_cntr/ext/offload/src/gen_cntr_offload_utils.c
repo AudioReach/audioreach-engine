@@ -13,7 +13,7 @@
 #include "gen_cntr_i.h"
 #include "media_fmt_extn_api.h"
 #include "offload_sp_api.h"
-#include "offload_metatdata_api.h"
+#include "offload_metadata_api.h"
 
 static ar_result_t gen_cntr_recreate_out_buf_olc_client(gen_cntr_t *             me_ptr,
                                                         gen_cntr_ext_out_port_t *ext_out_port_ptr,
@@ -910,7 +910,7 @@ ar_result_t gen_cntr_offload_handle_set_cfg_to_rd_sh_mem_ep(gen_cntr_t *        
                gen_topo_module_t *module_ptr =
                   (gen_topo_module_t *)ext_out_port_ptr->gu.int_out_port_ptr->cmn.module_ptr;
                spf_ref_counter_add_ref(temp_node_ptr->obj_ptr->tracking_ptr);
-               gen_topo_raise_tracking_event(module_ptr->topo_ptr,
+               gen_topo_raise_tracking_event(module_ptr->topo_ptr->gu.log_id,
                                              rd_ep_md_rendered_cfg_ptr->md_rendered_port_id,
                                              temp_node_ptr,
                                              !rd_ep_md_rendered_cfg_ptr->is_md_dropped,

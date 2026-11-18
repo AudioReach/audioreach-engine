@@ -1,0 +1,30 @@
+'''
+/*==============================================================================
+@file module_interfaces.api
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+env.Replace(AVS_ROOT = '${INC_ROOT}/${AVS_AU_NAME}/fwk')
+
+   
+env.PublishRestrictedApi('AVS',[
+   '${AVS_ROOT}/spf/interfaces/module/shared_lib_api/inc',
+   '${AVS_ROOT}/spf/interfaces/module/capi',
+   '${AVS_ROOT}/spf/interfaces/module/capi/adv',
+   '${AVS_ROOT}/spf/interfaces/module/audio_cmn_lib',
+   '${AVS_ROOT}/spf/interfaces/module/capi_cmn/cmn/inc',
+   '${AVS_ROOT}/spf/interfaces/module/capi_cmn/ctrl_port/inc',
+   '${AVS_ROOT}/spf/interfaces/module/internal_api/modules_prv/api',
+   '${AVS_ROOT}/spf/interfaces/module/capi_libraries',   
+   '${AVS_ROOT}/spf/interfaces/module/imcl/api',
+   '${AVS_ROOT}/spf/interfaces/module/capi_libraries/capi_library_thread_pool/inc',
+   '${AVS_ROOT}/spf/interfaces/module/offload/api',
+   '${AVS_ROOT}/spf/interfaces/module/metadata/api',
+   '${AVS_ROOT}/spf/interfaces/module/imcl/api',
+   ])  
+   
+env.LoadAPIUnits()

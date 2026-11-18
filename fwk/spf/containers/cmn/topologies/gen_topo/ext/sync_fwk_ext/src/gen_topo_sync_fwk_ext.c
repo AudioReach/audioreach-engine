@@ -123,11 +123,18 @@ static void gen_topo_fwk_extn_sync_propagate_threshold_state_upstream(gen_topo_t
 
    gen_topo_send_dm_consume_partial_input(me_ptr, module_ptr, is_threshold_disabled);
 
-   for (gu_input_port_list_t *list_ptr = module_ptr->gu.input_port_list_ptr; list_ptr != NULL; LIST_ADVANCE(list_ptr))
+   // propagate backwards till the IPC ports, IPC ports also need to be updated
+   // to ensure to make the ports optional if threshold is disabled.
+   gu_input_port_list_t *in_port_lists[] = { module_ptr->gu.input_port_list_ptr,
+                                             module_ptr->gu.ipc_input_port_list_ptr };
+   for (uint32_t i = 0; i < SIZE_OF_ARRAY(in_port_lists); i++)
    {
-      gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)list_ptr->ip_port_ptr;
+      for (gu_input_port_list_t *list_ptr = in_port_lists[i]; list_ptr != NULL; LIST_ADVANCE(list_ptr))
+      {
+         gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)list_ptr->ip_port_ptr;
 
-      gen_topo_fwk_extn_sync_set_propagate_threshold_state_from_ip_port(me_ptr, in_port_ptr, is_threshold_disabled);
+         gen_topo_fwk_extn_sync_set_propagate_threshold_state_from_ip_port(me_ptr, in_port_ptr, is_threshold_disabled);
+      }
    }
 }
 
@@ -151,14 +158,21 @@ void gen_topo_fwk_extn_sync_propagate_threshold_state(gen_topo_t *me_ptr)
          if (module_ptr->flags.need_sync_extn)
          {
             bool_t is_threshold_disabled = module_ptr->flags.is_threshold_disabled;
-            for (gu_input_port_list_t *list_ptr = module_ptr->gu.input_port_list_ptr; list_ptr != NULL;
-                 LIST_ADVANCE(list_ptr))
-            {
-               gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)list_ptr->ip_port_ptr;
 
-               gen_topo_fwk_extn_sync_set_propagate_threshold_state_from_ip_port(me_ptr,
-                                                                                 in_port_ptr,
-                                                                                 is_threshold_disabled);
+            // note that sync wont have any IPC input, just handling it here for completeness
+            // if IPC ports are supported in future.
+            gu_input_port_list_t *in_port_lists[] = { module_ptr->gu.input_port_list_ptr,
+                                                      module_ptr->gu.ipc_input_port_list_ptr };
+            for (uint32_t i = 0; i < SIZE_OF_ARRAY(in_port_lists); i++)
+            {
+               for (gu_input_port_list_t *list_ptr = in_port_lists[i]; list_ptr != NULL; LIST_ADVANCE(list_ptr))
+               {
+                  gen_topo_input_port_t *in_port_ptr = (gen_topo_input_port_t *)list_ptr->ip_port_ptr;
+
+                  gen_topo_fwk_extn_sync_set_propagate_threshold_state_from_ip_port(me_ptr,
+                                                                                    in_port_ptr,
+                                                                                    is_threshold_disabled);
+               }
             }
          }
       }

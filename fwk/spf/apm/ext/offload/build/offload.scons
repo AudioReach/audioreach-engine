@@ -1,0 +1,66 @@
+'''
+/**
+ * @file offload.scons
+ * @brief 
+ *  
+ * 
+ */
+'''
+
+Import('env')
+
+if 'USES_ENABLE_FUNCTION_SECTIONS' in env:
+   env.Append(CFLAGS = '-ffunction-sections')
+
+CBSP_API = [
+   'BOOT',
+   'DAL',
+   'DEBUGTOOLS',
+   'HAL',
+   'MPROC',
+   'POWER',
+   'SERVICES',
+   'SYSTEMDRIVERS',
+
+   # needs to be last also contains wrong comdef.h
+   'KERNEL',   
+]
+
+env.RequirePublicApi(CBSP_API,area='core')
+env.RequireRestrictedApi(['AVS'])
+env.RequireProtectedApi('AVS')
+env.RequirePrivateApi(['AVS'])
+
+platform_public_apis = [
+    'QAIC',
+    'STDDEF',
+    'HAPSDK'
+    ]
+
+env.RequirePublicApi([
+  'AMDB',
+])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = ".."
+LIBNAME = 'apm_offload_utils'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+# Generate regular source file list
+avs_reg_sources = env.GlobSourceFiles(['src/*.c'], SRCPATH,posix=True)
+  
+# Generate stub source file list
+avs_stub_sources = env.GlobSourceFiles(['stub_src/*.c'], SRCPATH,posix=True)
+
+# Genate  source file list
+avs_fwk_sources = []
+
+if 'USES_AVS_LIBRARY_BUILDER' in env:
+   env.AddAvsLibrary(['AVS_ADSP','AVS_ADSP_USER'], '${BUILDPATH}/'+LIBNAME,
+      [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)
+    
+   
+   

@@ -1,0 +1,38 @@
+#===============================================================================
+#
+# GENERAL DESCRIPTION
+#    Build script
+#
+#
+#===============================================================================
+Import('env')
+
+env.RequireProtectedApi('AVS')
+
+env.PublishPrivateApi('AVS',[
+   '../inc',
+   ])
+
+#-------------------------------------------------------------------------------
+# Setup source PATH
+#-------------------------------------------------------------------------------
+SRCPATH = ".."
+
+LIBNAME = 'dls'
+
+env.VariantDir('${BUILDPATH}', SRCPATH, duplicate=0)
+
+# Generate source file list - don't use any sources for hexagon build
+# Hexagon doesn't need to build the DLS service. DLS is required for
+# platforms that doesn't support diag service.
+avs_reg_sources = []
+
+# Generate stub source file list
+avs_stub_sources = env.GlobSourceFiles(['/stub_src/*.c', '/stub_src/*.S'], SRCPATH,posix=True)
+
+# Generate  source file list
+avs_fwk_sources = []
+
+bucket=['AVS_ADSP','AVS_ADSP_USER']
+
+env.AddAvsLibrary(bucket, '${BUILDPATH}/'+LIBNAME, [avs_reg_sources, avs_stub_sources, avs_fwk_sources], PACK_SRC=True)

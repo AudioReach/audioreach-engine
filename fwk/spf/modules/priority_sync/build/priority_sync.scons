@@ -1,0 +1,15 @@
+'''
+/*==============================================================================
+@file priority_sync.scons
+@brief 
+
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.H2xmlFileGenerate(env.subst('${AVS_ROOT}/spf/modules/priority_sync/api'))
+
+env.LoadSoftwareUnits()
+

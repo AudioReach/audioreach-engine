@@ -277,10 +277,12 @@ ar_result_t gen_topo_create_input_ports(gen_topo_t *topo_ptr)
 {
    return AR_EOK;
 }
+
 ar_result_t gen_topo_destroy_input_ports(gen_topo_t *topo_ptr)
 {
    return AR_EOK;
 }
+
 // ar_result_t gen_topo_create_ext_in_ports(gen_topo_t *topo_ptr) { return AR_EOK; }
 // ar_result_t gen_topo_destroy_ext_out_ports(gen_topo_t *topo_ptr) { return AR_EOK; }
 
@@ -366,11 +368,17 @@ static ar_result_t gen_topo_create_module(gen_topo_t            *topo_ptr,
    {
       if (AMDB_MODULE_TYPE_FRAMEWORK != module_ptr->gu.module_type)
       {
-         TRY(result, __gpr_cmd_register(module_ptr->gu.module_instance_id, graph_init_ptr->gpr_cb_fn, gpr_cb_handle));
          // In XPAN use cases, during module init, module registers with CPSS, which sends commands to the module
          // through GPR. If we have not registered for GPR first than this operation fails. Hence GPR registration
          // is required first.
          TRY(result, gen_topo_query_and_create_capi(topo_ptr, graph_init_ptr, module_ptr));
+
+         // skip GPR registration for IPC modules, it will be registered in the external port init context.
+         if (FALSE == module_ptr->flags.need_ipc_port_extn)
+         {
+            TRY(result,
+                __gpr_cmd_register(module_ptr->gu.module_instance_id, graph_init_ptr->gpr_cb_fn, gpr_cb_handle));
+         }
 
          // cannot use pure signal triggered topo
          if ((AR_GUID_OWNER_QC != (module_ptr->gu.module_id & AR_GUID_OWNER_MASK)))
@@ -400,8 +408,8 @@ static ar_result_t gen_topo_create_module(gen_topo_t            *topo_ptr,
    return result;
 }
 
-ar_result_t gen_topo_init_set_get_data_port_properties(gen_topo_module_t     *module_ptr,
-                                                       gen_topo_t            *topo_ptr,
+ar_result_t gen_topo_init_set_get_data_port_properties(gen_topo_module_t *    module_ptr,
+                                                       gen_topo_t *           topo_ptr,
                                                        bool_t                 is_placeholder_replaced,
                                                        gen_topo_graph_init_t *graph_init_ptr)
 {
@@ -583,6 +591,9 @@ ar_result_t gen_topo_init_set_get_data_port_properties(gen_topo_module_t     *mo
 
       out_port_ptr->gu.cmn.gu_status = GU_STATUS_DEFAULT;
    }
+
+   TRY(result, gen_topo_init_set_get_ipc_data_port_properties(module_ptr, topo_ptr, graph_init_ptr));
+
    CATCH(result, TOPO_MSG_PREFIX, topo_ptr->gu.log_id)
    {
    }
@@ -691,7 +702,11 @@ ar_result_t gen_topo_check_n_realloc_scratch_memory(gen_topo_t *topo_ptr, bool_t
    gu_sg_list_t *new_sg_list_ptr = NULL;
 
    num_ext_in_ports  = topo_ptr->gu.num_ext_in_ports;
+   num_ext_in_ports += topo_ptr->gu.num_ipc_ext_in_ports;
+
    num_ext_out_ports = topo_ptr->gu.num_ext_out_ports;
+   num_ext_out_ports += topo_ptr->gu.num_ipc_ext_out_ports;
+
    sg_list_ptr       = topo_ptr->gu.sg_list_ptr;
 
    // if async open handling is active then need to include the new external input/output ports and SG list pointer.
@@ -699,7 +714,11 @@ ar_result_t gen_topo_check_n_realloc_scratch_memory(gen_topo_t *topo_ptr, bool_t
    {
       gu_t *async_gu_ptr = get_gu_ptr_for_current_command_context(&topo_ptr->gu);
       num_ext_in_ports += async_gu_ptr->num_ext_in_ports;
+      num_ext_in_ports += async_gu_ptr->num_ipc_ext_in_ports;
+
       num_ext_out_ports += async_gu_ptr->num_ext_out_ports;
+      num_ext_out_ports += async_gu_ptr->num_ipc_ext_out_ports;
+
       new_sg_list_ptr = async_gu_ptr->sg_list_ptr; // async gu will have existing SGs as well.
    }
 
@@ -941,6 +960,12 @@ void gen_topo_destroy_module(gen_topo_t        *topo_ptr,
    if (reset_capi_dependent_dont_destroy)
    {
       gen_topo_reset_module_capi_dependent_portion(topo_ptr, module_ptr);
+   }
+
+   if(module_ptr->mod_buf_extn_ptr)
+   {
+      posal_memory_free(module_ptr->mod_buf_extn_ptr);
+      module_ptr->mod_buf_extn_ptr = NULL;
    }
 }
 /**

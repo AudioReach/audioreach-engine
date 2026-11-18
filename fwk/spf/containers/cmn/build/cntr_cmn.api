@@ -1,0 +1,73 @@
+'''
+/*==============================================================================
+@file cntr_cmn.api
+@brief
+
+==============================================================================*/
+
+'''
+
+Import('env')
+import os
+
+env.PublishRestrictedApi('AVS',[
+   '${AVS_ROOT}/spf/containers/cmn/inc',
+   '${AVS_ROOT}/spf/containers/gen_cntr/api',
+   '${AVS_ROOT}/spf/containers/gen_cntr/core/inc',
+   '${AVS_ROOT}/spf/containers/olc/inc',
+   '${AVS_ROOT}/spf/containers/cmn/graph_utils/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/core/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/core/inc/${TGT_SPECIFIC_FOLDER}',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/ext/offload/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/ext/voice/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/ext/path_delay/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/ext/ctrl_port/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/ext/island_exit/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/ext/soft_timer_fwk_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/ext/prof/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/ext/duty_cycle/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/ext/async_cmd_handle/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/ext/global_shmem_msg/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/topo_interface/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/topo_utils/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/core/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/pure_st_topo/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/ctrl_port/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/data_port_ops_intf_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/metadata/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/island_exit/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/path_delay/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/pcm_fwk_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/proc_dur_fwk_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/prof/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/sync_fwk_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/core/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/spl_topo/core/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/spl_topo/ext/trigger_policy_fwk_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/spl_topo/ext/dm_fwk_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/spl_topo/ext/mimo_proc_state_intf_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/spl_topo/ext/sync_fwk_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/topo_buf_mgr/inc',
+   '${AVS_ROOT}/spf/containers/cmn/icb/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/module_bypass/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/dm_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/global_shmem_msg/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/thin_topo/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/ipc_fwk_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/mod_buf_access_ext/inc',
+   '${AVS_ROOT}/spf/containers/cmn/container_utils/ext/ipc_fwk_ext/inc',
+   ])
+
+if not (os.path.exists('${AVS_ROOT}/spf/containers/cmn/container_utils/core/inc/${TGT_SPECIFIC_FOLDER}')):
+   env.PublishRestrictedApi('AVS',[
+       '${AVS_ROOT}/spf/containers/cmn/container_utils/core/inc/generic',
+       ])
+
+# This macro is used to enable thin topo extension for Generic container and gen topo.
+if 'USES_THIN_TOPO' in env:
+   env.PublishRestrictedApi('AVS',['${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/thin_topo/src/'])
+else:
+   # stub inline functions
+   env.PublishRestrictedApi('AVS',['${AVS_ROOT}/spf/containers/cmn/topologies/gen_topo/ext/thin_topo/stub_src/'])
+
+env.LoadAPIUnits()

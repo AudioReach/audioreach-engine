@@ -224,18 +224,25 @@ capi_err_t capi_jitter_buf_process(capi_t *capi_ptr, capi_stream_data_t *input[]
 
    if (!is_output_written)
    {
-      /* If we have reached this point then jitter buffer was empty when trying to read.
-       * We check if in the write cycle it was filled to send data out. If not the jitter
-       * buffer is drained and we add zeros to the buffer and read it into the output. */
-      result |= jitter_buf_check_fill_zeros(me_ptr);
-
-      result |= jitter_buf_stream_read(me_ptr, output[0]);
-      if (result == AR_EFAILED)
+      if (NULL == output[0])
       {
-         /* If we do not read into output we do not write into it either
-          * This works as a queue to prevent overruns in case buffer is
-          * almost full */
-         return CAPI_EFAILED;
+         AR_MSG(DBG_HIGH_PRIO, "Output buffers not available ");
+      }
+ 
+      else {
+         /* If we have reached this point then jitter buffer was empty when trying to read.
+         * We check if in the write cycle it was filled to send data out. If not the jitter
+         * buffer is drained and we add zeros to the buffer and read it into the output. */
+         result |= jitter_buf_check_fill_zeros(me_ptr);
+ 
+         result |= jitter_buf_stream_read(me_ptr, output[0]);
+         if (result == AR_EFAILED)
+         {
+            /* If we do not read into output we do not write into it either
+            * This works as a queue to prevent overruns in case buffer is
+            * almost full */
+            return CAPI_EFAILED;
+         }
       }
    }
 

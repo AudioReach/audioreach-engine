@@ -291,6 +291,8 @@ ar_result_t irm_route_cmd_to_satellite(irm_t     *irm_ptr,
       memscpy(curr_cmd_ctrl_ptr->loaned_mem_ptr, irm_payload_size, irm_payload_ptr, irm_payload_size);
       posal_cache_flush_v2((posal_mem_addr_t)curr_cmd_ctrl_ptr->loaned_mem_ptr, irm_payload_size);
 
+      new_apm_header_ptr->mem_map_handle      = curr_cmd_ctrl_ptr->ret_info.sat_handle;
+
 #ifdef IRM_OFFLOAD_DBG
       AR_MSG(DBG_HIGH_PRIO,
              "Copied payload of size %lu, into loaned mem for sat ID %lu. Sat mem handle is %lu",
@@ -412,6 +414,17 @@ __bailout_set_cfg_cmd_2:
       apm_offload_memory_free(&curr_cmd_ctrl_ptr->ret_info);
    }
 __bailout_set_cfg_cmd_1:
+   /* The get_cfg tracking entry was inserted at the start of this function before the
+   * failure occurred. Since no GPR response will ever arrive for this failed request,
+   * remove the entry here to prevent a memory leak. */
+  {
+     irm_get_cfg_resp_cmd_ctrl_t *get_cfg_ctrl =
+        irm_get_get_cfg_cmd_ctrl_rsp(curr_cmd_ctrl_ptr, get_cfg_cmd_ctrl_token);
+     if (NULL != get_cfg_ctrl)
+     {
+        irm_clear_get_cfg_cmd_crtl(curr_cmd_ctrl_ptr, get_cfg_ctrl);
+     }
+  }
    // Note: caller responds to the client
    irm_clear_cmd_ctrl(irm_ptr, curr_cmd_ctrl_ptr);
    return result;

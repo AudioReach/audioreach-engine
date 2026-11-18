@@ -131,6 +131,7 @@ void spl_topo_handle_internal_timestamp_discontinuity(spl_topo_t *            to
 						      uint32_t                prev_actual_data_len_all_ch,
 						      bool_t                  is_ext_op);
 
+bool_t spl_topo_is_ipc_module_trigger_satisfied(gen_topo_t *topo_ptr, gen_topo_module_t *module_ptr);
 
 /**
  * Check if there is any data in the output port's buffer and returns the actual data length */

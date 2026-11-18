@@ -24,10 +24,10 @@ LOCAL_SRC_FILES := \
     capi/src/capi_sal_port_utils.cpp \
     capi/src/capi_sal_utils.cpp
 
-LOCAL_CFLAGS    += -O3 -Wall -ffixed-x18
+LOCAL_CFLAGS    += -O3 -Wall
 
 LOCAL_CFLAGS_32 += -mfpu=neon
-LOCAL_CFLAGS_64 += -march=armv8-a+crypto
+LOCAL_CFLAGS_64 += -march=armv8-a+crypto -ffixed-x18
 
 LOCAL_SHARED_LIBRARIES := \
     liblx-osal \

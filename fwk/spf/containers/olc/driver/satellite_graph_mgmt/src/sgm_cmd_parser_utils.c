@@ -82,7 +82,9 @@ bool_t check_if_module_is_in_list(spf_list_node_t *mod_list_ptr, uint32_t num_mo
 
 ar_result_t add_module_list_to_graph_info(spgm_info_t *       spgm_ptr,
                                           apm_modules_list_t *mod_list_ptr,
-                                          uint32_t            host_container_id)
+                                          uint32_t            host_container_id,
+                                          bool_t             *is_ipc_module_present,
+                                          bool_t             *does_host_has_modules)
 {
    ar_result_t       result = AR_EOK;
    uint32_t          arr_idx;
@@ -111,8 +113,15 @@ ar_result_t add_module_list_to_graph_info(spgm_info_t *       spgm_ptr,
       module_node_ptr->sub_graph_id           = mod_list_ptr->sub_graph_id;
       module_node_ptr->is_registered_with_gpr = FALSE;
 
+      // check if current module is IPC Rx/Tx
+      if(MODULE_ID_IPC_TX == cmd_module_ptr->module_id || MODULE_ID_IPC_RX == cmd_module_ptr->module_id)
+      {
+         *is_ipc_module_present = TRUE;
+      }
+
       if (host_container_id == mod_list_ptr->container_id)
       {
+         *does_host_has_modules = TRUE;
          sgm_util_add_node_to_list(spgm_ptr,
                                    &spgm_ptr->gu_graph_info.olc_module_list_ptr,
                                    module_node_ptr,

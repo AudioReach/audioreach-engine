@@ -95,7 +95,7 @@ typedef struct capi_data_marker_t
 
    uint32_t miid;
 
-   uint32_t cntr_frame_dur_ms;
+   uint32_t cntr_frame_dur_us;
 
    uint32_t frame_counter;
 

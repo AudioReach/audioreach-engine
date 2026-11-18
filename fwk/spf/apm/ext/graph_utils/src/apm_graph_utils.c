@@ -397,6 +397,32 @@ static ar_result_t apm_sort_cont_graph_proc_order(apm_graph_info_t *graph_info_p
          /** Aggregate the number of peer containers */
          temp_cont_obj_ptr->graph_utils.out_degree += self_cont_out_port_list_obj_ptr->peer_cont_list.num_nodes;
 
+#ifdef APM_DBG_GRAPH_UPDATE
+         AR_MSG(DBG_HIGH_PRIO,
+                "apm_sort_cont_graph_proc_order(): preprocess: CONT_ID[0x%lX] is visited %lu out_degree %lu num_peers "
+                "%lu",
+                temp_cont_obj_ptr->container_id,
+                temp_cont_obj_ptr->graph_utils.node_visted,
+                temp_cont_obj_ptr->graph_utils.out_degree,
+                self_cont_out_port_list_obj_ptr->peer_cont_list.num_nodes);
+#endif
+
+         /** Iterate over the list of peer containers   */
+         spf_list_node_t *temp_list_ptr = self_cont_out_port_list_obj_ptr->peer_cont_list.list_ptr;
+         while (temp_list_ptr)
+         {
+            apm_container_t *peer_cntr_ptr = (apm_container_t *)temp_list_ptr->obj_ptr;
+
+#ifdef APM_DBG_GRAPH_UPDATE
+            AR_MSG(DBG_HIGH_PRIO,
+                   "apm_sort_cont_graph_proc_order(): preprocess: CONT_ID[0x%lX] PEER_CONT_ID[0x%lX]",
+                   temp_cont_obj_ptr->container_id,
+                   peer_cntr_ptr->container_id);
+#endif
+
+            temp_list_ptr = temp_list_ptr->next_ptr;
+         }
+
          /** Advance to next node in the list */
          curr_self_port_list_node_ptr = curr_self_port_list_node_ptr->next_ptr;
       }
@@ -451,6 +477,14 @@ static ar_result_t apm_sort_cont_graph_proc_order(apm_graph_info_t *graph_info_p
 
          /** Get top of stack   */
          stack_top_cont_obj_ptr = (apm_container_t *)dfs_temp_stack_ptr->obj_ptr;
+
+#ifdef APM_DBG_GRAPH_UPDATE
+         AR_MSG(DBG_HIGH_PRIO,
+                "apm_sort_cont_graph_proc_order(): Marked CONT_ID[0x%lX] is visited %lu out_degree %lu",
+                stack_top_cont_obj_ptr->container_id,
+                stack_top_cont_obj_ptr->graph_utils.node_visted,
+                stack_top_cont_obj_ptr->graph_utils.out_degree);
+#endif
 
          /** There should be no sorted node present in the temp stack  */
          if (stack_top_cont_obj_ptr->graph_utils.node_sorted)

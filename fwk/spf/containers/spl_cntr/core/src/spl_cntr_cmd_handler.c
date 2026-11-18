@@ -255,7 +255,7 @@ ar_result_t spl_cntr_allocate_gpd_mask_arr(spl_cntr_t *me_ptr)
  *       drops (threshold/MF prop can cause data drop).
  *  - start command to a data port may raise trigger policy
  */
-static ar_result_t spl_cntr_handle_events_after_cmds(spl_cntr_t *me_ptr, bool_t is_ack_cmd, ar_result_t rsp_result)
+ar_result_t spl_cntr_handle_events_after_cmds(spl_cntr_t *me_ptr, bool_t is_ack_cmd, ar_result_t rsp_result)
 {
    ar_result_t                 result              = AR_EOK;
    cu_base_t                  *base_ptr            = &me_ptr->cu;
@@ -562,7 +562,11 @@ static ar_result_t spl_cntr_handle_rest_of_graph_open(cu_base_t *base_ptr, void 
    /* Allocate memory for voice info structure, for voice call use cases*/
    TRY(result, cu_create_voice_info(&me_ptr->cu, open_cmd_ptr));
 
-   TRY(result, cu_init_external_ports(&me_ptr->cu, SPL_CNTR_EXT_CTRL_PORT_Q_OFFSET));
+   TRY(result,
+       cu_init_external_ports(&me_ptr->cu,
+                              SPL_CNTR_EXT_IN_PORT_Q_OFFSET,
+                              SPL_CNTR_EXT_OUT_PORT_Q_OFFSET,
+                              SPL_CNTR_EXT_CTRL_PORT_Q_OFFSET));
 
    SPF_CRITICAL_SECTION_START(&me_ptr->topo.t_base.gu);
 
@@ -1290,6 +1294,19 @@ ar_result_t spl_cntr_post_operate_on_ext_in_port(void                      *base
    spl_cntr_t             *me_ptr          = (spl_cntr_t *)base_ptr;
    spl_cntr_ext_in_port_t *ext_in_port_ptr = (spl_cntr_ext_in_port_t *)*ext_in_port_pptr;
    gen_topo_input_port_t  *in_port_ptr     = (gen_topo_input_port_t *)ext_in_port_ptr->gu.int_in_port_ptr;
+
+   // IPC module will insert EOS internally if requried container doesnt need to do insert EOS/DFG for
+   // ipc external input ports.
+   if(gu_is_ipc_ext_input_port(*ext_in_port_pptr))
+   {
+      SPL_CNTR_MSG(me_ptr->topo.t_base.gu.log_id,
+                  DBG_HIGH_PRIO,
+                  "MD_DBG: Skip inserting EOS/DFG for ipc ext in port (0x%0lX, 0x%lx) with result 0x%lx",
+                  in_port_ptr->gu.cmn.module_ptr->module_instance_id,
+                  in_port_ptr->gu.cmn.id,
+                  result);
+      return result;
+   }
 
    /* If ext input port receives both a self and peer stop/flush from upstream (any order)
     * eos need not be set since next DS container will anyway get the eos because of this self stop
@@ -2142,12 +2159,17 @@ ar_result_t spl_cntr_icb_info_from_downstream(cu_base_t *base_ptr)
    spl_cntr_t *me_ptr = (spl_cntr_t *)base_ptr;
    uint32_t    log_id = me_ptr->topo.t_base.gu.log_id;
 
+   gu_ext_out_port_t *gu_ext_out_port_ptr =
+      (gu_ext_out_port_t *)(((spf_msg_header_t *)base_ptr->cmd_msg.payload_ptr)->dst_handle_ptr);
+   spf_msg_header_t             *header_ptr      = (spf_msg_header_t *)base_ptr->cmd_msg.payload_ptr;
+   spf_msg_cmd_inform_icb_info_t *ds_icb_info_ptr = (spf_msg_cmd_inform_icb_info_t *)&header_ptr->payload_start;
+
    SPL_CNTR_MSG(log_id,
                 DBG_HIGH_PRIO,
                 "CMD:FRAME_LEN_DS: ICB: Executing ICB info from DS. current channel mask=0x%x",
                 me_ptr->cu.curr_chan_mask);
 
-   TRY(result, cu_cmd_icb_info_from_downstream(base_ptr));
+   TRY(result, cu_ext_out_handle_icb_info_from_downstream(base_ptr, ds_icb_info_ptr, gu_ext_out_port_ptr));
 
    CATCH(result, SPL_CNTR_MSG_PREFIX, log_id)
    {

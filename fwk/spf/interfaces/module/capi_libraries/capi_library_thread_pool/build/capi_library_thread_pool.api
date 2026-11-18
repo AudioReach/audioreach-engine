@@ -1,0 +1,21 @@
+'''
+/*==============================================================================
+@file capi_library_thread_pool.api
+@brief 
+
+================================================================================
+@copyright
+Copyright (c) 2018-2019,2020 Qualcomm Technologies, Inc.
+All Rights Reserved.
+Confidential and Proprietary - Qualcomm Technologies, Inc.
+==============================================================================*/
+
+'''
+
+Import('env')
+
+env.PublishRestrictedApi('CAPI_LIBRARY_THREAD_POOL',[
+   '${AVS_ROOT}/interfaces/module/capi_libraries/capi_library_thread_pool/inc'
+   ])   
+   
+env.LoadAPIUnits()

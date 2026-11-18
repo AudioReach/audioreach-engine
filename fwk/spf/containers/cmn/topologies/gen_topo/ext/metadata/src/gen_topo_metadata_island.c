@@ -1620,12 +1620,12 @@ ar_result_t gen_topo_free_md(gen_topo_t *           topo_ptr,
  *
  * is_dropped - some metadata (EOS) may result in different behavior for drop vs. consumption (render eos).
  */
-capi_err_t gen_topo_capi_metadata_destroy(void *                 context_ptr,
-                                          module_cmn_md_list_t * md_list_ptr,
+capi_err_t gen_topo_capi_metadata_destroy(void                  *context_ptr,
+                                          module_cmn_md_list_t  *md_list_ptr,
                                           bool_t                 is_dropped,
                                           module_cmn_md_list_t **head_pptr,
                                           uint32_t               md_actual_sink_miid,
-										  bool_t                 override_ctrl_to_disable_tracking_event)
+                                          bool_t                 override_ctrl_to_disable_tracking_event)
 {
    capi_err_t         result     = CAPI_EOK;
    ar_result_t        ar_result  = AR_EOK;
@@ -1664,7 +1664,7 @@ capi_err_t gen_topo_capi_metadata_destroy(void *                 context_ptr,
          {
             // Exit island here since we need to do a mem free operation which is in nlpi
             gen_topo_exit_island_temporarily(topo_ptr);
-            gen_topo_raise_tracking_event(topo_ptr,
+            gen_topo_raise_tracking_event(topo_ptr->gu.log_id,
                                           md_sink_miid,
                                           md_list_ptr,
                                           !is_dropped,
@@ -1693,7 +1693,7 @@ capi_err_t gen_topo_capi_metadata_destroy(void *                 context_ptr,
          {
             // Exit island here since we need to do a mem free operation which is in nlpi
             gen_topo_exit_island_temporarily(topo_ptr);
-            gen_topo_raise_tracking_event(topo_ptr,
+            gen_topo_raise_tracking_event(topo_ptr->gu.log_id,
                                           md_sink_miid,
                                           md_list_ptr,
                                           !is_dropped,
@@ -1951,6 +1951,14 @@ capi_err_t gen_topo_capi_metadata_propagate(void *                      context_
                                                  input_md_info_ptr->df,
                                                  output_md_info_ptr->df,
                                                  flushing_eos);
+
+         TOPO_MSG_ISLAND(topo_ptr->gu.log_id,
+                         DBG_LOW_PRIO,
+                         "MD_DBG: module 0x%lX. node_ptr 0x%p flushing_eos %lu, md_moved %lu",
+                         module_ptr->gu.module_instance_id,
+                         node_ptr,
+                         flushing_eos,
+                         md_moved);
 
          any_eos_moved |= (flushing_eos && md_moved);
 
@@ -2463,7 +2471,7 @@ ar_result_t gen_topo_respond_and_free_eos(gen_topo_t *           topo_ptr,
       {
          gen_topo_eos_event_payload_t eos_event_payload;
          eos_event_payload.is_flushing_eos = eos_metadata_ptr->flags.is_flushing_eos;
-         if (AR_EOK == gen_topo_raise_tracking_event(topo_ptr,
+         if (AR_EOK == gen_topo_raise_tracking_event(topo_ptr->gu.log_id,
                                                      sink_miid,
                                                      md_list_ptr,
                                                      is_eos_rendered,

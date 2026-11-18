@@ -17,6 +17,10 @@
 extern "C" {
 #endif //__cplusplus
 
+#ifdef VERBOSE_DEBUGGING
+#define THIN_TOPO_PROCESS_DEBUG
+#endif
+
 /** Thin topo related functions */
 ar_result_t gen_cntr_switch_from_thin_topo_to_gen_topo_during_process(gen_cntr_t *me_ptr);
 

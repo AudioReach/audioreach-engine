@@ -9,6 +9,7 @@
 
 #include "pt_cntr_i.h"
 #include "irm_cntr_prof_util.h"
+#include "spf_macros.h"
 
 // enable static to get accurate savings.
 #define PT_CNTR_STATIC static
@@ -44,6 +45,12 @@ PT_CNTR_STATIC void pt_cntr_propagate_ext_output_buffer_backwards(pt_cntr_t     
                                                                   pt_cntr_output_port_t *end_output_port_ptr,
                                                                   capi_stream_data_v2_t *sdata_ptr,
                                                                   uint32_t               num_bufs_to_update);
+
+PT_CNTR_STATIC ar_result_t pt_cntr_preprocess_setup_ipc_input_port(uint32_t               log_id,
+                                                                   pt_cntr_t             *me_ptr,
+                                                                   gen_topo_t            *topo_ptr,
+                                                                   pt_cntr_module_t      *module_ptr,
+                                                                   pt_cntr_ext_in_port_t *ipc_ext_in_port_ptr);
 
 static inline uint32_t __pt_cntr_module_flags_has_attached_module_bitmask()
 {
@@ -216,12 +223,11 @@ PT_CNTR_STATIC void pt_cntr_propagate_ext_input_buffer_forwards(pt_cntr_t       
       {
          GEN_CNTR_MSG(me_ptr->gc.topo.gu.log_id,
                       DBG_ERROR_PRIO,
-                      "ext input buffer propagation: cannot propagate across to output (MIID,Port):(0x%lX,%lx) "
-                      "already "
-                      "has an ext buffer assigned 0x%lx origin:%lu",
+                      "ext input buffer propagation: Warning! (MIID,Port):(0x%lX,%lx) "
+                      "already has an ext buffer assigned 0x%lx origin:%lu",
                       cur_out_port_ptr->gc.gu.cmn.module_ptr->module_instance_id,
                       cur_out_port_ptr->gc.gu.cmn.id,
-                      cur_out_port_ptr->gc.common.bufs_ptr[b].data_ptr,
+                      cur_out_port_ptr->gc.common.bufs_ptr[0].data_ptr,
                       cur_out_port_ptr->gc.common.flags.buf_origin);
       }
 #endif
@@ -313,10 +319,6 @@ static inline ar_result_t pt_cntr_mod_buf_mgr_extn_wrapper_get_in_buf(gen_topo_t
                                                                       uint32_t               port_index,
                                                                       capi_stream_data_v2_t *sdata_ptr)
 {
-   return module_ptr->get_input_buf_fn(module_ptr->buffer_mgr_cb_handle,
-                                       port_index,
-                                       &sdata_ptr->bufs_num,
-                                       sdata_ptr->buf_ptr);
 
 #ifdef VERBOSE_DEBUGGING
    GEN_CNTR_MSG(topo_ptr->gu.log_id,
@@ -325,8 +327,14 @@ static inline ar_result_t pt_cntr_mod_buf_mgr_extn_wrapper_get_in_buf(gen_topo_t
                 module_ptr->gc.topo.gu.module_instance_id,
                 port_index,
                 sdata_ptr->bufs_num,
-                sdata_ptr->buf_ptr->data_ptr);
+                (sdata_ptr->buf_ptr ? sdata_ptr->buf_ptr->data_ptr: NULL));
 #endif
+
+   return module_ptr->get_input_buf_fn(module_ptr->buffer_mgr_cb_handle,
+                                       port_index,
+                                       &sdata_ptr->bufs_num,
+                                       sdata_ptr->buf_ptr);
+
 }
 
 static inline ar_result_t pt_cntr_mod_buf_mgr_extn_wrapper_return_out_buf(gen_topo_t            *topo_ptr,
@@ -873,11 +881,10 @@ PT_CNTR_STATIC void pt_cntr_process_attached_module_to_output(gen_topo_t        
    uint32_t out_port_idx = out_port_ptr->gc.gu.cmn.index;
    // clang-format off
    IRM_PROFILE_MOD_PROCESS_SECTION(out_attached_module_ptr->gc.topo.prof_info_ptr, topo_ptr->gu.prof_mutex,
-   attached_proc_result =
-      out_attached_module_ptr->gc.topo.capi_ptr->vtbl_ptr
-         ->process(out_attached_module_ptr->gc.topo.capi_ptr,
-                   (capi_stream_data_t **)&(host_module_ptr->out_port_sdata_pptr[out_port_idx]),
-                   (capi_stream_data_t **)&(host_module_ptr->out_port_sdata_pptr[out_port_idx]));
+   attached_proc_result = gen_topo_capi_process_wrapper(topo_ptr,
+                                                        &out_attached_module_ptr->gc.topo,
+                                                        (capi_stream_data_t **)&(host_module_ptr->out_port_sdata_pptr[out_port_idx]),
+                                                        (capi_stream_data_t **)&(host_module_ptr->out_port_sdata_pptr[out_port_idx]));
    );
    // clang-format on
 
@@ -954,6 +961,28 @@ PT_CNTR_STATIC ar_result_t pt_cntr_data_process_one_frame(pt_cntr_t *me_ptr)
       TRY(result, pt_cntr_preprocess_setup_ext_output(me_ptr, module_ptr, ext_out_port_ptr));
    }
 
+   /* Iterate through all IPC input and output ports, poll and setup the buffers. */
+   for (gu_ext_in_port_list_t *ipc_in_port_list_ptr = me_ptr->gc.topo.gu.ipc_ext_in_port_list_ptr;
+        (NULL != ipc_in_port_list_ptr);
+        LIST_ADVANCE(ipc_in_port_list_ptr))
+   {
+      pt_cntr_ext_in_port_t *ipc_ext_in_port_ptr = (pt_cntr_ext_in_port_t *)ipc_in_port_list_ptr->ext_in_port_ptr;
+      pt_cntr_module_t      *module_ptr = (pt_cntr_module_t *)ipc_ext_in_port_ptr->gc.gu.int_in_port_ptr->cmn.module_ptr;
+
+      TRY(result, pt_cntr_preprocess_setup_ipc_input_port(log_id, me_ptr, topo_ptr, module_ptr, ipc_ext_in_port_ptr));
+   }
+
+   for (gu_ext_out_port_list_t *ipc_out_port_list_ptr = me_ptr->gc.topo.gu.ipc_ext_out_port_list_ptr;
+        (NULL != ipc_out_port_list_ptr);
+        LIST_ADVANCE(ipc_out_port_list_ptr))
+   {
+      TRY(result,
+          cu_poll_and_setup_ipc_output_port_buffer(&me_ptr->gc.cu,
+                                                   ipc_out_port_list_ptr->ext_out_port_ptr,
+                                                   NULL,
+                                                   ALLOW_OVERRUN));
+   }
+
    /** -------- PRE-PROCESS INPUT SIDE of MIMO --------------- */
 
 #ifdef VERBOSE_DEBUGGING
@@ -1016,10 +1045,12 @@ PT_CNTR_STATIC ar_result_t pt_cntr_data_process_one_frame(pt_cntr_t *me_ptr)
       // proc_info_ptr->is_in_mod_proc_context = TRUE;
 
       // clang-format off
-      IRM_PROFILE_MOD_PROCESS_SECTION(src_module_ptr->gc.topo.prof_info_ptr, topo_ptr->gu.prof_mutex,
-      proc_result                           = src_module_ptr->process(src_module_ptr->gc.topo.capi_ptr,
-                                            NULL, // will be NULL for src module
-                                            (capi_stream_data_t **)src_module_ptr->out_port_sdata_pptr);
+      IRM_PROFILE_MOD_PROCESS_SECTION(src_module_ptr->gc.topo.prof_info_ptr,
+      topo_ptr->gu.prof_mutex,
+      proc_result = gen_topo_capi_process_wrapper(topo_ptr,
+                                                  &src_module_ptr->gc.topo,
+                                                  NULL,
+                                                  (capi_stream_data_t **)src_module_ptr->out_port_sdata_pptr);
       );
       // clang-format on
 
@@ -1228,9 +1259,10 @@ PT_CNTR_STATIC ar_result_t pt_cntr_data_process_one_frame(pt_cntr_t *me_ptr)
 
       // clang-format off
       IRM_PROFILE_MOD_PROCESS_SECTION(module_ptr->gc.topo.prof_info_ptr, topo_ptr->gu.prof_mutex,
-      proc_result = module_ptr->process(module_ptr->gc.topo.capi_ptr,
-                                        (capi_stream_data_t **)module_ptr->in_port_sdata_pptr,
-                                        (capi_stream_data_t **)module_ptr->out_port_sdata_pptr);
+      proc_result = gen_topo_capi_process_wrapper(topo_ptr,
+                                                  &module_ptr->gc.topo,
+                                                  (capi_stream_data_t **)module_ptr->in_port_sdata_pptr,
+                                                  (capi_stream_data_t **)module_ptr->out_port_sdata_pptr);
       );
       // clang-format on
 
@@ -1436,9 +1468,10 @@ PT_CNTR_STATIC ar_result_t pt_cntr_data_process_one_frame(pt_cntr_t *me_ptr)
 
       // clang-format off
       IRM_PROFILE_MOD_PROCESS_SECTION(sink_module_ptr->gc.topo.prof_info_ptr, topo_ptr->gu.prof_mutex,
-      proc_result = sink_module_ptr->process(sink_module_ptr->gc.topo.capi_ptr,
-                                             (capi_stream_data_t **)sink_module_ptr->in_port_sdata_pptr,
-                                             (capi_stream_data_t **)NULL);
+      proc_result = gen_topo_capi_process_wrapper(topo_ptr,
+                                                  &sink_module_ptr->gc.topo,
+                                                  (capi_stream_data_t **)sink_module_ptr->in_port_sdata_pptr,
+                                                  (capi_stream_data_t **)NULL);
       );
       // clang-format on
 
@@ -2232,9 +2265,29 @@ PT_CNTR_STATIC ar_result_t pt_cntr_copy_n_setup_ext_in_sdata_for_non_pass_thru(p
 /* thn container's callback for the interrupt signal.*/
 ar_result_t pt_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_index)
 {
-   ar_result_t result = AR_EOK;
    pt_cntr_t  *me_ptr = (pt_cntr_t *)cu_ptr;
+#ifdef ENABLE_CNTR_PROC_TIME_PROFILING
+   if(me_ptr->gc.st_module.processed_interrupt_counter < (30*1000*5))
+   {
+      me_ptr->gc.ts_stats.curr_fwk_start_ts = posal_timer_get_time();
+      me_ptr->gc.ts_stats.profile_curr_frame = TRUE;
+      me_ptr->gc.ts_stats.print_curr_frame = (me_ptr->gc.st_module.processed_interrupt_counter & 0xFF) ? TRUE : FALSE;
+   }
+   else
+   {
+      me_ptr->gc.ts_stats.profile_curr_frame = FALSE;
+   }
+#endif
 
+#if defined(ENABLE_CAPI_PROC_TIME_PROFILING) && (ENABLE_CAPI_PROC_TIME_PROFILING > 0)
+   me_ptr->gc.topo.mod_ts.profile_curr_frame =
+      (me_ptr->gc.st_module.processed_interrupt_counter < (30*1000*5) && (me_ptr->gc.st_module.processed_interrupt_counter & 0xFF)) ?
+      TRUE : FALSE;
+#endif
+
+   ar_result_t result = AR_EOK;
+
+   //GEN_CNTR_MSG(me_ptr->gc.topo.gu.log_id, DBG_LOW_PRIO, "pt_cntr_signal_trigger: Received signal trigger");
 #ifdef VERBOSE_DEBUGGING
    uint64_t proc_ts_before = posal_timer_get_time();
    GEN_CNTR_MSG(me_ptr->gc.topo.gu.log_id, DBG_LOW_PRIO, "pt_cntr_signal_trigger: Received signal trigger");
@@ -2261,13 +2314,12 @@ ar_result_t pt_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_index
 
       // signal miss cannot be handled in island, even if signal miss is to be ignored, we will exit island. This
       // reduces island footprint.
-      // gen_topo_exit_island_temporarily(&me_ptr->gc.topo);
-      // bool_t continue_processing = TRUE;
-      // gen_cntr_check_handle_signal_miss(&me_ptr->gc, FALSE /*is_after_process*/, &continue_processing);
-      // if (!continue_processing)
-      // {
-      //    return result;
-      // }
+      bool_t continue_processing = TRUE;
+      gen_cntr_check_handle_signal_miss(&me_ptr->gc, FALSE /*is_after_process*/, &continue_processing);
+      if (!continue_processing)
+      {
+         return result;
+      }
    }
 
    if (me_ptr->gc.cu.cmd_msg.payload_ptr)
@@ -2290,8 +2342,8 @@ ar_result_t pt_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_index
     * TODO: implement post process lite weight signal miss detection. if data process takes more than interrupt duration
     *
     * For signal miss detection,
-    *    1. increment "me_ptr->st_module.signal_miss_counter" if there is a signal miss
-    *    2. increment me_ptr->st_module.processed_interrupt_counter++
+    *    1. increment "me_ptr->gc.st_module.signal_miss_counter" if there is a signal miss
+    *    2. increment me_ptr->gc.st_module.processed_interrupt_counter++
     *    3. me_ptr->gc.topo.flags.need_to_ignore_signal_miss = FALSE;
     *    4. me_ptr->prev_err_print_time_ms = me_ptr->gc.topo.proc_context.err_print_time_in_this_process_ms;
     *
@@ -2305,6 +2357,14 @@ ar_result_t pt_cntr_signal_trigger(cu_base_t *cu_ptr, uint32_t channel_bit_index
    {
       me_ptr->gc.st_module.st_module_ts_ptr->is_valid = FALSE;
    }
+
+#ifdef ENABLE_CNTR_PROC_TIME_PROFILING
+   gen_cntr_cache_n_print_cntr_proc_time_stats(&me_ptr->gc);
+#endif
+
+#if defined(ENABLE_CAPI_PROC_TIME_PROFILING) && (ENABLE_CAPI_PROC_TIME_PROFILING > 0)
+   gen_topo_print_mod_proc_time_profiling_stats(&me_ptr->gc.topo);
+#endif
 
 #ifdef VERBOSE_DEBUGGING
    int64_t diff = posal_timer_get_time() - proc_ts_before;
@@ -2357,6 +2417,60 @@ capi_err_t pt_cntr_bypass_module_process(capi_t *_pif, capi_stream_data_t *input
       {
          *out_actual_data_len = MIN(out_max_data_len, in_actual_data_len);
       }
+   }
+
+   return result;
+}
+
+PT_CNTR_STATIC ar_result_t pt_cntr_preprocess_setup_ipc_input_port(uint32_t               log_id,
+                                                                   pt_cntr_t             *me_ptr,
+                                                                   gen_topo_t            *topo_ptr,
+                                                                   pt_cntr_module_t      *module_ptr,
+                                                                   pt_cntr_ext_in_port_t *ipc_ext_in_port_ptr)
+{
+   ar_result_t result = AR_EOK;
+   INIT_EXCEPTION_HANDLING
+
+   TRY(result,
+       cu_poll_and_setup_ipc_input_port_buffer(&me_ptr->gc.cu,
+                                               &ipc_ext_in_port_ptr->gc.gu,
+                                               NULL,
+                                               ALLOW_UNDERRUN));
+
+   gen_topo_capi_event_flag_t *capi_event_flag_ptr = NULL;
+   cu_event_flags_t           *fwk_event_flag_ptr  = NULL;
+   // In data-path event handling, we need to exclude any events set in the command context.
+   // Therefore avoid reconciliation of the event flags.
+   GEN_TOPO_CAPI_EVENT_HANDLER_CONTEXT
+   CU_FWK_EVENT_HANDLER_CONTEXT
+
+   GEN_TOPO_GET_CAPI_EVENT_FLAG_PTR_FOR_EVENT_HANDLING(capi_event_flag_ptr, &me_ptr->gc.topo, FALSE /*do reconcile*/)
+   CU_GET_FWK_EVENT_FLAG_PTR_FOR_EVENT_HANDLING(fwk_event_flag_ptr, &me_ptr->gc.cu, FALSE /*do reconcile*/);
+   GEN_CNTR_MSG(me_ptr->gc.topo.gu.log_id,
+                DBG_LOW_PRIO,
+                "Handling fwk events: fwk events 0x%lX, capi events 0x%lX",
+                fwk_event_flag_ptr->word,
+                capi_event_flag_ptr->word);
+
+   bool_t                  mf_th_ps_event = FALSE;
+   gen_topo_process_info_t temp;
+   memset(&temp, 0, sizeof(gen_topo_process_info_t));
+
+   me_ptr->flags.processing_data_path_mf = TRUE;
+   pt_cntr_handle_process_events_and_flags(me_ptr,
+                                           &temp,
+                                           &mf_th_ps_event,
+                                           pt_cntr_get_gu_sorted_list_ptr(topo_ptr, module_ptr));
+   me_ptr->flags.processing_data_path_mf = FALSE;
+
+   GEN_CNTR_MSG(log_id,
+                DBG_HIGH_PRIO,
+                "Handled events in the IPC input port setup context of module 0x%lX port_id %x",
+                module_ptr->gc.topo.gu.module_instance_id,
+                ipc_ext_in_port_ptr->gc.gu.int_in_port_ptr->cmn.id);
+
+   CATCH(result, GEN_CNTR_MSG_PREFIX, me_ptr->gc.topo.gu.log_id)
+   {
    }
 
    return result;
