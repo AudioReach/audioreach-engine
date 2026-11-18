@@ -36,6 +36,10 @@ config PCM_CNV
         select MSIIR
         default y
 
+config MFC_OSRC
+        tristate "Enable MFC_OSRC Library"
+        default n
+
 config IIR_MBDRC
         tristate "Enable IIR_MBDRC Library"
         default y
