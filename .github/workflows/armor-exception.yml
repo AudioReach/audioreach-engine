@@ -1,0 +1,26 @@
+name: ARMOR Exception Approval
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  pull-requests: write
+  actions: write
+  contents: read
+
+jobs:
+  approve-exception:
+    # Cheap prefilter only; the action applies the exact-match rule
+    if: >-
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, 'approve-breaking-change')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run ARMOR Exception Approval
+        uses: qualcomm-linux-stg/armor-checkers-staging/.github/actions/exception_approval@armor-exception
+        with:
+          commenter: ${{ github.event.comment.user.login }}
+          pr-number: ${{ github.event.issue.number }}
+          repository: ${{ github.repository }}
